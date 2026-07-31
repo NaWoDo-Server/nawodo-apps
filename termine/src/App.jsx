@@ -122,7 +122,6 @@ function Hofteiler({ session }) {
   const [categories, setCategories] = useState([]);
   const [resources, setResources] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [activeCategoryIds, setActiveCategoryIds] = useState(() => {
@@ -138,7 +137,6 @@ function Hofteiler({ session }) {
   const [showSettings, setShowSettings] = useState(false);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingResPhoto, setUploadingResPhoto] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -177,7 +175,6 @@ function Hofteiler({ session }) {
   const [editResCategoryId, setEditResCategoryId] = useState("");
   const [editResPhoto, setEditResPhoto] = useState(null);
 
-  const logoInputRef = useRef(null);
   const resPhotoInputRef = useRef(null);
   const editResPhotoInputRef = useRef(null);
 
@@ -226,16 +223,14 @@ function Hofteiler({ session }) {
 
   const loadAll = useCallback(async (isFirst = false) => {
     try {
-      const [cats, res, bks, settings] = await Promise.all([
+      const [cats, res, bks] = await Promise.all([
         supabase.from("categories").select("*").order("sort_order").then((r) => r.data || []),
         supabase.from("resources").select("*").order("created_at").then((r) => r.data || []),
         supabase.from("bookings").select("*").then((r) => r.data || []),
-        supabase.from("settings").select("*").then((r) => r.data || []),
       ]);
       setCategories(cats);
       setResources(res);
       setBookings(bks);
-      setLogoUrl(settings.find((s) => s.key === "logo_url")?.value || null);
       if (isFirst) {
         setActiveCategoryIds((prev) => {
           if (prev) return prev;
@@ -495,15 +490,6 @@ function Hofteiler({ session }) {
     } catch {}
   }
 
-  async function handleLogoUpload(file) {
-    setUploadingLogo(true);
-    try {
-      const url = await uploadFile(file, "branding/logo");
-      await supabase.from("settings").upsert({ key: "logo_url", value: url });
-      setLogoUrl(url);
-    } catch {} finally { setUploadingLogo(false); }
-  }
-
   function requireAdmin(action) {
     if (isAdmin) { action(); return; }
     alert("Das dürfen nur Admin-Accounts. Melde dich beim Admin, falls du das brauchst.");
@@ -546,9 +532,7 @@ function Hofteiler({ session }) {
       <div className={isDesktop ? "w-full" : "sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
       <div className="px-5 lg:px-8 pt-6 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          {logoUrl ? <img src={logoUrl} alt="Logo" className="h-8 object-contain" /> : (
-            <img src="/termine/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
-          )}
+          <img src="/termine/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
           <h1 className="font-bold text-lg">Termine</h1>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -913,33 +897,6 @@ function Hofteiler({ session }) {
             <button onClick={handleChangePassword} disabled={savingPassword} className="w-full rounded-lg py-2.5 mb-4 text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: INK, opacity: savingPassword ? 0.7 : 1 }}>
               {savingPassword && <Loader2 size={15} className="animate-spin" />} {savingPassword ? "Speichern…" : "Passwort speichern"}
             </button>
-
-            <label className="text-xs font-medium block mb-1">Logo</label>
-            {logoUrl && <img src={logoUrl} className="w-16 h-16 rounded-lg object-cover mb-2" />}
-            <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="w-full rounded-lg py-2.5 mb-3 text-sm border flex items-center justify-center gap-2" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}>{uploadingLogo ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />} {uploadingLogo ? "Lädt hoch…" : "Logo hochladen"}</button>
-            <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
-
-            {isAdmin && (
-              <>
-                <label className="text-xs font-medium block mb-1 mt-2">Artikel verwalten</label>
-                <div className="space-y-1 mb-2 max-h-48 overflow-y-auto">
-                  {resources.filter((r) => r.category_id !== eventCategory?.id).map((r) => {
-                    const Icon = ICONS[r.icon] || Zap;
-                    return (
-                      <button
-                        key={r.id}
-                        onClick={() => { setShowSettings(false); openEditResource(r); }}
-                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left"
-                        style={{ backgroundColor: "#fff" }}
-                      >
-                        <Icon size={14} /> <span className="flex-1 truncate">{r.name}</span> <Pencil size={12} style={{ color: INK_SOFT }} />
-                      </button>
-                    );
-                  })}
-                </div>
-                <button onClick={() => { setShowSettings(false); setShowResourceForm(true); }} className="w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm mb-3" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neuer Artikel</button>
-              </>
-            )}
 
             <button onClick={handleLogout} className="w-full rounded-lg py-2.5 text-sm border" style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}>Abmelden</button>
           </div>

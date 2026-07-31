@@ -581,7 +581,7 @@ function Fahrtenbuch({ session }) {
                 {pendingBookings.length > 0 && (
                   <div className="mb-5">
                     <div className="text-xs font-semibold mb-2" style={{ color: "#C9752F" }}>Ausstehende Buchungen – noch nicht im Fahrtenbuch</div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-2">
                       {pendingBookings.map((b) => (
                         <button key={b.id} onClick={() => openFormFromBooking(b)} className="text-left rounded-lg px-3.5 py-3 flex items-center justify-between" style={{ backgroundColor: "#fff", border: "1.5px dashed #C9752F55" }}>
                           <div>

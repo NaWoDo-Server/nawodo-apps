@@ -6,7 +6,7 @@ import { fmtDate, addMonths, monthLabel, monthGrid, bookingEndDate, assignLanesC
 
 const DOW = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const LANE_H = 20; // px pro Reiter-Zeile
-const HEADER_H = 22; // px für die Tageszahl
+const HEADER_H = 26; // px für die Tageszahl
 const MAX_LANES = 6; // Gesamtzahl Zeilen pro Kachel (Höhe bleibt immer gleich)
 const VISIBLE_LANES = MAX_LANES - 1; // die unterste Zeile ist für "+" reserviert, falls nötig (= 5 sichtbare Einträge)
 const CELL_H = HEADER_H + MAX_LANES * LANE_H + 8; // alle Kacheln exakt gleich hoch
@@ -48,10 +48,10 @@ export default function DesktopMonthGrid({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2 mb-3">
         <button onClick={() => onMonthChange(addMonths(month, -1))} className="p-2 rounded-full" style={{ backgroundColor: BORDER }}><ChevronLeft size={16} /></button>
-        <div className="font-semibold text-base">{monthLabel(month)}</div>
         <button onClick={() => onMonthChange(addMonths(month, 1))} className="p-2 rounded-full" style={{ backgroundColor: BORDER }}><ChevronRight size={16} /></button>
+        <div className="font-semibold text-base">{monthLabel(month)}</div>
       </div>
 
       <div className="grid grid-cols-7 mb-1">
@@ -141,7 +141,7 @@ export default function DesktopMonthGrid({
                   return (
                     <div
                       key={`num-${cell.date}`}
-                      className="absolute text-xs font-semibold px-1.5 pt-1"
+                      className="absolute text-sm font-bold px-1.5 pt-0.5"
                       style={{
                         left: `${(di / 7) * 100}%`,
                         top: 0,

@@ -8,7 +8,7 @@ import { weekdayLabel, bookingEndDate, bookingCoversDate, toMinutes, dayIndexInR
 // sich diese Komponente). Wird durch Einzelklick auf einen Tag angezeigt.
 export default function DayAgenda({
   date, bookings, resources, calendarResources, eventCategory, colorFor, onDelete, onEdit,
-  onBook, showBookButton,
+  onBook, showBookButton, isManageable,
 }) {
   const dayBookings = bookings
     .filter((b) => bookingCoversDate(b, date) && calendarResources.some((r) => r.id === b.resource_id))
@@ -55,8 +55,12 @@ export default function DayAgenda({
                   </div>
                   <div className="text-xs mt-0.5 truncate" style={{ color: INK_SOFT }}>{b.name}{b.note ? ` · ${b.note}` : ""}</div>
                 </div>
-                <button onClick={() => onEdit(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }} title="Bearbeiten"><Pencil size={15} /></button>
-                <button onClick={() => onDelete(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }} title="Löschen"><Trash2 size={15} /></button>
+                {(!isManageable || isManageable(res)) && (
+                  <>
+                    <button onClick={() => onEdit(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }} title="Bearbeiten"><Pencil size={15} /></button>
+                    <button onClick={() => onDelete(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }} title="Löschen"><Trash2 size={15} /></button>
+                  </>
+                )}
               </div>
             );
           })}

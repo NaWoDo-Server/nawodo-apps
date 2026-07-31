@@ -20,6 +20,12 @@ import DesktopWeekGrid from "./DesktopWeekGrid";
 import BookingDialog from "./BookingDialog";
 import DayAgenda from "./DayAgenda";
 
+// "sharing": alle Reiter außer Termine sind buchbar/bearbeitbar, Termine nur sichtbar.
+// "termine": nur der Termine-Reiter ist buchbar/bearbeitbar, alle anderen nur sichtbar.
+// Beide Apps teilen sich dieselbe Datenbank (Kategorien/Ressourcen/Buchungen), sehen sich
+// also gegenseitig, sind aber getrennt nutzbar. Für die Termine-App: hier auf "termine" ändern.
+const APP_MODE = "sharing";
+
 async function uploadFile(file, pathPrefix) {
   const ext = file.name.split(".").pop();
   const path = `${pathPrefix}-${Date.now()}.${ext}`;
@@ -182,7 +188,19 @@ function Hofteiler({ session }) {
 
   const eventCategory = categories.find((c) => c.event_mode);
   const eventResource = eventCategory ? resources.find((r) => r.category_id === eventCategory.id) : null;
-  const pickableCategories = categories.filter((c) => !c.event_mode);
+  // Reiter, die in DIESER App tatsächlich buchbar sind (die jeweils andere Kategorie
+  // bleibt sichtbar/filterbar, ist hier aber nur zum Ansehen da).
+  const pickableCategories = APP_MODE === "termine" ? [] : categories.filter((c) => !c.event_mode);
+  // Wird nur an den BookingDialog übergeben, um den Termine-Reiter dort ein-/auszublenden.
+  // Alle anderen Übergaben von eventCategory (an die Kalender-Grids/DayAgenda) bleiben
+  // unverändert, da Termine weiterhin überall SICHTBAR sein sollen.
+  const dialogEventCategory = APP_MODE === "termine" ? eventCategory : null;
+  // Bestimmt pro Buchung, ob sie in DIESER App bearbeitet/gelöscht werden darf.
+  function isManageable(resource) {
+    if (!resource) return true;
+    const isEvent = !!(eventCategory && resource.category_id === eventCategory.id);
+    return APP_MODE === "termine" ? isEvent : !isEvent;
+  }
   const roomCategory = categories.find((c) => c.name === "Raumbuchung");
   const roomResources = roomCategory ? resources.filter((r) => r.category_id === roomCategory.id) : [];
   const zoeResource = resources.find((r) => r.name === "Zoe");
@@ -309,7 +327,7 @@ function Hofteiler({ session }) {
     setFormRoomId(null);
     setFormBlockZoe(false);
     setDialogResourceId(null);
-    setDialogCategoryId(pickableCategories[0]?.id || null);
+    setDialogCategoryId(pickableCategories[0]?.id || dialogEventCategory?.id || null);
     setSelectedDate(dateStr);
     setDesktopDialogOpen(true);
   }
@@ -319,6 +337,7 @@ function Hofteiler({ session }) {
   // nicht wechseln, um Verwechslungen zu vermeiden.
   function openEditBookingDialog(booking) {
     const res = resources.find((r) => r.id === booking.resource_id);
+    if (!isManageable(res)) return; // Sicherheitsnetz – Button ist in der DayAgenda ohnehin ausgeblendet
     const isEventBooking = !!(eventCategory && res?.category_id === eventCategory.id);
     setFormError("");
     setEditingBookingId(booking.id);
@@ -338,7 +357,7 @@ function Hofteiler({ session }) {
 
   async function handleDesktopSave() {
     setFormError("");
-    const isEventMode = eventCategory && dialogCategoryId === eventCategory.id;
+    const isEventMode = dialogEventCategory && dialogCategoryId === dialogEventCategory.id;
     if (isEventMode) {
       if (!formTitle.trim()) return setFormError("Bitte einen Titel für den Termin eintragen.");
     } else if (!dialogResourceId) {
@@ -384,6 +403,8 @@ function Hofteiler({ session }) {
   }
 
   async function handleDelete(booking) {
+    const res = resources.find((r) => r.id === booking.resource_id);
+    if (!isManageable(res)) return; // Sicherheitsnetz – Button ist in der DayAgenda ohnehin ausgeblendet
     const label = booking.all_day
       ? `Ganztägig${bookingEndDate(booking) !== booking.date ? ` (${booking.date} – ${bookingEndDate(booking)})` : ` (${booking.date})`}`
       : `${booking.start_time}–${booking.end_time}`;
@@ -501,7 +522,7 @@ function Hofteiler({ session }) {
           {logoUrl ? <img src={logoUrl} alt="Logo" className="h-8 object-contain" /> : (
             <img src="/sharing/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
           )}
-          <h1 className="font-bold text-lg">Ressourcen im Wohnprojekt</h1>
+          <h1 className="font-bold text-lg">Sharing</h1>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
@@ -579,6 +600,7 @@ function Hofteiler({ session }) {
                 calendarResources={calendarResources}
                 eventCategory={eventCategory}
                 colorFor={colorFor}
+                isManageable={isManageable}
                 onDelete={handleDelete}
                 onEdit={openEditBookingDialog}
                 onBook={(d) => openBookingDialog(d)}
@@ -722,6 +744,7 @@ function Hofteiler({ session }) {
             calendarResources={calendarResources}
             eventCategory={eventCategory}
             colorFor={colorFor}
+            isManageable={isManageable}
             onDelete={handleDelete}
             onEdit={openEditBookingDialog}
             onBook={(d) => openBookingDialog(d)}
@@ -737,7 +760,7 @@ function Hofteiler({ session }) {
         isEditing={!!editingBookingId}
         userName={userName}
         pickableCategories={pickableCategories}
-        eventCategory={eventCategory}
+        eventCategory={dialogEventCategory}
         resources={resources}
         roomResources={roomResources}
         zoeResource={zoeResource}

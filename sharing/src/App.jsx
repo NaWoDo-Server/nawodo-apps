@@ -1,133 +1,23 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Zap, Wrench, Shirt, Tent, Car, Bike, Hammer, Package, Camera, Music,
-  Plug, Home, Trees, Sun, Umbrella, Flame, Users, Sofa, Truck, CalendarDays,
-  Plus, Trash2, ChevronLeft, ChevronRight, X, AlertCircle, Loader2, Settings, Image as ImageIcon, Pencil, Check, List,
+  Zap, Home, Package, Plus, Trash2, ChevronLeft, ChevronRight, X, AlertCircle, Loader2,
+  Image as ImageIcon, Pencil, Check, List, CalendarDays,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
-
-const ICONS = {
-  zap: Zap, wrench: Wrench, shirt: Shirt, tent: Tent, car: Car, bike: Bike, hammer: Hammer,
-  package: Package, camera: Camera, music: Music, plug: Plug, home: Home, trees: Trees,
-  sun: Sun, umbrella: Umbrella, flame: Flame, users: Users, sofa: Sofa, truck: Truck, calendar: CalendarDays,
-};
-const ICON_KEYS = Object.keys(ICONS);
-const PAPER = "#F1F0EA";
-const INK = "#2B2B26";
-const INK_SOFT = "#6B6A61";
-const FILTER_KEY = "hofteiler_active_categories";
-
-// ---- Datum/Zeit-Hilfsfunktionen ----
-function fmtDate(d) { const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0"); return `${y}-${m}-${day}`; }
-function addDays(dateStr, n) { const d = new Date(dateStr + "T00:00:00"); d.setDate(d.getDate() + n); return fmtDate(d); }
-function weekdayLabel(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  const days = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
-  const months = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-  return `${days[d.getDay()]}, ${d.getDate()}. ${months[d.getMonth()]}`;
-}
-function toMinutes(t) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
-function bookingEndDate(b) { return b.end_date || b.date; }
-function bookingCoversDate(b, dateStr) { return dateStr >= b.date && dateStr <= bookingEndDate(b); }
-function dateTimeMs(dateStr, timeStr) {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const [hh, mm] = timeStr.split(":").map(Number);
-  return new Date(y, m - 1, d, hh, mm).getTime();
-}
-function bookingRangeMs(b) {
-  const start = dateTimeMs(b.date, b.all_day ? "00:00" : b.start_time);
-  const end = dateTimeMs(bookingEndDate(b), b.all_day ? "23:59" : b.end_time);
-  return [start, end];
-}
-function rangeOverlapsMs(aStart, aEnd, bStart, bEnd) { return aStart < bEnd && bStart < aEnd; }
-function dayIndexInRange(b, dateStr) {
-  const start = new Date(b.date + "T00:00:00");
-  const cur = new Date(dateStr + "T00:00:00");
-  const end = new Date(bookingEndDate(b) + "T00:00:00");
-  const totalDays = Math.round((end - start) / 86400000) + 1;
-  const idx = Math.round((cur - start) / 86400000) + 1;
-  return { idx, totalDays };
-}
-function spanSegmentStyle(b, dateStr) {
-  const isStart = dateStr === b.date;
-  const isEnd = dateStr === bookingEndDate(b);
-  if (isStart && isEnd) return { width: "100%", marginLeft: 0, borderRadius: 9999 };
-  if (isStart) return { width: "50%", marginLeft: "50%", borderRadius: "9999px 0 0 9999px" };
-  if (isEnd) return { width: "50%", marginLeft: 0, borderRadius: "0 9999px 9999px 0" };
-  return { width: "100%", marginLeft: 0, borderRadius: 0 };
-}
-
-function startOfWeek(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  const offset = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - offset);
-  return fmtDate(d);
-}
-function addWeeks(dateStr, n) { const d = new Date(dateStr + "T00:00:00"); d.setDate(d.getDate() + 7 * n); return fmtDate(d); }
-function weekDays(weekStartStr) { const arr = []; for (let i = 0; i < 7; i++) arr.push(addDays(weekStartStr, i)); return arr; }
-function weekRangeLabel(weekStartStr) {
-  const start = new Date(weekStartStr + "T00:00:00");
-  const end = new Date(weekStartStr + "T00:00:00"); end.setDate(end.getDate() + 6);
-  const months = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
-  if (start.getMonth() === end.getMonth()) return `${start.getDate()}.–${end.getDate()}. ${months[start.getMonth()]} ${start.getFullYear()}`;
-  return `${start.getDate()}. ${months[start.getMonth()]} – ${end.getDate()}. ${months[end.getMonth()]} ${end.getFullYear()}`;
-}
-function firstOfMonth(dateStr) { return dateStr.slice(0, 8) + "01"; }
-function addMonths(monthStr, n) { const d = new Date(monthStr + "T00:00:00"); d.setMonth(d.getMonth() + n); return firstOfMonth(fmtDate(d)); }
-function monthLabel(monthStr) {
-  const d = new Date(monthStr + "T00:00:00");
-  const months = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
-  return `${months[d.getMonth()]} ${d.getFullYear()}`;
-}
-function monthGrid(monthStr) {
-  const first = new Date(monthStr + "T00:00:00");
-  const year = first.getFullYear(), month = first.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const offset = (first.getDay() + 6) % 7;
-  const cells = [];
-  for (let i = 0; i < offset; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    cells.push({ date: dateStr, day: d });
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
-}
-
-// ---- Farb-Hilfsfunktionen ----
-function hexToHsl(hex) {
-  let r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h, s, l = (max + min) / 2;
-  if (max === min) { h = s = 0; }
-  else {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      default: h = (r - g) / d + 4;
-    }
-    h /= 6;
-  }
-  return { h: h * 360, s: s * 100, l: l * 100 };
-}
-function hslToHex(h, s, l) {
-  s /= 100; l /= 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  const toHex = (x) => Math.round(255 * x).toString(16).padStart(2, "0");
-  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
-}
-function shadeForIndex(baseHex, index, total) {
-  const { h, s, l } = hexToHsl(baseHex);
-  if (total <= 1) return baseHex;
-  const step = 22;
-  const mid = (total - 1) / 2;
-  const newL = Math.min(82, Math.max(18, l + (index - mid) * step));
-  return hslToHex(h, Math.max(s, 45), newL);
-}
+import { ICONS, ICON_KEYS } from "./icons";
+import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT, FILTER_KEY } from "./theme";
+import {
+  fmtDate, addDays, weekdayLabel, toMinutes, bookingEndDate, bookingCoversDate,
+  dateTimeMs, bookingRangeMs, rangeOverlapsMs, dayIndexInRange, spanSegmentStyle,
+  startOfWeek, addWeeks, weekDays, weekRangeLabel, rangeLabel, firstOfMonth, addMonths,
+  monthLabel, monthLabelShort, monthGrid, shadeForIndex,
+} from "./calendarUtils";
+import { useIsDesktop } from "./useIsDesktop";
+import CategorySidebar from "./CategorySidebar";
+import MiniMonthCalendar from "./MiniMonthCalendar";
+import DesktopMonthGrid from "./DesktopMonthGrid";
+import DesktopWeekGrid from "./DesktopWeekGrid";
+import BookingDialog from "./BookingDialog";
 
 async function uploadFile(file, pathPrefix) {
   const ext = file.name.split(".").pop();
@@ -260,6 +150,14 @@ function Hofteiler({ session }) {
   const [formStartDate, setFormStartDate] = useState(fmtDate(new Date()));
   const [formEndDate, setFormEndDate] = useState(fmtDate(new Date()));
 
+  // Desktop-Kalender: eigener Buchungsdialog mit Reiter-/Artikel-Auswahl,
+  // eigener Monat/Woche-Umschalter, unabhängig von der mobilen Tag/Woche/Monat-Ansicht.
+  const isDesktop = useIsDesktop();
+  const [desktopViewMode, setDesktopViewMode] = useState("month");
+  const [desktopDialogOpen, setDesktopDialogOpen] = useState(false);
+  const [dialogCategoryId, setDialogCategoryId] = useState(null);
+  const [dialogResourceId, setDialogResourceId] = useState(null);
+
   const [newResName, setNewResName] = useState("");
   const [newResIcon, setNewResIcon] = useState("zap");
   const [newResCategoryId, setNewResCategoryId] = useState("");
@@ -347,8 +245,10 @@ function Hofteiler({ session }) {
 
   // Items für die Reiter-Leiste: ohne die Termin-Kategorie (die hat keine wählbaren Items)
   const tabResources = resources.filter((r) => (activeCategoryIds || []).includes(r.category_id) && r.category_id !== eventCategory?.id);
-  // Ressourcen für Kalender/Tagesübersicht: alle aktiven Bereiche, inkl. Termine; ohne Auswahl -> alles anzeigen
-  const calendarResources = activeCategoryIds && activeCategoryIds.length ? resources.filter((r) => activeCategoryIds.includes(r.category_id)) : resources;
+  // Ressourcen für Kalender/Tagesübersicht: alle aktiven Bereiche, inkl. Termine.
+  // activeCategoryIds === null heißt "noch nicht initialisiert" (kurz beim Laden) -> alles zeigen.
+  // Ein leeres Array heißt "bewusst alles abgewählt" -> nichts zeigen.
+  const calendarResources = activeCategoryIds ? resources.filter((r) => activeCategoryIds.includes(r.category_id)) : resources;
 
   useEffect(() => {
     if (tabResources.length && !tabResources.find((r) => r.id === selectedResourceId)) {
@@ -447,6 +347,76 @@ function Hofteiler({ session }) {
       setFormNote("");
       setFormAllDay(false);
       setFormRoomId(null);
+    } catch (e) {
+      setFormError(e.message || "Speichern hat nicht geklappt. Nochmal versuchen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ---- Desktop-Buchungsdialog: Reiter + Artikel werden im Dialog selbst gewählt ----
+  function openBookingDialog(dateStr, startTime) {
+    setFormError("");
+    setFormTitle("");
+    setFormNote("");
+    setFormAllDay(false);
+    setFormStartDate(dateStr);
+    setFormEndDate(dateStr);
+    setFormStart(startTime || "08:00");
+    if (startTime) {
+      const [hh, mm] = startTime.split(":").map(Number);
+      const endMin = Math.min(23 * 60 + 59, hh * 60 + mm + 60);
+      setFormEnd(`${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`);
+    } else {
+      setFormEnd("10:00");
+    }
+    setFormRoomId(null);
+    setFormBlockZoe(false);
+    setDialogResourceId(null);
+    setDialogCategoryId(pickableCategories[0]?.id || null);
+    setSelectedDate(dateStr);
+    setDesktopDialogOpen(true);
+  }
+
+  async function handleDesktopSave() {
+    setFormError("");
+    const isEventMode = eventCategory && dialogCategoryId === eventCategory.id;
+    if (isEventMode) {
+      if (!formTitle.trim()) return setFormError("Bitte einen Titel für den Termin eintragen.");
+    } else if (!dialogResourceId) {
+      return setFormError("Bitte einen Artikel auswählen.");
+    }
+    if (formEndDate < formStartDate) return setFormError("Enddatum darf nicht vor dem Startdatum liegen.");
+    if (!formAllDay && formEndDate === formStartDate && toMinutes(formEnd) <= toMinutes(formStart)) {
+      return setFormError("Ende muss nach dem Start liegen.");
+    }
+    setSaving(true);
+    try {
+      if (isEventMode) {
+        await checkConflictAndInsert({ resourceId: eventResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
+        if (formRoomId) {
+          try {
+            await checkConflictAndInsert({ resourceId: formRoomId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
+          } catch (roomErr) {
+            setFormError(`Termin gespeichert, aber der Raum konnte nicht mitgebucht werden: ${roomErr.message}`);
+            setSaving(false);
+            return;
+          }
+        }
+      } else {
+        await checkConflictAndInsert({ resourceId: dialogResourceId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
+        const dialogResource = resources.find((r) => r.id === dialogResourceId);
+        if (formBlockZoe && zoeResource && isWallboxResource(dialogResource)) {
+          try {
+            await checkConflictAndInsert({ resourceId: zoeResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
+          } catch (zoeErr) {
+            setFormError(`Gebucht, aber Zoe konnte nicht mitgeblockt werden: ${zoeErr.message}`);
+            setSaving(false);
+            return;
+          }
+        }
+      }
+      setDesktopDialogOpen(false);
     } catch (e) {
       setFormError(e.message || "Speichern hat nicht geklappt. Nochmal versuchen.");
     } finally {
@@ -591,6 +561,7 @@ function Hofteiler({ session }) {
         </div>
       </div>
 
+      {!isDesktop && (
       <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         {categories.map((c) => {
           const Icon = ICONS[c.icon] || Package;
@@ -602,8 +573,9 @@ function Hofteiler({ session }) {
           );
         })}
       </div>
+      )}
 
-      {pickableCategories
+      {!isDesktop && pickableCategories
         .filter((c) => (activeCategoryIds || []).includes(c.id))
         .map((cat) => {
           const items = tabResources.filter((r) => r.category_id === cat.id);
@@ -628,7 +600,7 @@ function Hofteiler({ session }) {
           );
         })}
 
-      {eventCategory && (activeCategoryIds || []).includes(eventCategory.id) && eventResource && (
+      {!isDesktop && eventCategory && (activeCategoryIds || []).includes(eventCategory.id) && eventResource && (
         <div className="px-5 mt-3">
           <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: eventCategory.color }}>{eventCategory.name}</div>
           <div className="flex gap-2 flex-wrap">
@@ -639,27 +611,79 @@ function Hofteiler({ session }) {
         </div>
       )}
 
-      {isAdmin && (
+      {!isDesktop && isAdmin && (
         <div className="px-5 mt-3 flex gap-2 flex-wrap">
           <button onClick={() => requireAdmin(() => setShowResourceForm(true))} className="flex items-center gap-1 px-3 py-2 rounded-full text-sm" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
         </div>
       )}
 
-      {isAdmin && activeResource && (
+      {!isDesktop && isAdmin && activeResource && (
         <div className="px-5 flex justify-end mt-1.5 mb-1">
           <button onClick={() => requireAdmin(() => openEditResource(activeResource))} className="flex items-center gap-1 text-xs" style={{ color: INK_SOFT }}><Pencil size={12} /> {activeResource.name} bearbeiten</button>
         </div>
       )}
 
-      {activeResource?.photo_url && (
+      {!isDesktop && activeResource?.photo_url && (
         <div className="px-5 mb-3"><img src={activeResource.photo_url} alt={activeResource.name} className="w-full h-32 object-cover rounded-xl" /></div>
       )}
 
-      <>
+      {isDesktop && (
+        <div className="px-5 mt-3 flex gap-6 items-start">
+          <div className="w-52 flex-shrink-0">
+            <MiniMonthCalendar month={calendarMonth} onMonthChange={setCalendarMonth} selectedDate={selectedDate} onQuickBook={(d) => openBookingDialog(d)} />
+            <CategorySidebar
+              categories={categories}
+              activeCategoryIds={activeCategoryIds}
+              onToggle={toggleCategory}
+              onAll={() => setActiveCategoryIds(categories.map((c) => c.id))}
+              onNone={() => setActiveCategoryIds([])}
+            />
+            {isAdmin && (
+              <button onClick={() => requireAdmin(() => setShowResourceForm(true))} className="mt-4 flex items-center gap-1 px-3 py-2 rounded-full text-sm" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neuer Artikel</button>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: "#E4E1D3" }}>
+                <button onClick={() => setDesktopViewMode("month")} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold" style={{ backgroundColor: desktopViewMode === "month" ? "#fff" : "transparent", color: desktopViewMode === "month" ? INK : INK_SOFT }}><CalendarDays size={13} /> Monat</button>
+                <button onClick={() => { setDesktopViewMode("week"); setCalendarWeekStart(startOfWeek(selectedDate)); }} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold" style={{ backgroundColor: desktopViewMode === "week" ? "#fff" : "transparent", color: desktopViewMode === "week" ? INK : INK_SOFT }}><CalendarDays size={13} /> Woche</button>
+              </div>
+              <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: INK }}><Plus size={14} /> Buchen</button>
+            </div>
+            {desktopViewMode === "month" ? (
+              <DesktopMonthGrid
+                month={calendarMonth}
+                onMonthChange={setCalendarMonth}
+                bookings={bookings}
+                calendarResources={calendarResources}
+                eventCategory={eventCategory}
+                colorFor={colorFor}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                onOpenDialog={(d) => openBookingDialog(d)}
+              />
+            ) : (
+              <DesktopWeekGrid
+                weekStart={calendarWeekStart}
+                onWeekChange={setCalendarWeekStart}
+                bookings={bookings}
+                calendarResources={calendarResources}
+                eventCategory={eventCategory}
+                colorFor={colorFor}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                onOpenDialog={(d, t) => openBookingDialog(d, t)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {!isDesktop && <>
         <div className="px-5 mt-2 flex items-center justify-between">
           <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: "#E4E1D3" }}>
             <button onClick={() => setViewMode("day")} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "day" ? "#fff" : "transparent", color: viewMode === "day" ? INK : INK_SOFT }}><List size={13} /> Tag</button>
-            <button onClick={() => { setViewMode("week"); setCalendarWeekStart(startOfWeek(selectedDate)); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "week" ? "#fff" : "transparent", color: viewMode === "week" ? INK : INK_SOFT }}><CalendarDays size={13} /> Woche</button>
+            <button onClick={() => { setViewMode("week"); setCalendarWeekStart(selectedDate); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "week" ? "#fff" : "transparent", color: viewMode === "week" ? INK : INK_SOFT }}><CalendarDays size={13} /> Woche</button>
             <button onClick={() => { setViewMode("month"); setCalendarMonth(firstOfMonth(selectedDate)); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "month" ? "#fff" : "transparent", color: viewMode === "month" ? INK : INK_SOFT }}><CalendarDays size={13} /> Monat</button>
           </div>
         </div>
@@ -667,12 +691,12 @@ function Hofteiler({ session }) {
         {viewMode === "week" && (
           <div className="px-5 mt-3">
             <div className="flex items-center justify-between mb-2">
-              <button onClick={() => setCalendarWeekStart(addWeeks(calendarWeekStart, -1))} className="p-2 rounded-full" style={{ backgroundColor: "#E4E1D3" }}><ChevronLeft size={16} /></button>
-              <div className="font-semibold text-sm">{weekRangeLabel(calendarWeekStart)}</div>
-              <button onClick={() => setCalendarWeekStart(addWeeks(calendarWeekStart, 1))} className="p-2 rounded-full" style={{ backgroundColor: "#E4E1D3" }}><ChevronRight size={16} /></button>
+              <button onClick={() => setCalendarWeekStart(addDays(calendarWeekStart, -3))} className="p-2 rounded-full" style={{ backgroundColor: "#E4E1D3" }}><ChevronLeft size={16} /></button>
+              <div className="font-semibold text-sm">{rangeLabel(calendarWeekStart, addDays(calendarWeekStart, 2))}</div>
+              <button onClick={() => setCalendarWeekStart(addDays(calendarWeekStart, 3))} className="p-2 rounded-full" style={{ backgroundColor: "#E4E1D3" }}><ChevronRight size={16} /></button>
             </div>
-            <div className="grid grid-cols-7 gap-1.5">
-              {weekDays(calendarWeekStart).map((dateStr) => {
+            <div className="grid grid-cols-3 gap-2">
+              {[0, 1, 2].map((i) => addDays(calendarWeekStart, i)).map((dateStr) => {
                 const d = new Date(dateStr + "T00:00:00");
                 const weekdayShort = ["So","Mo","Di","Mi","Do","Fr","Sa"][d.getDay()];
                 const spanningItems = calendarResources
@@ -872,8 +896,37 @@ function Hofteiler({ session }) {
             </div>
           </div>
         )}
-      </>
+      </>}
       </div>
+
+      <BookingDialog
+        open={desktopDialogOpen}
+        onClose={() => setDesktopDialogOpen(false)}
+        userName={userName}
+        pickableCategories={pickableCategories}
+        eventCategory={eventCategory}
+        resources={resources}
+        roomResources={roomResources}
+        zoeResource={zoeResource}
+        isWallboxResource={isWallboxResource}
+        colorFor={colorFor}
+        categoryId={dialogCategoryId}
+        onCategoryChange={(id) => { setDialogCategoryId(id); setDialogResourceId(null); }}
+        resourceId={dialogResourceId}
+        onResourceChange={setDialogResourceId}
+        formTitle={formTitle} setFormTitle={setFormTitle}
+        formAllDay={formAllDay} setFormAllDay={setFormAllDay}
+        formStartDate={formStartDate} setFormStartDate={setFormStartDate}
+        formStart={formStart} setFormStart={setFormStart}
+        formEndDate={formEndDate} setFormEndDate={setFormEndDate}
+        formEnd={formEnd} setFormEnd={setFormEnd}
+        formRoomId={formRoomId} setFormRoomId={setFormRoomId}
+        formBlockZoe={formBlockZoe} setFormBlockZoe={setFormBlockZoe}
+        formNote={formNote} setFormNote={setFormNote}
+        formError={formError}
+        saving={saving}
+        onSave={handleDesktopSave}
+      />
 
       {showForm && (
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowForm(false)}>

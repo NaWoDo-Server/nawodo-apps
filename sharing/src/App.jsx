@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Zap, Home, Package, Plus, Trash2, ChevronLeft, ChevronRight, X, AlertCircle, Loader2,
+  Zap, Home, Package, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, X, AlertCircle, Loader2,
   Image as ImageIcon, Pencil, Check, CalendarDays,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
@@ -25,6 +25,9 @@ import DayAgenda from "./DayAgenda";
 // Beide Apps teilen sich dieselbe Datenbank (Kategorien/Ressourcen/Buchungen), sehen sich
 // also gegenseitig, sind aber getrennt nutzbar. Für die Termine-App: hier auf "termine" ändern.
 const APP_MODE = "sharing";
+// Sharing und Termine laufen unter derselben Domain (nur andere Pfade), teilen sich
+// also denselben localStorage – daher eigener Schlüssel pro App-Modus.
+const APP_FILTER_KEY = `${FILTER_KEY}_${APP_MODE}`;
 
 async function uploadFile(file, pathPrefix) {
   const ext = file.name.split(".").pop();
@@ -123,7 +126,7 @@ function Hofteiler({ session }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [activeCategoryIds, setActiveCategoryIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(FILTER_KEY)) || null; } catch { return null; }
+    try { return JSON.parse(localStorage.getItem(APP_FILTER_KEY)) || null; } catch { return null; }
   });
   const [selectedDate, setSelectedDate] = useState(fmtDate(new Date()));
   const [viewMode, setViewMode] = useState("month");
@@ -162,6 +165,7 @@ function Hofteiler({ session }) {
   const [dialogCategoryId, setDialogCategoryId] = useState(null);
   const [dialogResourceId, setDialogResourceId] = useState(null);
   const [editingBookingId, setEditingBookingId] = useState(null);
+  const [mobileGroupOpen, setMobileGroupOpen] = useState(false);
 
   const [newResName, setNewResName] = useState("");
   const [newResIcon, setNewResIcon] = useState("zap");
@@ -208,14 +212,15 @@ function Hofteiler({ session }) {
     const isEvent = !!(eventCategory && resource.category_id === eventCategory.id);
     return APP_MODE === "termine" ? (isEvent || isRoom(resource)) : !isEvent;
   }
-  // Reihenfolge/Gruppierung für die Reiter-Liste: in der Termine-App steht der
-  // Termine-Reiter oben, alle anderen (nur zum Ansehen) sind unter "Sharing" eingeklappt.
-  const primaryCategoryIds = APP_MODE === "termine" && eventCategory ? [eventCategory.id] : null;
-  const groupCategoryIds = APP_MODE === "termine" ? categories.filter((c) => c.id !== eventCategory?.id).map((c) => c.id) : null;
-  // Für die mobilen Reiter-Chips: Termine-Reiter in der Termine-App ganz vorne.
-  const orderedCategories = APP_MODE === "termine" && eventCategory
-    ? [eventCategory, ...categories.filter((c) => c.id !== eventCategory.id)]
-    : categories;
+  // Reihenfolge/Gruppierung für die Reiter-Liste: in der Termine-App stehen Termine
+  // und Raumbuchung oben (beide dort buchbar), alle anderen (nur zum Ansehen) sind
+  // unter "Sharing" eingeklappt.
+  const primaryCategoryIds = APP_MODE === "termine" && eventCategory
+    ? [eventCategory.id, ...(roomCategory ? [roomCategory.id] : [])]
+    : null;
+  const groupCategoryIds = APP_MODE === "termine"
+    ? categories.filter((c) => c.id !== eventCategory?.id && c.id !== roomCategory?.id).map((c) => c.id)
+    : null;
   const zoeResource = resources.find((r) => r.name === "Zoe");
   const isWallboxResource = (r) => r?.name === "Wallbox 1" || r?.name === "Wallbox 2";
 
@@ -232,7 +237,14 @@ function Hofteiler({ session }) {
       setBookings(bks);
       setLogoUrl(settings.find((s) => s.key === "logo_url")?.value || null);
       if (isFirst) {
-        setActiveCategoryIds((prev) => prev || cats.map((c) => c.id));
+        setActiveCategoryIds((prev) => {
+          if (prev) return prev;
+          const eventCat = cats.find((c) => c.event_mode);
+          if (!eventCat) return cats.map((c) => c.id);
+          return APP_MODE === "termine"
+            ? [eventCat.id]
+            : cats.filter((c) => c.id !== eventCat.id).map((c) => c.id);
+        });
         if (!newResCategoryId && cats.length) {
           const firstPickable = cats.find((c) => !c.event_mode);
           setNewResCategoryId(firstPickable?.id || cats[0].id);
@@ -262,7 +274,7 @@ function Hofteiler({ session }) {
   }, []);
 
   useEffect(() => {
-    if (activeCategoryIds) localStorage.setItem(FILTER_KEY, JSON.stringify(activeCategoryIds));
+    if (activeCategoryIds) localStorage.setItem(APP_FILTER_KEY, JSON.stringify(activeCategoryIds));
   }, [activeCategoryIds]);
 
   function toggleCategory(id) {
@@ -545,7 +557,21 @@ function Hofteiler({ session }) {
 
       {!isDesktop && (
       <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {orderedCategories.map((c) => {
+        {(primaryCategoryIds ? categories.filter((c) => primaryCategoryIds.includes(c.id)) : categories).map((c) => {
+          const Icon = ICONS[c.icon] || Package;
+          const active = (activeCategoryIds || []).includes(c.id);
+          return (
+            <button key={c.id} onClick={() => toggleCategory(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0" style={{ backgroundColor: active ? c.color : `${c.color}1A`, color: active ? "#fff" : c.color, border: `1.5px solid ${active ? c.color : `${c.color}55`}` }}>
+              {active ? <Check size={12} /> : <Icon size={12} />} {c.name}
+            </button>
+          );
+        })}
+        {primaryCategoryIds && groupCategoryIds && groupCategoryIds.length > 0 && (
+          <button onClick={() => setMobileGroupOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0" style={{ backgroundColor: BORDER, color: INK_SOFT, border: `1.5px solid ${BORDER_SOFT}` }}>
+            {mobileGroupOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Sharing
+          </button>
+        )}
+        {primaryCategoryIds && mobileGroupOpen && categories.filter((c) => (groupCategoryIds || []).includes(c.id)).map((c) => {
           const Icon = ICONS[c.icon] || Package;
           const active = (activeCategoryIds || []).includes(c.id);
           return (

@@ -6,7 +6,7 @@ import { fmtDate, addMonths, monthLabel, monthGrid, bookingEndDate, assignLanesC
 
 const DOW = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const LANE_H = 20; // px pro Reiter-Zeile
-const HEADER_H = 28; // px für die Tageszahl
+const HEADER_H = 26; // px für die Tageszahl
 const MAX_LANES = 6; // Gesamtzahl Zeilen pro Kachel (Höhe bleibt immer gleich)
 const VISIBLE_LANES = MAX_LANES - 1; // die unterste Zeile ist für "+" reserviert, falls nötig (= 5 sichtbare Einträge)
 const CELL_H = HEADER_H + MAX_LANES * LANE_H + 8; // alle Kacheln exakt gleich hoch
@@ -137,17 +137,18 @@ export default function DesktopMonthGrid({
                 {week.map((cell, di) => {
                   if (!cell) return null;
                   const isToday = cell.date === today;
+                  const isSelected = cell.date === selectedDate;
                   return (
                     <div
                       key={`num-${cell.date}`}
-                      className="absolute text-base font-extrabold px-1.5 pt-0.5"
+                      className="absolute text-sm font-bold px-1.5 pt-0.5"
                       style={{
                         left: `${(di / 7) * 100}%`,
                         top: 0,
                         width: `${(1 / 7) * 100}%`,
                         height: HEADER_H,
                         color: isToday ? INK : INK_SOFT,
-                        backgroundColor: BORDER,
+                        backgroundColor: isSelected ? "#EDEAD8" : isToday ? "#F6F4EA" : "#fff",
                       }}
                     >
                       {cell.day}

@@ -77,20 +77,82 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .topbar {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: -8px;
+    .account-menu {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 20;
     }
-    .logout-link {
+    .avatar-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #2B2B26;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .account-dropdown {
+      position: absolute;
+      top: 44px;
+      right: 0;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      padding: 10px;
+      min-width: 160px;
+    }
+    .account-name {
       font-size: 12px;
       color: #6B6A61;
-      text-decoration: none;
-      border: 1px solid #D8D5C7;
-      border-radius: 999px;
-      padding: 5px 12px;
-      background: #fff;
+      padding: 4px 8px 8px;
+      border-bottom: 1px solid #F1F0EA;
+      margin-bottom: 6px;
+      word-break: break-word;
     }
+    .logout-item {
+      display: block;
+      text-align: left;
+      width: 100%;
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: #A13D3D;
+      text-decoration: none;
+      padding: 6px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .logout-item:hover { background: #F1F0EA; }
+
+    .today-widget { display: none; }
+    .today-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .today-empty { font-size: 12px; color: #9B9A90; margin-top: 4px; }
+    .today-row { font-size: 13px; }
+    .today-row .t-title { font-weight: 600; }
+    .today-row .t-time { color: #6B6A61; font-size: 12px; }
+    .today-toggles { display: flex; gap: 6px; margin-top: 12px; }
+    .today-toggle {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1.5px solid #D8D5C7;
+      background: transparent;
+      color: #6B6A61;
+      cursor: pointer;
+    }
+    .today-toggle.active {
+      background: #1F6F5C;
+      border-color: #1F6F5C;
+      color: #fff;
+    }
+
     .footer-legal {
       text-align: center;
       margin-top: 40px;
@@ -204,6 +266,7 @@
       .widget { padding: 18px 18px; border-radius: 22px; }
       .weather-icon { font-size: 38px; }
       .weather-temp { font-size: 28px; }
+      .today-widget { display: block; }
 
       .main { flex: 1; }
       .grid {
@@ -233,7 +296,13 @@
     </div>
 
     <div id="appBox" class="hidden">
-      <div class="topbar"><a href="#" id="logoutLink" class="logout-link">Abmelden</a></div>
+      <div class="account-menu">
+        <button id="avatarBtn" class="avatar-btn">?</button>
+        <div id="accountDropdown" class="account-dropdown hidden">
+          <div class="account-name" id="accountName"></div>
+          <button id="logoutLink" class="logout-item">Abmelden</button>
+        </div>
+      </div>
 
       <div class="page">
         <div class="widgets">
@@ -254,6 +323,15 @@
             <div class="diary-title">Besucher im Vorgarten</div>
             <div class="diary-date">31. Juli 2026</div>
           </a>
+
+          <div class="widget today-widget" id="todayWidget">
+            <div class="widget-label" id="todayLabel">Heute im Terminkalender</div>
+            <div class="today-list" id="todayList"></div>
+            <div class="today-toggles">
+              <button class="today-toggle" id="toggleTermine" data-cat="termine">Termine</button>
+              <button class="today-toggle" id="toggleRaum" data-cat="raum">Raumplanung</button>
+            </div>
+          </div>
         </div>
 
         <div class="main">
@@ -299,7 +377,7 @@
               <div class="icon" style="background:#1F6F5C;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
               </div>
-              <span class="label">NaWoDo Homepage</span>
+              <span class="label">Homepage</span>
             </a>
           </div>
         </div>
@@ -355,6 +433,9 @@
       var loginPassword = document.getElementById("loginPassword");
       var loginError = document.getElementById("loginError");
       var loginBtn = document.getElementById("loginBtn");
+      var avatarBtn = document.getElementById("avatarBtn");
+      var accountDropdown = document.getElementById("accountDropdown");
+      var accountName = document.getElementById("accountName");
       var logoutLink = document.getElementById("logoutLink");
 
       var url = window.__SUPABASE_URL__;
@@ -374,16 +455,22 @@
         loadingBox.classList.add("hidden");
         appBox.classList.add("hidden");
         loginBox.classList.remove("hidden");
+        accountDropdown.classList.add("hidden");
       }
 
-      function showApp() {
+      function showApp(session) {
         loadingBox.classList.add("hidden");
         loginBox.classList.add("hidden");
         appBox.classList.remove("hidden");
+        var user = session.user;
+        var name = (user.user_metadata && user.user_metadata.name) || user.email;
+        avatarBtn.textContent = name.charAt(0).toUpperCase();
+        accountName.textContent = name;
+        loadTodayWidget(client);
       }
 
       client.auth.getSession().then(function (res) {
-        if (res.data && res.data.session) showApp();
+        if (res.data && res.data.session) showApp(res.data.session);
         else showLogin();
       });
 
@@ -401,7 +488,7 @@
             loginError.textContent = "E-Mail oder Passwort falsch.";
             loginError.classList.remove("hidden");
           } else {
-            showApp();
+            showApp(res.data.session);
           }
         });
       });
@@ -410,11 +497,88 @@
         if (e.key === "Enter") loginBtn.click();
       });
 
+      avatarBtn.addEventListener("click", function () {
+        accountDropdown.classList.toggle("hidden");
+      });
+      document.addEventListener("click", function (e) {
+        if (!accountDropdown.contains(e.target) && e.target !== avatarBtn) {
+          accountDropdown.classList.add("hidden");
+        }
+      });
+
       logoutLink.addEventListener("click", function (e) {
         e.preventDefault();
         client.auth.signOut().then(function () { showLogin(); });
       });
     })();
+
+    function fmtDateISO(d) {
+      var y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    }
+
+    function loadTodayWidget(client) {
+      var todayList = document.getElementById("todayList");
+      var toggleTermine = document.getElementById("toggleTermine");
+      var toggleRaum = document.getElementById("toggleRaum");
+      var active = { termine: true, raum: false }; // Terminplanung ist als Einziges standardmäßig an
+
+      Promise.all([
+        client.from("categories").select("*"),
+        client.from("resources").select("*"),
+        client.from("bookings").select("*"),
+      ]).then(function (results) {
+        var categories = (results[0].data) || [];
+        var resources = (results[1].data) || [];
+        var bookings = (results[2].data) || [];
+
+        var termineCat = categories.find(function (c) { return c.event_mode; });
+        var raumCat = categories.find(function (c) { return c.name === "Raumbuchung"; });
+        var resourceById = {};
+        resources.forEach(function (r) { resourceById[r.id] = r; });
+
+        var today = fmtDateISO(new Date());
+
+        function render() {
+          var catIds = [];
+          if (active.termine && termineCat) catIds.push(termineCat.id);
+          if (active.raum && raumCat) catIds.push(raumCat.id);
+
+          var todays = bookings.filter(function (b) {
+            var res = resourceById[b.resource_id];
+            if (!res || catIds.indexOf(res.category_id) === -1) return false;
+            var start = b.date, end = b.end_date || b.date;
+            return start <= today && end >= today;
+          }).sort(function (a, b) {
+            if (a.all_day && !b.all_day) return -1;
+            if (!a.all_day && b.all_day) return 1;
+            return (a.start_time || "").localeCompare(b.start_time || "");
+          });
+
+          if (todays.length === 0) {
+            todayList.innerHTML = '<div class="today-empty">Heute nichts geplant.</div>';
+          } else {
+            todayList.innerHTML = todays.map(function (b) {
+              var res = resourceById[b.resource_id];
+              var isRoom = raumCat && res && res.category_id === raumCat.id;
+              var title = isRoom ? (res.name + (b.name ? " · " + b.name : "")) : (b.title || b.name);
+              var time = b.all_day ? "ganztägig" : (b.start_time + "–" + b.end_time);
+              return '<div class="today-row"><div class="t-title">' + title + '</div><div class="t-time">' + time + '</div></div>';
+            }).join("");
+          }
+
+          toggleTermine.classList.toggle("active", active.termine);
+          toggleRaum.classList.toggle("active", active.raum);
+        }
+
+        toggleTermine.addEventListener("click", function () { active.termine = !active.termine; render(); });
+        toggleRaum.addEventListener("click", function () { active.raum = !active.raum; render(); });
+
+        render();
+      }).catch(function () {
+        todayList.innerHTML = '<div class="today-empty">Konnte Termine nicht laden.</div>';
+      });
+    }
   </script>
 </body>
 </html>

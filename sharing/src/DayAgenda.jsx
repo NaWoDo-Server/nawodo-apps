@@ -1,5 +1,5 @@
 import React from "react";
-import { Trash2, Plus, Zap } from "lucide-react";
+import { Trash2, Pencil, Plus, Zap } from "lucide-react";
 import { ICONS } from "./icons";
 import { INK, INK_SOFT, BORDER } from "./theme";
 import { weekdayLabel, bookingEndDate, bookingCoversDate, toMinutes, dayIndexInRange } from "./calendarUtils";
@@ -7,7 +7,7 @@ import { weekdayLabel, bookingEndDate, bookingCoversDate, toMinutes, dayIndexInR
 // Tagesansicht, die unter dem Kalender erscheint (Desktop und Mobile teilen
 // sich diese Komponente). Wird durch Einzelklick auf einen Tag angezeigt.
 export default function DayAgenda({
-  date, bookings, resources, calendarResources, eventCategory, colorFor, onDelete,
+  date, bookings, resources, calendarResources, eventCategory, colorFor, onDelete, onEdit,
   onBook, showBookButton,
 }) {
   const dayBookings = bookings
@@ -55,7 +55,8 @@ export default function DayAgenda({
                   </div>
                   <div className="text-xs mt-0.5 truncate" style={{ color: INK_SOFT }}>{b.name}{b.note ? ` · ${b.note}` : ""}</div>
                 </div>
-                <button onClick={() => onDelete(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }}><Trash2 size={15} /></button>
+                <button onClick={() => onEdit(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }} title="Bearbeiten"><Pencil size={15} /></button>
+                <button onClick={() => onDelete(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }} title="Löschen"><Trash2 size={15} /></button>
               </div>
             );
           })}

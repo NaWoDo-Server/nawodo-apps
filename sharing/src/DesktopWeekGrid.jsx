@@ -109,16 +109,17 @@ export default function DesktopWeekGrid({
               <div
                 key={`t-${it.booking.id}-${i}`}
                 title={`${time}${main}`}
-                className="absolute text-white text-[10px] font-semibold px-1.5 truncate flex items-center gap-1 rounded"
+                className="absolute text-white text-[10px] font-semibold px-1.5 flex items-center gap-1 rounded"
                 style={{
                   left: `calc(48px + ${(it.startCol / 7) * 100}% + 1px)`,
                   width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
-                  top: 4 + it.lane * BANNER_LANE_H,
-                  height: BANNER_LANE_H - 3,
+                  top: 4 + it.lane * BANNER_LANE_H + 1,
+                  height: BANNER_LANE_H - 4,
                   backgroundColor: eventCategory.color,
+                  boxShadow: "0 0 0 1px #fff",
                 }}
               >
-                <Icon size={10} className="flex-shrink-0" /> <span className="truncate">{time}{main}</span>
+                <Icon size={10} className="flex-shrink-0" /> <span className="truncate min-w-0">{time}{main}</span>
               </div>
             );
           })}
@@ -130,16 +131,17 @@ export default function DesktopWeekGrid({
               <div
                 key={`b-${it.booking.id}-${i}`}
                 title={`${time}${main}`}
-                className="absolute text-white text-[10px] font-medium px-1.5 truncate flex items-center gap-1 rounded"
+                className="absolute text-white text-[10px] font-medium px-1.5 flex items-center gap-1 rounded"
                 style={{
                   left: `calc(48px + ${(it.startCol / 7) * 100}% + 1px)`,
                   width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
-                  top: 4 + banner.termine.laneCount * BANNER_LANE_H + it.lane * BANNER_LANE_H,
-                  height: BANNER_LANE_H - 3,
+                  top: 4 + banner.termine.laneCount * BANNER_LANE_H + it.lane * BANNER_LANE_H + 1,
+                  height: BANNER_LANE_H - 4,
                   backgroundColor: colorFor(it.resource),
+                  boxShadow: "0 0 0 1px #fff",
                 }}
               >
-                <Icon size={10} className="flex-shrink-0" /> <span className="truncate">{time}{main}</span>
+                <Icon size={10} className="flex-shrink-0" /> <span className="truncate min-w-0">{time}{main}</span>
               </div>
             );
           })}
@@ -191,9 +193,10 @@ export default function DesktopWeekGrid({
                         left: `calc(${it.lane * widthPct}% + 1px)`,
                         width: `calc(${widthPct}% - 2px)`,
                         backgroundColor: isEvent ? eventCategory.color : colorFor(it.resource),
+                        boxShadow: "0 0 0 1px #fff",
                       }}
                     >
-                      <div className="font-semibold truncate flex items-center gap-1"><Icon size={9} className="flex-shrink-0" /> {isEvent ? (it.booking.title || eventCategory.name) : it.resource.name}</div>
+                      <div className="font-semibold flex items-center gap-1 min-w-0"><Icon size={9} className="flex-shrink-0" /> <span className="truncate min-w-0">{isEvent ? (it.booking.title || eventCategory.name) : it.resource.name}</span></div>
                       <div className="truncate opacity-90">{it.booking.start_time}–{it.booking.end_time}{!isEvent ? ` · ${it.booking.name}` : ""}</div>
                     </div>
                   );

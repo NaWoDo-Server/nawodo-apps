@@ -7,7 +7,8 @@ import { fmtDate, addMonths, monthLabel, monthGrid, assignLanesCapped } from "./
 const DOW = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const LANE_H = 20; // px pro Reiter-Zeile
 const HEADER_H = 22; // px für die Tageszahl
-const MAX_LANES = 4; // ab hier greift "+N mehr" statt die Kachel wachsen zu lassen
+const MAX_LANES = 4; // Gesamtzahl Zeilen pro Kachel (Höhe bleibt immer gleich)
+const VISIBLE_LANES = MAX_LANES - 1; // die unterste Zeile ist für "+" reserviert, falls nötig
 const CELL_H = HEADER_H + MAX_LANES * LANE_H + 8; // alle Kacheln exakt gleich hoch
 
 export default function DesktopMonthGrid({
@@ -36,7 +37,7 @@ export default function DesktopMonthGrid({
     // Termine zuerst einsortieren, damit sie bei der Lane-Vergabe Vorrang haben
     // (immer über den normalen Buchungen, wie gefordert).
     const combined = [...covering.filter((it) => it.isEvent), ...covering.filter((it) => !it.isEvent)];
-    return assignLanesCapped(combined, weekDates, MAX_LANES);
+    return assignLanesCapped(combined, weekDates, VISIBLE_LANES);
   }), [month, bookings, calendarResources, eventCategory]);
 
   return (
@@ -60,7 +61,6 @@ export default function DesktopMonthGrid({
                 if (!cell) return <div key={di} className="border-r border-b" style={{ borderColor: BORDER_SOFT, backgroundColor: "#FAFAF6" }} />;
                 const isToday = cell.date === today;
                 const isSelected = cell.date === selectedDate;
-                const overflow = layout.overflowByDate[cell.date] || 0;
                 return (
                   <button
                     key={cell.date}
@@ -74,11 +74,6 @@ export default function DesktopMonthGrid({
                     }}
                   >
                     <span className="text-xs font-semibold" style={{ color: isToday ? INK : INK_SOFT }}>{cell.day}</span>
-                    {overflow > 0 && (
-                      <span className="absolute left-1.5 bottom-1 text-[9px] font-bold px-1 py-0.5 rounded" style={{ backgroundColor: BORDER, color: INK_SOFT }}>
-                        +{overflow} mehr
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -93,18 +88,43 @@ export default function DesktopMonthGrid({
                     <div
                       key={`${it.booking.id}-${i}`}
                       title={`${time}${main}`}
-                      className="absolute text-white text-[10px] font-medium px-1 truncate flex items-center gap-1 rounded"
+                      className="absolute text-white text-[10px] font-medium px-1 flex items-center gap-1 rounded"
                       style={{
                         left: `calc(${(it.startCol / 7) * 100}% + 1px)`,
                         width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
-                        top: HEADER_H + it.lane * LANE_H,
-                        height: LANE_H - 3,
+                        top: HEADER_H + it.lane * LANE_H + 1,
+                        height: LANE_H - 4,
                         backgroundColor: it.isEvent ? eventCategory.color : colorFor(it.resource),
                         fontWeight: it.isEvent ? 600 : 500,
+                        boxShadow: "0 0 0 1px #fff",
                       }}
                     >
                       <Icon size={9} className="flex-shrink-0" />
-                      <span className="truncate">{time}{main}</span>
+                      <span className="truncate min-w-0">{time}{main}</span>
+                    </div>
+                  );
+                })}
+                {/* Reservierte unterste Zeile: erscheint nur bei Überlauf, damit sie nie
+                    von einem Balken verdeckt wird (keine Buchung wird auf dieser Lane platziert) */}
+                {week.map((cell, di) => {
+                  if (!cell) return null;
+                  const overflow = layout.overflowByDate[cell.date] || 0;
+                  if (overflow <= 0) return null;
+                  return (
+                    <div
+                      key={`overflow-${cell.date}`}
+                      title={`${overflow} weitere Buchung${overflow > 1 ? "en" : ""}`}
+                      className="absolute text-[10px] font-bold flex items-center justify-center rounded"
+                      style={{
+                        left: `calc(${(di / 7) * 100}% + 1px)`,
+                        width: `calc(${(1 / 7) * 100}% - 2px)`,
+                        top: HEADER_H + VISIBLE_LANES * LANE_H + 1,
+                        height: LANE_H - 4,
+                        backgroundColor: BORDER,
+                        color: INK_SOFT,
+                      }}
+                    >
+                      +
                     </div>
                   );
                 })}

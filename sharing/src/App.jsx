@@ -155,6 +155,7 @@ function Hofteiler({ session }) {
   const [desktopDialogOpen, setDesktopDialogOpen] = useState(false);
   const [dialogCategoryId, setDialogCategoryId] = useState(null);
   const [dialogResourceId, setDialogResourceId] = useState(null);
+  const [editingBookingId, setEditingBookingId] = useState(null);
 
   const [newResName, setNewResName] = useState("");
   const [newResIcon, setNewResIcon] = useState("zap");
@@ -252,12 +253,15 @@ function Hofteiler({ session }) {
     return data || [];
   }
 
-  function checkConflictAndInsert({ resourceId, startDate, endDate, allDay, startTime, endTime, name, note, title }) {
+  // bookingId gesetzt = bestehende Buchung aktualisieren (eigene Buchung wird bei der
+  // Konfliktprüfung ignoriert), sonst neue Buchung anlegen.
+  function checkConflictAndSave({ bookingId, resourceId, startDate, endDate, allDay, startTime, endTime, name, note, title }) {
     return (async () => {
       const latest = await refreshBookings();
       const newBooking = { date: startDate, end_date: endDate, all_day: allDay, start_time: allDay ? "00:00" : startTime, end_time: allDay ? "23:59" : endTime };
       const [newStart, newEnd] = bookingRangeMs(newBooking);
       const conflict = latest.find((b) => {
+        if (bookingId && b.id === bookingId) return false;
         if (b.resource_id !== resourceId) return false;
         const [bStart, bEnd] = bookingRangeMs(b);
         return rangeOverlapsMs(newStart, newEnd, bStart, bEnd);
@@ -266,7 +270,7 @@ function Hofteiler({ session }) {
         const range = conflict.date === bookingEndDate(conflict) ? conflict.date : `${conflict.date} – ${bookingEndDate(conflict)}`;
         throw new Error(conflict.all_day ? `Schon belegt von ${conflict.name} (ganztägig, ${range}).` : `Schon belegt von ${conflict.name} (${conflict.date} ${conflict.start_time} – ${bookingEndDate(conflict)} ${conflict.end_time}).`);
       }
-      const { error } = await supabase.from("bookings").insert({
+      const payload = {
         resource_id: resourceId,
         date: startDate,
         end_date: endDate,
@@ -276,7 +280,10 @@ function Hofteiler({ session }) {
         name: name.trim(),
         note: note.trim() || null,
         title: title ? title.trim() : null,
-      });
+      };
+      const { error } = bookingId
+        ? await supabase.from("bookings").update(payload).eq("id", bookingId)
+        : await supabase.from("bookings").insert(payload);
       if (error) throw error;
       await refreshBookings();
     })();
@@ -285,6 +292,7 @@ function Hofteiler({ session }) {
   // ---- Buchungsdialog (Desktop + Mobile teilen sich diesen): Reiter + Artikel werden im Dialog selbst gewählt ----
   function openBookingDialog(dateStr, startTime) {
     setFormError("");
+    setEditingBookingId(null);
     setFormTitle("");
     setFormNote("");
     setFormAllDay(false);
@@ -306,6 +314,28 @@ function Hofteiler({ session }) {
     setDesktopDialogOpen(true);
   }
 
+  // Öffnet denselben Dialog vorausgefüllt mit einer bestehenden Buchung, zum Korrigieren
+  // von Tippfehlern o.ä. (Zeit/Datum/Notiz/Titel). Der Artikel selbst lässt sich hier
+  // nicht wechseln, um Verwechslungen zu vermeiden.
+  function openEditBookingDialog(booking) {
+    const res = resources.find((r) => r.id === booking.resource_id);
+    const isEventBooking = !!(eventCategory && res?.category_id === eventCategory.id);
+    setFormError("");
+    setEditingBookingId(booking.id);
+    setDialogCategoryId(res?.category_id ?? null);
+    setDialogResourceId(isEventBooking ? null : booking.resource_id);
+    setFormTitle(booking.title || "");
+    setFormAllDay(booking.all_day);
+    setFormStartDate(booking.date);
+    setFormEndDate(bookingEndDate(booking));
+    setFormStart(booking.start_time);
+    setFormEnd(booking.end_time);
+    setFormNote(booking.note || "");
+    setFormRoomId(null);
+    setFormBlockZoe(false);
+    setDesktopDialogOpen(true);
+  }
+
   async function handleDesktopSave() {
     setFormError("");
     const isEventMode = eventCategory && dialogCategoryId === eventCategory.id;
@@ -321,10 +351,10 @@ function Hofteiler({ session }) {
     setSaving(true);
     try {
       if (isEventMode) {
-        await checkConflictAndInsert({ resourceId: eventResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
+        await checkConflictAndSave({ bookingId: editingBookingId, resourceId: eventResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
         if (formRoomId) {
           try {
-            await checkConflictAndInsert({ resourceId: formRoomId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
+            await checkConflictAndSave({ resourceId: formRoomId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
           } catch (roomErr) {
             setFormError(`Termin gespeichert, aber der Raum konnte nicht mitgebucht werden: ${roomErr.message}`);
             setSaving(false);
@@ -332,11 +362,11 @@ function Hofteiler({ session }) {
           }
         }
       } else {
-        await checkConflictAndInsert({ resourceId: dialogResourceId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
+        await checkConflictAndSave({ bookingId: editingBookingId, resourceId: dialogResourceId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
         const dialogResource = resources.find((r) => r.id === dialogResourceId);
         if (formBlockZoe && zoeResource && isWallboxResource(dialogResource)) {
           try {
-            await checkConflictAndInsert({ resourceId: zoeResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
+            await checkConflictAndSave({ resourceId: zoeResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
           } catch (zoeErr) {
             setFormError(`Gebucht, aber Zoe konnte nicht mitgeblockt werden: ${zoeErr.message}`);
             setSaving(false);
@@ -345,6 +375,7 @@ function Hofteiler({ session }) {
         }
       }
       setDesktopDialogOpen(false);
+      setEditingBookingId(null);
     } catch (e) {
       setFormError(e.message || "Speichern hat nicht geklappt. Nochmal versuchen.");
     } finally {
@@ -549,6 +580,7 @@ function Hofteiler({ session }) {
                 eventCategory={eventCategory}
                 colorFor={colorFor}
                 onDelete={handleDelete}
+                onEdit={openEditBookingDialog}
                 onBook={(d) => openBookingDialog(d)}
                 showBookButton={false}
               />
@@ -691,6 +723,7 @@ function Hofteiler({ session }) {
             eventCategory={eventCategory}
             colorFor={colorFor}
             onDelete={handleDelete}
+            onEdit={openEditBookingDialog}
             onBook={(d) => openBookingDialog(d)}
             showBookButton={true}
           />
@@ -700,7 +733,8 @@ function Hofteiler({ session }) {
 
       <BookingDialog
         open={desktopDialogOpen}
-        onClose={() => setDesktopDialogOpen(false)}
+        onClose={() => { setDesktopDialogOpen(false); setEditingBookingId(null); }}
+        isEditing={!!editingBookingId}
         userName={userName}
         pickableCategories={pickableCategories}
         eventCategory={eventCategory}

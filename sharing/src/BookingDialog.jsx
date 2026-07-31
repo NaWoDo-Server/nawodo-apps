@@ -17,7 +17,7 @@ export default function BookingDialog({
   formRoomId, setFormRoomId,
   formBlockZoe, setFormBlockZoe,
   formNote, setFormNote,
-  formError, saving, onSave,
+  formError, saving, onSave, isEditing,
 }) {
   if (!open) return null;
 
@@ -31,7 +31,7 @@ export default function BookingDialog({
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-lg">Buchen</h2>
+          <h2 className="font-bold text-lg">{isEditing ? "Buchung bearbeiten" : "Buchen"}</h2>
           <button onClick={onClose}><X size={20} /></button>
         </div>
 
@@ -146,7 +146,7 @@ export default function BookingDialog({
           className="w-full rounded-lg py-3 font-semibold text-sm flex items-center justify-center gap-2"
           style={{ backgroundColor: accentColor, color: "#fff", opacity: saving || !canSave ? 0.6 : 1 }}
         >
-          {saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Speichern…" : isEventMode ? "Termin eintragen" : "Blocken"}
+          {saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Speichern…" : isEditing ? "Speichern" : isEventMode ? "Termin eintragen" : "Blocken"}
         </button>
       </div>
     </div>

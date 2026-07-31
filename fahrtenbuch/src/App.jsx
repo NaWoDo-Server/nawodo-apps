@@ -467,20 +467,10 @@ function Fahrtenbuch({ session }) {
                 </div>
               )}
 
-              <div className="px-5 mt-1 mb-3 flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
-                    <Calendar size={12} /> {rangeLabel}
-                  </button>
-                  <button onClick={() => setShowStats(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
-                    <BarChart3 size={12} /> Statistiken
-                  </button>
-                </div>
-                {isAdmin && (
-                  <button onClick={() => openPicker("export")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
-                    <Download size={12} /> Als CSV exportieren
-                  </button>
-                )}
+              <div className="px-5 mt-1 mb-3">
+                <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
+                  <Calendar size={12} /> {rangeLabel}
+                </button>
               </div>
 
               {pendingBookings.length > 0 && (
@@ -527,6 +517,12 @@ function Fahrtenbuch({ session }) {
                     )}
                   </div>
                 ))}
+              </div>
+
+              <div className="px-5 mt-4">
+                <button onClick={() => setShowStats(true)} className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
+                  <BarChart3 size={12} /> Statistiken
+                </button>
               </div>
             </>
           )

@@ -556,16 +556,13 @@ function Fahrtenbuch({ session }) {
                 </div>
 
                 {activeCar && (
-                  <div className="rounded-lg px-3.5 py-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
-                    <div className="text-xs mb-2" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
+                  <div className="flex flex-col gap-2">
+                    <div className="text-xs" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
                     <button onClick={openForm} className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
                   </div>
                 )}
 
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
-                    <Calendar size={12} /> {rangeLabel}
-                  </button>
                   <button onClick={() => setShowStats(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
                     <BarChart3 size={12} /> Statistiken
                   </button>
@@ -594,6 +591,12 @@ function Fahrtenbuch({ session }) {
                     </div>
                   </div>
                 )}
+
+                <div className="mb-3">
+                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
+                    <Calendar size={12} /> {rangeLabel}
+                  </button>
+                </div>
 
                 {carEntries.length === 0 ? (
                   <div className="text-center py-14 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>

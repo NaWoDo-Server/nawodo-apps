@@ -188,9 +188,16 @@ function Hofteiler({ session }) {
 
   const eventCategory = categories.find((c) => c.event_mode);
   const eventResource = eventCategory ? resources.find((r) => r.category_id === eventCategory.id) : null;
+  const roomCategory = categories.find((c) => c.name === "Raumbuchung");
+  const roomResources = roomCategory ? resources.filter((r) => r.category_id === roomCategory.id) : [];
+  // Ausnahme: Raumbuchung bleibt in BEIDEN Apps buchbar (Räume werden oft zusammen mit
+  // Terminen gebraucht), alle anderen Sharing-Reiter nur in der Sharing-App.
+  const isRoom = (resource) => !!(roomCategory && resource?.category_id === roomCategory.id);
   // Reiter, die in DIESER App tatsächlich buchbar sind (die jeweils andere Kategorie
   // bleibt sichtbar/filterbar, ist hier aber nur zum Ansehen da).
-  const pickableCategories = APP_MODE === "termine" ? [] : categories.filter((c) => !c.event_mode);
+  const pickableCategories = APP_MODE === "termine"
+    ? categories.filter((c) => roomCategory && c.id === roomCategory.id)
+    : categories.filter((c) => !c.event_mode);
   // Wird nur an den BookingDialog übergeben, um den Termine-Reiter dort ein-/auszublenden.
   // Alle anderen Übergaben von eventCategory (an die Kalender-Grids/DayAgenda) bleiben
   // unverändert, da Termine weiterhin überall SICHTBAR sein sollen.
@@ -199,10 +206,16 @@ function Hofteiler({ session }) {
   function isManageable(resource) {
     if (!resource) return true;
     const isEvent = !!(eventCategory && resource.category_id === eventCategory.id);
-    return APP_MODE === "termine" ? isEvent : !isEvent;
+    return APP_MODE === "termine" ? (isEvent || isRoom(resource)) : !isEvent;
   }
-  const roomCategory = categories.find((c) => c.name === "Raumbuchung");
-  const roomResources = roomCategory ? resources.filter((r) => r.category_id === roomCategory.id) : [];
+  // Reihenfolge/Gruppierung für die Reiter-Liste: in der Termine-App steht der
+  // Termine-Reiter oben, alle anderen (nur zum Ansehen) sind unter "Sharing" eingeklappt.
+  const primaryCategoryIds = APP_MODE === "termine" && eventCategory ? [eventCategory.id] : null;
+  const groupCategoryIds = APP_MODE === "termine" ? categories.filter((c) => c.id !== eventCategory?.id).map((c) => c.id) : null;
+  // Für die mobilen Reiter-Chips: Termine-Reiter in der Termine-App ganz vorne.
+  const orderedCategories = APP_MODE === "termine" && eventCategory
+    ? [eventCategory, ...categories.filter((c) => c.id !== eventCategory.id)]
+    : categories;
   const zoeResource = resources.find((r) => r.name === "Zoe");
   const isWallboxResource = (r) => r?.name === "Wallbox 1" || r?.name === "Wallbox 2";
 
@@ -532,7 +545,7 @@ function Hofteiler({ session }) {
 
       {!isDesktop && (
       <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {categories.map((c) => {
+        {orderedCategories.map((c) => {
           const Icon = ICONS[c.icon] || Package;
           const active = (activeCategoryIds || []).includes(c.id);
           return (
@@ -554,6 +567,9 @@ function Hofteiler({ session }) {
               onToggle={toggleCategory}
               onAll={() => setActiveCategoryIds(categories.map((c) => c.id))}
               onNone={() => setActiveCategoryIds([])}
+              primaryCategoryIds={primaryCategoryIds}
+              groupLabel="Sharing"
+              groupCategoryIds={groupCategoryIds}
             />
             {isAdmin && (
               <button onClick={() => requireAdmin(() => setShowResourceForm(true))} className="mt-4 flex items-center gap-1 px-3 py-2 rounded-full text-sm" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neuer Artikel</button>

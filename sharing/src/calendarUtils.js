@@ -137,6 +137,24 @@ export function assignLanes(items, dates) {
   return { placed, laneCount: lanes.length };
 }
 
+// Wie assignLanes, aber mit fester Obergrenze an sichtbaren Lanes. Alles was
+// darüber hinausgeht, wird nicht gerendert; stattdessen wird pro Tag gezählt,
+// wie viele "versteckte" Buchungen diesen Tag berühren (für ein "+N"-Badge).
+export function assignLanesCapped(items, dates, maxLanes) {
+  const { placed } = assignLanes(items, dates);
+  const visible = placed.filter((p) => p.lane < maxLanes);
+  const hidden = placed.filter((p) => p.lane >= maxLanes);
+  const overflowByDate = {};
+  hidden.forEach((p) => {
+    for (let i = p.startCol; i <= p.endCol; i++) {
+      const d = dates[i];
+      if (!d) continue;
+      overflowByDate[d] = (overflowByDate[d] || 0) + 1;
+    }
+  });
+  return { visible, overflowByDate };
+}
+
 export function shadeForIndex(baseHex, index, total) {
   const { h, s, l } = hexToHsl(baseHex);
   if (total <= 1) return baseHex;

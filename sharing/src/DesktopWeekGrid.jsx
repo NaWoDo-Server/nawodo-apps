@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
+import { ICONS } from "./icons";
 import { INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
 import { fmtDate, addWeeks, weekDays, weekRangeLabel, bookingEndDate, toMinutes, assignLanes } from "./calendarUtils";
 
@@ -100,36 +101,48 @@ export default function DesktopWeekGrid({
             <div />
             {dates.map((d) => <div key={d} className="border-r" style={{ borderColor: "#EFEDE2" }} />)}
           </div>
-          {banner.termine.placed.map((it, i) => (
-            <div
-              key={`t-${it.booking.id}-${i}`}
-              className="absolute text-white text-[10px] font-semibold px-1.5 truncate flex items-center rounded"
-              style={{
-                left: `calc(48px + ${(it.startCol / 7) * 100}% + 1px)`,
-                width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
-                top: 4 + it.lane * BANNER_LANE_H,
-                height: BANNER_LANE_H - 3,
-                backgroundColor: eventCategory.color,
-              }}
-            >
-              {it.booking.title || eventCategory.name}
-            </div>
-          ))}
-          {banner.items.placed.map((it, i) => (
-            <div
-              key={`b-${it.booking.id}-${i}`}
-              className="absolute text-white text-[10px] font-medium px-1.5 truncate flex items-center rounded"
-              style={{
-                left: `calc(48px + ${(it.startCol / 7) * 100}% + 1px)`,
-                width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
-                top: 4 + banner.termine.laneCount * BANNER_LANE_H + it.lane * BANNER_LANE_H,
-                height: BANNER_LANE_H - 3,
-                backgroundColor: colorFor(it.resource),
-              }}
-            >
-              {it.resource.name} – {it.booking.name}
-            </div>
-          ))}
+          {banner.termine.placed.map((it, i) => {
+            const Icon = ICONS[eventCategory.icon] || Zap;
+            const time = !it.booking.all_day ? `${it.booking.start_time}–${it.booking.end_time} ` : "";
+            const main = it.booking.title || eventCategory.name;
+            return (
+              <div
+                key={`t-${it.booking.id}-${i}`}
+                title={`${time}${main}`}
+                className="absolute text-white text-[10px] font-semibold px-1.5 truncate flex items-center gap-1 rounded"
+                style={{
+                  left: `calc(48px + ${(it.startCol / 7) * 100}% + 1px)`,
+                  width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
+                  top: 4 + it.lane * BANNER_LANE_H,
+                  height: BANNER_LANE_H - 3,
+                  backgroundColor: eventCategory.color,
+                }}
+              >
+                <Icon size={10} className="flex-shrink-0" /> <span className="truncate">{time}{main}</span>
+              </div>
+            );
+          })}
+          {banner.items.placed.map((it, i) => {
+            const Icon = ICONS[it.resource.icon] || Zap;
+            const time = !it.booking.all_day ? `${it.booking.start_time}–${it.booking.end_time} ` : "";
+            const main = `${it.resource.name} – ${it.booking.name}`;
+            return (
+              <div
+                key={`b-${it.booking.id}-${i}`}
+                title={`${time}${main}`}
+                className="absolute text-white text-[10px] font-medium px-1.5 truncate flex items-center gap-1 rounded"
+                style={{
+                  left: `calc(48px + ${(it.startCol / 7) * 100}% + 1px)`,
+                  width: `calc(${((it.endCol - it.startCol + 1) / 7) * 100}% - 2px)`,
+                  top: 4 + banner.termine.laneCount * BANNER_LANE_H + it.lane * BANNER_LANE_H,
+                  height: BANNER_LANE_H - 3,
+                  backgroundColor: colorFor(it.resource),
+                }}
+              >
+                <Icon size={10} className="flex-shrink-0" /> <span className="truncate">{time}{main}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -164,12 +177,14 @@ export default function DesktopWeekGrid({
                 ))}
                 {hourlyByDay[di].map((it, i) => {
                   const isEvent = eventCategory && it.resource.category_id === eventCategory.id;
+                  const Icon = (isEvent ? ICONS[eventCategory.icon] : ICONS[it.resource.icon]) || Zap;
                   const top = ((it.start - DAY_START) / 60) * HOUR_PX;
                   const height = Math.max(((it.end - it.start) / 60) * HOUR_PX, 16);
                   const widthPct = 100 / it.laneCount;
                   return (
                     <div
                       key={`${it.booking.id}-${i}`}
+                      title={`${it.booking.start_time}–${it.booking.end_time} ${isEvent ? (it.booking.title || eventCategory.name) : it.resource.name}`}
                       className="absolute text-white text-[10px] px-1 py-0.5 rounded overflow-hidden"
                       style={{
                         top, height,
@@ -178,7 +193,7 @@ export default function DesktopWeekGrid({
                         backgroundColor: isEvent ? eventCategory.color : colorFor(it.resource),
                       }}
                     >
-                      <div className="font-semibold truncate">{isEvent ? (it.booking.title || eventCategory.name) : it.resource.name}</div>
+                      <div className="font-semibold truncate flex items-center gap-1"><Icon size={9} className="flex-shrink-0" /> {isEvent ? (it.booking.title || eventCategory.name) : it.resource.name}</div>
                       <div className="truncate opacity-90">{it.booking.start_time}–{it.booking.end_time}{!isEvent ? ` · ${it.booking.name}` : ""}</div>
                     </div>
                   );

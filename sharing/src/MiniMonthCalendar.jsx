@@ -3,11 +3,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { INK, INK_SOFT, BORDER } from "./theme";
 import { addMonths, monthGrid, monthLabelShort, fmtDate } from "./calendarUtils";
 
-// Kleiner Monatsüberblick oben links. Klick auf einen Tag öffnet direkt den
-// Buchungsdialog für diesen Tag (siehe onQuickBook) und springt im großen
-// Kalender dorthin. Navigation hier steuert dieselbe calendarMonth wie das
-// große Grid, beide bleiben also synchron.
-export default function MiniMonthCalendar({ month, onMonthChange, selectedDate, onQuickBook }) {
+// Kleiner Monatsüberblick oben links. Einzelklick wählt den Tag (Tagesansicht
+// erscheint unter dem großen Kalender), Doppelklick öffnet direkt den
+// Buchungsdialog für diesen Tag. Navigation hier steuert dieselbe
+// calendarMonth wie das große Grid, beide bleiben also synchron.
+export default function MiniMonthCalendar({ month, onMonthChange, selectedDate, onSelectDate, onOpenDialog }) {
   const today = fmtDate(new Date());
   return (
     <div>
@@ -33,8 +33,9 @@ export default function MiniMonthCalendar({ month, onMonthChange, selectedDate, 
           return (
             <button
               key={cell.date}
-              onClick={() => onQuickBook(cell.date)}
-              title="Klicken zum Buchen"
+              onClick={() => onSelectDate(cell.date)}
+              onDoubleClick={() => onOpenDialog(cell.date)}
+              title="Klicken zum Auswählen, doppelklicken zum Buchen"
               className="aspect-square rounded text-[10px] flex items-center justify-center"
               style={{
                 backgroundColor: isSelected ? INK : isToday ? BORDER : "transparent",

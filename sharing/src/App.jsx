@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Zap, Home, Package, Plus, Trash2, ChevronLeft, ChevronRight, X, AlertCircle, Loader2,
-  Image as ImageIcon, Pencil, Check, List, CalendarDays,
+  Image as ImageIcon, Pencil, Check, CalendarDays,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { ICONS, ICON_KEYS } from "./icons";
 import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT, FILTER_KEY } from "./theme";
 import {
-  fmtDate, addDays, weekdayLabel, toMinutes, bookingEndDate, bookingCoversDate,
-  dateTimeMs, bookingRangeMs, rangeOverlapsMs, dayIndexInRange, spanSegmentStyle,
-  startOfWeek, addWeeks, weekDays, weekRangeLabel, rangeLabel, firstOfMonth, addMonths,
-  monthLabel, monthLabelShort, monthGrid, shadeForIndex,
+  fmtDate, addDays, toMinutes, bookingEndDate, bookingCoversDate,
+  bookingRangeMs, rangeOverlapsMs, spanSegmentStyle,
+  startOfWeek, addWeeks, rangeLabel, firstOfMonth, addMonths,
+  monthLabel, monthGrid, shadeForIndex,
 } from "./calendarUtils";
 import { useIsDesktop } from "./useIsDesktop";
 import CategorySidebar from "./CategorySidebar";
@@ -18,6 +18,7 @@ import MiniMonthCalendar from "./MiniMonthCalendar";
 import DesktopMonthGrid from "./DesktopMonthGrid";
 import DesktopWeekGrid from "./DesktopWeekGrid";
 import BookingDialog from "./BookingDialog";
+import DayAgenda from "./DayAgenda";
 
 async function uploadFile(file, pathPrefix) {
   const ext = file.name.split(".").pop();
@@ -118,22 +119,19 @@ function Hofteiler({ session }) {
   const [activeCategoryIds, setActiveCategoryIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(FILTER_KEY)) || null; } catch { return null; }
   });
-  const [selectedResourceId, setSelectedResourceId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(fmtDate(new Date()));
   const [viewMode, setViewMode] = useState("month");
   const [calendarMonth, setCalendarMonth] = useState(firstOfMonth(fmtDate(new Date())));
   const [calendarWeekStart, setCalendarWeekStart] = useState(startOfWeek(fmtDate(new Date())));
-  const [showForm, setShowForm] = useState(false);
-  const [showTerminForm, setShowTerminForm] = useState(false);
   const [showResourceForm, setShowResourceForm] = useState(false);
   const [showEditResourceForm, setShowEditResourceForm] = useState(false);
+  const [editingResourceId, setEditingResourceId] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingResPhoto, setUploadingResPhoto] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
-  const [hoveredDate, setHoveredDate] = useState(null);
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -243,20 +241,10 @@ function Hofteiler({ session }) {
     });
   }
 
-  // Items für die Reiter-Leiste: ohne die Termin-Kategorie (die hat keine wählbaren Items)
-  const tabResources = resources.filter((r) => (activeCategoryIds || []).includes(r.category_id) && r.category_id !== eventCategory?.id);
   // Ressourcen für Kalender/Tagesübersicht: alle aktiven Bereiche, inkl. Termine.
   // activeCategoryIds === null heißt "noch nicht initialisiert" (kurz beim Laden) -> alles zeigen.
   // Ein leeres Array heißt "bewusst alles abgewählt" -> nichts zeigen.
   const calendarResources = activeCategoryIds ? resources.filter((r) => activeCategoryIds.includes(r.category_id)) : resources;
-
-  useEffect(() => {
-    if (tabResources.length && !tabResources.find((r) => r.id === selectedResourceId)) {
-      setSelectedResourceId(tabResources[0].id);
-    }
-    if (!tabResources.length) setSelectedResourceId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryIds, resources]);
 
   async function refreshBookings() {
     const { data } = await supabase.from("bookings").select("*");
@@ -294,67 +282,7 @@ function Hofteiler({ session }) {
     })();
   }
 
-  async function handleAddBooking() {
-    setFormError("");
-    if (formEndDate < formStartDate) return setFormError("Enddatum darf nicht vor dem Startdatum liegen.");
-    if (!formAllDay && formEndDate === formStartDate && toMinutes(formEnd) <= toMinutes(formStart)) {
-      return setFormError("Ende muss nach dem Start liegen.");
-    }
-    setSaving(true);
-    try {
-      await checkConflictAndInsert({ resourceId: selectedResourceId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
-      if (formBlockZoe && zoeResource) {
-        try {
-          await checkConflictAndInsert({ resourceId: zoeResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
-        } catch (zoeErr) {
-          setFormError(`Wallbox gebucht, aber Zoe konnte nicht mitgeblockt werden: ${zoeErr.message}`);
-          setSaving(false);
-          return;
-        }
-      }
-      setShowForm(false);
-      setFormNote("");
-      setFormAllDay(false);
-      setFormBlockZoe(false);
-    } catch (e) {
-      setFormError(e.message || "Speichern hat nicht geklappt. Nochmal versuchen.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleAddTermin() {
-    setFormError("");
-    if (!formTitle.trim()) return setFormError("Bitte einen Titel für den Termin eintragen.");
-    if (formEndDate < formStartDate) return setFormError("Enddatum darf nicht vor dem Startdatum liegen.");
-    if (!formAllDay && formEndDate === formStartDate && toMinutes(formEnd) <= toMinutes(formStart)) {
-      return setFormError("Ende muss nach dem Start liegen.");
-    }
-    setSaving(true);
-    try {
-      await checkConflictAndInsert({ resourceId: eventResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
-      if (formRoomId) {
-        try {
-          await checkConflictAndInsert({ resourceId: formRoomId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
-        } catch (roomErr) {
-          setFormError(`Termin gespeichert, aber der Raum konnte nicht mitgebucht werden: ${roomErr.message}`);
-          setSaving(false);
-          return;
-        }
-      }
-      setShowTerminForm(false);
-      setFormTitle("");
-      setFormNote("");
-      setFormAllDay(false);
-      setFormRoomId(null);
-    } catch (e) {
-      setFormError(e.message || "Speichern hat nicht geklappt. Nochmal versuchen.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // ---- Desktop-Buchungsdialog: Reiter + Artikel werden im Dialog selbst gewählt ----
+  // ---- Buchungsdialog (Desktop + Mobile teilen sich diesen): Reiter + Artikel werden im Dialog selbst gewählt ----
   function openBookingDialog(dateStr, startTime) {
     setFormError("");
     setFormTitle("");
@@ -440,7 +368,6 @@ function Hofteiler({ session }) {
       const { data, error } = await supabase.from("resources").insert({ name: newResName.trim(), icon: newResIcon, category_id: newResCategoryId, photo_url }).select().single();
       if (error) throw error;
       setResources((prev) => [...prev, data]);
-      setSelectedResourceId(data.id);
       setShowResourceForm(false);
       setNewResName("");
       setNewResPhoto(null);
@@ -452,6 +379,7 @@ function Hofteiler({ session }) {
   }
 
   function openEditResource(resource) {
+    setEditingResourceId(resource.id);
     setEditResName(resource.name);
     setEditResIcon(resource.icon);
     setEditResCategoryId(resource.category_id);
@@ -532,23 +460,12 @@ function Hofteiler({ session }) {
     return <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}><p className="text-center">Verbindung zur Datenbank fehlgeschlagen. Prüfe config.js oder lade die Seite neu.</p></div>;
   }
 
-  const activeResource = tabResources.find((r) => r.id === selectedResourceId) || tabResources[0];
-  const activeColor = colorFor(activeResource);
-
-  // FIX: Tagesübersicht zeigt IMMER alle Buchungen der sichtbaren Bereiche, unabhängig vom gewählten Item-Reiter
-  const dayBookings = bookings
-    .filter((b) => bookingCoversDate(b, selectedDate) && calendarResources.some((r) => r.id === b.resource_id))
-    .sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
-
-  const previewDate = hoveredDate || selectedDate;
-  const previewBookings = bookings
-    .filter((b) => bookingCoversDate(b, previewDate) && calendarResources.some((r) => r.id === b.resource_id))
-    .sort((a, b) => toMinutes(a.start_time) - toMinutes(b.start_time));
+  const editingResource = resources.find((r) => r.id === editingResourceId);
 
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto sm:border-x" style={{ borderColor: "#E4E1D3" }}>
-      <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+      <div className={isDesktop ? "w-full" : "sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
+      <div className="px-5 lg:px-8 pt-6 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           {logoUrl ? <img src={logoUrl} alt="Logo" className="h-8 object-contain" /> : (
             <img src="/sharing/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
@@ -575,62 +492,10 @@ function Hofteiler({ session }) {
       </div>
       )}
 
-      {!isDesktop && pickableCategories
-        .filter((c) => (activeCategoryIds || []).includes(c.id))
-        .map((cat) => {
-          const items = tabResources.filter((r) => r.category_id === cat.id);
-          if (!items.length) return null;
-          return (
-            <div key={cat.id} className="px-5 mt-3">
-              <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: cat.color }}>{cat.name}</div>
-              <div className="flex gap-2 flex-wrap">
-                {items.map((r) => {
-                  const Icon = ICONS[r.icon] || Zap;
-                  const active = r.id === activeResource?.id;
-                  const col = colorFor(r);
-                  return (
-                    <button key={r.id} onClick={() => setSelectedResourceId(r.id)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium" style={{ backgroundColor: active ? col : `${col}1A`, color: active ? "#fff" : INK, border: `1.5px solid ${active ? col : `${col}55`}` }}>
-                      <Icon size={14} />
-                      <span>{r.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-
-      {!isDesktop && eventCategory && (activeCategoryIds || []).includes(eventCategory.id) && eventResource && (
-        <div className="px-5 mt-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: eventCategory.color }}>{eventCategory.name}</div>
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={() => { setShowTerminForm(true); setFormError(""); setFormTitle(""); setFormAllDay(false); setFormStartDate(selectedDate); setFormEndDate(selectedDate); setFormRoomId(null); }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold" style={{ backgroundColor: eventCategory.color, color: "#fff" }}>
-              <CalendarDays size={14} /> Termin eintragen
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!isDesktop && isAdmin && (
-        <div className="px-5 mt-3 flex gap-2 flex-wrap">
-          <button onClick={() => requireAdmin(() => setShowResourceForm(true))} className="flex items-center gap-1 px-3 py-2 rounded-full text-sm" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
-        </div>
-      )}
-
-      {!isDesktop && isAdmin && activeResource && (
-        <div className="px-5 flex justify-end mt-1.5 mb-1">
-          <button onClick={() => requireAdmin(() => openEditResource(activeResource))} className="flex items-center gap-1 text-xs" style={{ color: INK_SOFT }}><Pencil size={12} /> {activeResource.name} bearbeiten</button>
-        </div>
-      )}
-
-      {!isDesktop && activeResource?.photo_url && (
-        <div className="px-5 mb-3"><img src={activeResource.photo_url} alt={activeResource.name} className="w-full h-32 object-cover rounded-xl" /></div>
-      )}
-
       {isDesktop && (
-        <div className="px-5 mt-3 flex gap-6 items-start">
+        <div className="px-5 lg:px-8 mt-3 flex gap-6 items-start">
           <div className="w-52 flex-shrink-0">
-            <MiniMonthCalendar month={calendarMonth} onMonthChange={setCalendarMonth} selectedDate={selectedDate} onQuickBook={(d) => openBookingDialog(d)} />
+            <MiniMonthCalendar month={calendarMonth} onMonthChange={setCalendarMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onOpenDialog={(d) => openBookingDialog(d)} />
             <CategorySidebar
               categories={categories}
               activeCategoryIds={activeCategoryIds}
@@ -675,6 +540,19 @@ function Hofteiler({ session }) {
                 onOpenDialog={(d, t) => openBookingDialog(d, t)}
               />
             )}
+            <div className="mt-4">
+              <DayAgenda
+                date={selectedDate}
+                bookings={bookings}
+                resources={resources}
+                calendarResources={calendarResources}
+                eventCategory={eventCategory}
+                colorFor={colorFor}
+                onDelete={handleDelete}
+                onBook={(d) => openBookingDialog(d)}
+                showBookButton={false}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -682,9 +560,8 @@ function Hofteiler({ session }) {
       {!isDesktop && <>
         <div className="px-5 mt-2 flex items-center justify-between">
           <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: "#E4E1D3" }}>
-            <button onClick={() => setViewMode("day")} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "day" ? "#fff" : "transparent", color: viewMode === "day" ? INK : INK_SOFT }}><List size={13} /> Tag</button>
-            <button onClick={() => { setViewMode("week"); setCalendarWeekStart(selectedDate); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "week" ? "#fff" : "transparent", color: viewMode === "week" ? INK : INK_SOFT }}><CalendarDays size={13} /> Woche</button>
             <button onClick={() => { setViewMode("month"); setCalendarMonth(firstOfMonth(selectedDate)); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "month" ? "#fff" : "transparent", color: viewMode === "month" ? INK : INK_SOFT }}><CalendarDays size={13} /> Monat</button>
+            <button onClick={() => { setViewMode("week"); setCalendarWeekStart(selectedDate); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: viewMode === "week" ? "#fff" : "transparent", color: viewMode === "week" ? INK : INK_SOFT }}><CalendarDays size={13} /> Woche</button>
           </div>
         </div>
 
@@ -711,9 +588,8 @@ function Hofteiler({ session }) {
                 return (
                   <button
                     key={dateStr}
-                    onClick={() => { if (dateStr === selectedDate || hoveredDate === dateStr) { setSelectedDate(dateStr); setViewMode("day"); } else { setSelectedDate(dateStr); } }}
-                    onMouseEnter={() => setHoveredDate(dateStr)}
-                    onMouseLeave={() => setHoveredDate(null)}
+                    onClick={() => setSelectedDate(dateStr)}
+                    onDoubleClick={() => openBookingDialog(dateStr)}
                     className="rounded-lg py-3 flex flex-col items-center gap-1.5 relative"
                     style={{ backgroundColor: isToday ? "#E4E1D3" : "#fff", color: INK, border: isSelected ? `1.5px solid ${INK}` : "1.5px solid transparent" }}
                   >
@@ -747,7 +623,6 @@ function Hofteiler({ session }) {
           </div>
         )}
 
-
         {viewMode === "month" && (
           <div className="px-5 mt-3">
             <div className="flex items-center justify-between mb-2">
@@ -773,9 +648,8 @@ function Hofteiler({ session }) {
                 return (
                   <button
                     key={cell.date}
-                    onClick={() => { if (cell.date === selectedDate || hoveredDate === cell.date) { setSelectedDate(cell.date); setViewMode("day"); } else { setSelectedDate(cell.date); } }}
-                    onMouseEnter={() => setHoveredDate(cell.date)}
-                    onMouseLeave={() => setHoveredDate(null)}
+                    onClick={() => setSelectedDate(cell.date)}
+                    onDoubleClick={() => openBookingDialog(cell.date)}
                     className="aspect-square rounded-lg flex flex-col items-center justify-center text-sm relative gap-0.5"
                     style={{ backgroundColor: isToday ? "#E4E1D3" : "#fff", color: INK, border: isSelected ? `1.5px solid ${INK}` : "1.5px solid transparent" }}
                   >
@@ -808,94 +682,19 @@ function Hofteiler({ session }) {
           </div>
         )}
 
-        {(viewMode === "week" || viewMode === "month") && (
-          <div className="px-5 mt-4">
-            <div className="text-sm font-semibold mb-2" style={{ color: INK_SOFT }}>{weekdayLabel(hoveredDate || selectedDate)}{hoveredDate && hoveredDate !== selectedDate ? " (Vorschau)" : ""}</div>
-            {previewBookings.length === 0 ? (
-              <div className="text-xs py-3 px-3 rounded-lg" style={{ backgroundColor: "#E9E6D9", color: INK_SOFT }}>Frei</div>
-            ) : (
-              <div className="space-y-2">
-                {previewBookings.map((b) => {
-                  const res = resources.find((r) => r.id === b.resource_id);
-                  const Icon = ICONS[res?.icon] || Zap;
-                  const label = b.title || res?.name;
-                  const isMultiDay = bookingEndDate(b) !== b.date;
-                  const { idx, totalDays } = isMultiDay ? dayIndexInRange(b, previewDate) : { idx: 1, totalDays: 1 };
-                  return (
-                    <div key={b.id} className="flex items-center gap-2.5 text-sm px-3.5 py-3 rounded-lg" style={{ backgroundColor: "#fff" }}>
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: colorFor(res) }}>
-                        <Icon size={13} color="#fff" />
-                      </span>
-                      <span className="font-semibold flex-shrink-0">{label}</span>
-                      <span style={{ color: INK_SOFT }}>
-                        {b.all_day ? `Ganztägig${isMultiDay ? ` bis ${bookingEndDate(b)}` : ""}` : `${b.start_time}–${b.end_time}`} · {b.name}{b.note ? ` · ${b.note}` : ""}
-                      </span>
-                      {isMultiDay && (
-                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0" style={{ backgroundColor: colorFor(res), color: "#fff" }}>{idx}/{totalDays}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {viewMode === "day" && (
-          <>
-            <div className="px-5 mt-3 flex items-center justify-between">
-              <button onClick={() => setSelectedDate(addDays(selectedDate, -1))} className="p-2 rounded-full" style={{ backgroundColor: "#E4E1D3" }}><ChevronLeft size={18} /></button>
-              <div className="text-center">
-                <div className="font-semibold text-sm">{weekdayLabel(selectedDate)}</div>
-                {selectedDate !== fmtDate(new Date()) && <button onClick={() => setSelectedDate(fmtDate(new Date()))} className="text-xs underline" style={{ color: INK_SOFT }}>Zu heute</button>}
-              </div>
-              <button onClick={() => setSelectedDate(addDays(selectedDate, 1))} className="p-2 rounded-full" style={{ backgroundColor: "#E4E1D3" }}><ChevronRight size={18} /></button>
-            </div>
-
-            <div className="px-5 mt-5 space-y-2">
-              {dayBookings.length === 0 && <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Noch frei den ganzen Tag.</p></div>}
-              {dayBookings.map((b) => {
-                const res = resources.find((r) => r.id === b.resource_id);
-                const Icon = ICONS[res?.icon] || Zap;
-                const label = b.title || res?.name;
-                const isMultiDay = bookingEndDate(b) !== b.date;
-                const { idx, totalDays } = isMultiDay ? dayIndexInRange(b, selectedDate) : { idx: 1, totalDays: 1 };
-                return (
-                  <div key={b.id} className="rounded-lg pl-3.5 pr-2 py-3.5 flex items-center gap-3 relative" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
-                    <div className="absolute left-0 top-0 bottom-0 w-2 rounded-l-lg" style={{ backgroundColor: colorFor(res) }} />
-                    <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ml-1.5" style={{ backgroundColor: colorFor(res) }}><Icon size={15} color="#fff" /></span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-semibold text-sm">{label}</span>
-                        {b.all_day ? (
-                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: "#E4E1D3", color: INK }}>
-                            Ganztägig{isMultiDay ? ` · bis ${weekdayLabel(bookingEndDate(b))}` : ""}
-                          </span>
-                        ) : (
-                          <span className="text-sm" style={{ color: INK_SOFT }}>
-                            {b.start_time}{isMultiDay ? ` (${b.date.slice(8)}.${b.date.slice(5,7)}.)` : ""}–{b.end_time}{isMultiDay ? ` (${bookingEndDate(b).slice(8)}.${bookingEndDate(b).slice(5,7)}.)` : ""}
-                          </span>
-                        )}
-                        {isMultiDay && <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: colorFor(res), color: "#fff" }}>{idx}/{totalDays}</span>}
-                      </div>
-                      <div className="text-xs mt-0.5 truncate" style={{ color: INK_SOFT }}>{b.name}{b.note ? ` · ${b.note}` : ""}</div>
-                    </div>
-                    <button onClick={() => handleDelete(b)} className="p-2 flex-shrink-0" style={{ color: "#B8B4A2" }}><Trash2 size={15} /></button>
-                  </div>
-                );
-              })}
-            </div>
-            {!activeResource && <p className="px-5 mt-3 text-xs" style={{ color: INK_SOFT }}>Wähle oben einen Bereich aus, um selbst zu buchen.</p>}
-          </>
-        )}
-
-        {activeResource && (
-          <div className="fixed inset-0 pointer-events-none flex justify-center z-40">
-            <div className="w-full sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl relative">
-              <button onClick={() => { setShowForm(true); setFormError(""); setFormAllDay(false); setFormStartDate(selectedDate); setFormEndDate(selectedDate); setFormBlockZoe(false); }} className="pointer-events-auto absolute bottom-6 right-5 rounded-full px-5 py-3.5 flex items-center gap-2 font-semibold text-sm shadow-lg" style={{ backgroundColor: activeColor, color: "#fff" }}><Plus size={16} /> Buchen</button>
-            </div>
-          </div>
-        )}
+        <div className="px-5 mt-4 mb-4">
+          <DayAgenda
+            date={selectedDate}
+            bookings={bookings}
+            resources={resources}
+            calendarResources={calendarResources}
+            eventCategory={eventCategory}
+            colorFor={colorFor}
+            onDelete={handleDelete}
+            onBook={(d) => openBookingDialog(d)}
+            showBookButton={true}
+          />
+        </div>
       </>}
       </div>
 
@@ -928,95 +727,6 @@ function Hofteiler({ session }) {
         onSave={handleDesktopSave}
       />
 
-      {showForm && (
-        <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowForm(false)}>
-          <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">{activeResource?.name} buchen</h2><button onClick={() => setShowForm(false)}><X size={20} /></button></div>
-            <div className="flex items-center gap-2 mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
-              <span className="text-xs" style={{ color: INK_SOFT }}>Gebucht als</span>
-              <span className="text-sm font-semibold">{userName}</span>
-            </div>
-
-            <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
-              <input type="checkbox" checked={formAllDay} onChange={(e) => setFormAllDay(e.target.checked)} className="w-4 h-4" />
-              <span className="text-sm font-medium">Ganztägig</span>
-            </label>
-
-            <div className="flex gap-3 mb-3">
-              <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Start</label>
-                <input type="date" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-                {!formAllDay && <input type="time" value={formStart} onChange={(e) => setFormStart(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />}
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Ende</label>
-                <input type="date" min={formStartDate} value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-                {!formAllDay && <input type="time" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />}
-              </div>
-            </div>
-            {isWallboxResource(activeResource) && zoeResource && (
-              <label className="flex items-center gap-2 mb-3 cursor-pointer select-none px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
-                <input type="checkbox" checked={formBlockZoe} onChange={(e) => setFormBlockZoe(e.target.checked)} className="w-4 h-4" />
-                <span className="text-sm font-medium">Zoe (E-Auto) gleichzeitig blocken</span>
-              </label>
-            )}
-            <label className="text-xs font-medium block mb-1">Notiz (optional)</label>
-            <input value={formNote} onChange={(e) => setFormNote(e.target.value)} placeholder="z.B. Ladung dringend" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-            {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
-            <button onClick={handleAddBooking} disabled={saving} className="w-full rounded-lg py-3 font-semibold text-sm flex items-center justify-center gap-2" style={{ backgroundColor: activeColor, color: "#fff", opacity: saving ? 0.7 : 1 }}>{saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Speichern…" : "Blocken"}</button>
-          </div>
-        </div>
-      )}
-
-
-      {showTerminForm && eventResource && (
-        <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowTerminForm(false)}>
-          <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Termin eintragen</h2><button onClick={() => setShowTerminForm(false)}><X size={20} /></button></div>
-            <label className="text-xs font-medium block mb-1">Titel des Termins</label>
-            <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="z.B. Hoffest, Versammlung" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-            <div className="flex items-center gap-2 mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
-              <span className="text-xs" style={{ color: INK_SOFT }}>Eingetragen von</span>
-              <span className="text-sm font-semibold">{userName}</span>
-            </div>
-
-            <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
-              <input type="checkbox" checked={formAllDay} onChange={(e) => setFormAllDay(e.target.checked)} className="w-4 h-4" />
-              <span className="text-sm font-medium">Ganztägig</span>
-            </label>
-
-            <div className="flex gap-3 mb-3">
-              <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Start</label>
-                <input type="date" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-                {!formAllDay && <input type="time" value={formStart} onChange={(e) => setFormStart(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />}
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Ende</label>
-                <input type="date" min={formStartDate} value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-                {!formAllDay && <input type="time" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />}
-              </div>
-            </div>
-
-            {roomResources.length > 0 && (
-              <>
-                <label className="text-xs font-medium block mb-1">Raum dazu buchen (optional)</label>
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  <button onClick={() => setFormRoomId(null)} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: !formRoomId ? INK : "transparent", color: !formRoomId ? "#fff" : INK_SOFT, border: `1.5px solid ${!formRoomId ? INK : "#D8D5C7"}` }}>Kein Raum</button>
-                  {roomResources.map((r) => (
-                    <button key={r.id} onClick={() => setFormRoomId(r.id)} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: formRoomId === r.id ? colorFor(r) : "transparent", color: formRoomId === r.id ? "#fff" : INK, border: `1.5px solid ${formRoomId === r.id ? colorFor(r) : "#D8D5C7"}` }}>{r.name}</button>
-                  ))}
-                </div>
-              </>
-            )}
-            <label className="text-xs font-medium block mb-1">Notiz (optional)</label>
-            <input value={formNote} onChange={(e) => setFormNote(e.target.value)} placeholder="weitere Infos" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-            {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
-            <button onClick={handleAddTermin} disabled={saving} className="w-full rounded-lg py-3 font-semibold text-sm flex items-center justify-center gap-2" style={{ backgroundColor: eventCategory?.color, color: "#fff", opacity: saving ? 0.7 : 1 }}>{saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Speichern…" : "Termin eintragen"}</button>
-          </div>
-        </div>
-      )}
-
       {showResourceForm && (
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowResourceForm(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
@@ -1043,7 +753,7 @@ function Hofteiler({ session }) {
         </div>
       )}
 
-      {showEditResourceForm && activeResource && (
+      {showEditResourceForm && editingResource && (
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowEditResourceForm(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Item bearbeiten</h2><button onClick={() => setShowEditResourceForm(false)}><X size={20} /></button></div>
@@ -1062,11 +772,11 @@ function Hofteiler({ session }) {
               ); })}
             </div>
             <label className="text-xs font-medium block mb-1">Foto</label>
-            {activeResource.photo_url && !editResPhoto && <img src={activeResource.photo_url} className="w-full h-24 object-cover rounded-lg mb-2" />}
-            <button onClick={() => editResPhotoInputRef.current?.click()} className="w-full rounded-lg py-2.5 mb-4 text-sm border flex items-center justify-center gap-2" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}><ImageIcon size={15} /> {editResPhoto ? editResPhoto.name : activeResource.photo_url ? "Foto ersetzen" : "Foto hinzufügen"}</button>
+            {editingResource.photo_url && !editResPhoto && <img src={editingResource.photo_url} className="w-full h-24 object-cover rounded-lg mb-2" />}
+            <button onClick={() => editResPhotoInputRef.current?.click()} className="w-full rounded-lg py-2.5 mb-4 text-sm border flex items-center justify-center gap-2" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}><ImageIcon size={15} /> {editResPhoto ? editResPhoto.name : editingResource.photo_url ? "Foto ersetzen" : "Foto hinzufügen"}</button>
             <input ref={editResPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => setEditResPhoto(e.target.files?.[0] || null)} />
-            <button onClick={() => handleEditResource(activeResource.id)} disabled={savingEdit} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: INK, opacity: savingEdit ? 0.7 : 1 }}>{savingEdit && <Loader2 size={15} className="animate-spin" />} {savingEdit ? "Speichern…" : "Speichern"}</button>
-            <button onClick={() => handleDeleteResource(activeResource.id)} className="w-full rounded-lg py-3 font-semibold text-sm flex items-center justify-center gap-2" style={{ color: "#A13D3D", border: "1.5px solid #E0B8B8" }}><Trash2 size={15} /> Item löschen</button>
+            <button onClick={() => handleEditResource(editingResource.id)} disabled={savingEdit} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: INK, opacity: savingEdit ? 0.7 : 1 }}>{savingEdit && <Loader2 size={15} className="animate-spin" />} {savingEdit ? "Speichern…" : "Speichern"}</button>
+            <button onClick={() => handleDeleteResource(editingResource.id)} className="w-full rounded-lg py-3 font-semibold text-sm flex items-center justify-center gap-2" style={{ color: "#A13D3D", border: "1.5px solid #E0B8B8" }}><Trash2 size={15} /> Item löschen</button>
           </div>
         </div>
       )}
@@ -1107,6 +817,29 @@ function Hofteiler({ session }) {
             {logoUrl && <img src={logoUrl} className="w-16 h-16 rounded-lg object-cover mb-2" />}
             <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="w-full rounded-lg py-2.5 mb-3 text-sm border flex items-center justify-center gap-2" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}>{uploadingLogo ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />} {uploadingLogo ? "Lädt hoch…" : "Logo hochladen"}</button>
             <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
+
+            {isAdmin && (
+              <>
+                <label className="text-xs font-medium block mb-1 mt-2">Artikel verwalten</label>
+                <div className="space-y-1 mb-2 max-h-48 overflow-y-auto">
+                  {resources.filter((r) => r.category_id !== eventCategory?.id).map((r) => {
+                    const Icon = ICONS[r.icon] || Zap;
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => { setShowSettings(false); openEditResource(r); }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left"
+                        style={{ backgroundColor: "#fff" }}
+                      >
+                        <Icon size={14} /> <span className="flex-1 truncate">{r.name}</span> <Pencil size={12} style={{ color: INK_SOFT }} />
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={() => { setShowSettings(false); setShowResourceForm(true); }} className="w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm mb-3" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neuer Artikel</button>
+              </>
+            )}
+
             <button onClick={handleLogout} className="w-full rounded-lg py-2.5 text-sm border" style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}>Abmelden</button>
           </div>
         </div>

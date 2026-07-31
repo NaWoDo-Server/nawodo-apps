@@ -24,9 +24,9 @@ function CategoryRow({ c, isActive, onToggle, indent }) {
 // Ist keine Kategorie angewählt, zeigt der Kalender auch nichts an (Filter-Logik sitzt in App.jsx).
 //
 // Optional: primaryCategoryIds/groupLabel/groupCategoryIds – wenn gesetzt, werden die
-// primären Kategorien (z.B. Termine) oben einzeln gezeigt, alle übrigen Kategorien
-// darunter in einem einklappbaren Reiter (z.B. "Sharing") gebündelt, um die Liste
-// übersichtlicher zu halten (genutzt in der Termine-App).
+// primären Kategorien (z.B. Termine + Raumbuchung) oben einzeln gezeigt, alle übrigen
+// Kategorien darunter in einem einklappbaren Reiter (z.B. "Sharing") gebündelt, um die
+// Liste übersichtlicher zu halten (genutzt in der Termine-App).
 export default function CategorySidebar({ categories, activeCategoryIds, onToggle, onAll, onNone, primaryCategoryIds, groupLabel, groupCategoryIds }) {
   const [groupOpen, setGroupOpen] = useState(false);
   const active = activeCategoryIds || [];

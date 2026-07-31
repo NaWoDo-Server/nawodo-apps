@@ -324,6 +324,7 @@ function Hofteiler({ session }) {
         name: name.trim(),
         note: note.trim() || null,
         title: title ? title.trim() : null,
+        ...(bookingId ? {} : { user_id: user.id }),
       };
       const { error } = bookingId
         ? await supabase.from("bookings").update(payload).eq("id", bookingId)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Car, X, AlertCircle, Loader2, Home, Download, Calendar, BarChart3, Pencil, Trash2 } from "lucide-react";
 import { supabase, configMissing } from "./supabaseClient";
+import { useIsDesktop } from "./useIsDesktop";
 
 const PAPER = "#F1F0EA";
 const INK = "#2B2B26";
@@ -89,7 +90,7 @@ function AuthGate() {
           <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: BLUE }}>
             <Car size={30} color="#fff" />
           </div>
-          <h1 className="font-bold text-lg mb-1">Fahrtenbuch</h1>
+          <h1 className="font-bold text-lg mb-1">NaWoDo Fahrtenbuch</h1>
           <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Mit deinem NaWoDo-Account anmelden.</p>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" className="w-full rounded-lg px-3 py-2.5 mb-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
           <input value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="Passwort" type="password" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
@@ -111,6 +112,7 @@ function Fahrtenbuch({ session }) {
   const userName = user.user_metadata?.name || user.email;
   const isAdmin = user.user_metadata?.is_admin === true;
   const initial = userName.charAt(0).toUpperCase();
+  const isDesktop = useIsDesktop();
 
   const [cars, setCars] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -257,12 +259,19 @@ function Fahrtenbuch({ session }) {
     return isAdmin || entry.user_id === user.id;
   }
 
+  // Nur wer das Fahrzeug gebucht hat (oder ein Admin) darf die km dazu eintragen.
+  // Alte Buchungen ohne user_id (vor der Umstellung angelegt) bleiben für alle offen.
+  function canLogBooking(b) {
+    return isAdmin || !b.user_id || b.user_id === user.id;
+  }
+
   const todayStr = fmtDate(new Date());
   const loggedBookingIds = new Set(entries.filter((e) => e.booking_id).map((e) => e.booking_id));
   const pendingBookings = bookings
     .filter((b) => b.resource_id === selectedCarId)
     .filter((b) => !loggedBookingIds.has(b.id))
     .filter((b) => (b.end_date || b.date) <= todayStr)
+    .filter(canLogBooking)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   function openForm() {
@@ -420,11 +429,11 @@ function Fahrtenbuch({ session }) {
 
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="sm:max-w-2xl mx-auto sm:border-x" style={{ borderColor: "#E4E1D3" }}>
-        <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+      <div className={isDesktop ? "w-full" : "sm:max-w-2xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
+        <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6 flex items-center justify-between" : "px-5 pt-6 pb-3 flex items-center justify-between"}>
           <div className="flex items-center gap-2.5">
-            <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
-            <h1 className="font-bold text-lg">Fahrtenbuch</h1>
+            <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-11 object-contain" : "h-8 object-contain"} />
+            <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>NaWoDo Fahrtenbuch</h1>
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
@@ -432,93 +441,198 @@ function Fahrtenbuch({ session }) {
           </div>
         </div>
 
-        {cars.length === 0 && !isAdmin ? (
-          <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
-        ) : (
-          <>
-            <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {cars.map((c) => {
-                const active = c.id === selectedCarId;
-                return (
-                  <button key={c.id} onClick={() => setSelectedCarId(c.id)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium flex-shrink-0" style={{ backgroundColor: active ? BLUE : `${BLUE}1A`, color: active ? "#fff" : INK, border: `1.5px solid ${active ? BLUE : `${BLUE}55`}` }}>
-                    <Car size={14} /> {c.name}
-                  </button>
-                );
-              })}
-              {isAdmin && (
-                <button onClick={() => { setShowCarForm(true); setNewCarName(""); }} className="flex items-center gap-1 px-3 py-2 rounded-full text-sm flex-shrink-0" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
-              )}
-            </div>
-
-            {activeCar && (
-              <div className="px-5 mt-4 mb-2 flex items-center justify-between">
-                <div className="text-xs" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
-                <button onClick={openForm} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
-              </div>
-            )}
-
-            <div className="px-5 mt-1 mb-3 flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
-                  <Calendar size={12} /> {rangeLabel}
-                </button>
-                <button onClick={() => setShowStats(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
-                  <BarChart3 size={12} /> Statistiken
-                </button>
-              </div>
-              {isAdmin && (
-                <button onClick={() => openPicker("export")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
-                  <Download size={12} /> Als CSV exportieren
-                </button>
-              )}
-            </div>
-
-            {pendingBookings.length > 0 && (
-              <div className="px-5 mb-4">
-                <div className="text-xs font-semibold mb-2" style={{ color: "#C9752F" }}>Ausstehende Buchungen – noch nicht im Fahrtenbuch</div>
-                <div className="space-y-2">
-                  {pendingBookings.map((b) => (
-                    <button key={b.id} onClick={() => openFormFromBooking(b)} className="w-full text-left rounded-lg px-3.5 py-3 flex items-center justify-between" style={{ backgroundColor: "#fff", border: "1.5px dashed #C9752F55" }}>
-                      <div>
-                        <div className="text-sm font-semibold">{fmtEntryDate(b.date)}{b.end_date && b.end_date !== b.date ? ` – ${fmtEntryDate(b.end_date)}` : ""}</div>
-                        <div className="text-xs" style={{ color: INK_SOFT }}>{b.name}{b.all_day ? " · ganztägig" : ` · ${b.start_time}–${b.end_time}`}</div>
-                      </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#C9752F1A", color: "#C9752F" }}>km eintragen</span>
+        {!isDesktop && (
+          cars.length === 0 && !isAdmin ? (
+            <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
+          ) : (
+            <>
+              <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                {cars.map((c) => {
+                  const active = c.id === selectedCarId;
+                  return (
+                    <button key={c.id} onClick={() => setSelectedCarId(c.id)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium flex-shrink-0" style={{ backgroundColor: active ? BLUE : `${BLUE}1A`, color: active ? "#fff" : INK, border: `1.5px solid ${active ? BLUE : `${BLUE}55`}` }}>
+                      <Car size={14} /> {c.name}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
+                {isAdmin && (
+                  <button onClick={() => { setShowCarForm(true); setNewCarName(""); }} className="flex items-center gap-1 px-3 py-2 rounded-full text-sm flex-shrink-0" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
+                )}
               </div>
-            )}
 
-            <div className="px-5 space-y-2">
-              {carEntries.length === 0 && (
-                <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>
+              {activeCar && (
+                <div className="px-5 mt-4 mb-2 flex items-center justify-between">
+                  <div className="text-xs" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
+                  <button onClick={openForm} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
+                </div>
               )}
-              {carEntries.map((e) => (
-                <div key={e.id} onClick={() => canEdit(e) && openEditForm(e)} className="rounded-lg px-3.5 py-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)", cursor: canEdit(e) ? "pointer" : "default" }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold">{fmtEntryDate(e.date)}</div>
-                      <div className="text-xs" style={{ color: INK_SOFT }}>{e.driver_name}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <div className="text-sm font-semibold">{e.end_km - e.start_km} km</div>
-                        <div className="text-xs" style={{ color: INK_SOFT }}>{e.start_km} → {e.end_km}</div>
-                      </div>
-                      {canEdit(e) && <Pencil size={13} style={{ color: "#B8B4A2" }} />}
-                    </div>
+
+              <div className="px-5 mt-1 mb-3 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
+                    <Calendar size={12} /> {rangeLabel}
+                  </button>
+                  <button onClick={() => setShowStats(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
+                    <BarChart3 size={12} /> Statistiken
+                  </button>
+                </div>
+                {isAdmin && (
+                  <button onClick={() => openPicker("export")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
+                    <Download size={12} /> Als CSV exportieren
+                  </button>
+                )}
+              </div>
+
+              {pendingBookings.length > 0 && (
+                <div className="px-5 mb-4">
+                  <div className="text-xs font-semibold mb-2" style={{ color: "#C9752F" }}>Ausstehende Buchungen – noch nicht im Fahrtenbuch</div>
+                  <div className="space-y-2">
+                    {pendingBookings.map((b) => (
+                      <button key={b.id} onClick={() => openFormFromBooking(b)} className="w-full text-left rounded-lg px-3.5 py-3 flex items-center justify-between" style={{ backgroundColor: "#fff", border: "1.5px dashed #C9752F55" }}>
+                        <div>
+                          <div className="text-sm font-semibold">{fmtEntryDate(b.date)}{b.end_date && b.end_date !== b.date ? ` – ${fmtEntryDate(b.end_date)}` : ""}</div>
+                          <div className="text-xs" style={{ color: INK_SOFT }}>{b.name}{b.all_day ? " · ganztägig" : ` · ${b.start_time}–${b.end_time}`}</div>
+                        </div>
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#C9752F1A", color: "#C9752F" }}>km eintragen</span>
+                      </button>
+                    ))}
                   </div>
-                  {(e.note || e.is_expense) && (
-                    <div className="text-xs mt-1.5 pt-1.5 flex items-center justify-between" style={{ color: INK_SOFT, borderTop: "1px solid #F1F0EA" }}>
-                      <span>{e.note}</span>
-                      {e.is_expense && <span className="font-semibold" style={{ color: "#C9752F" }}>Ausgabe: {e.expense_amount} €</span>}
+                </div>
+              )}
+
+              <div className="px-5 space-y-2">
+                {carEntries.length === 0 && (
+                  <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>
+                )}
+                {carEntries.map((e) => (
+                  <div key={e.id} onClick={() => canEdit(e) && openEditForm(e)} className="rounded-lg px-3.5 py-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)", cursor: canEdit(e) ? "pointer" : "default" }}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold">{fmtEntryDate(e.date)}</div>
+                        <div className="text-xs" style={{ color: INK_SOFT }}>{e.driver_name}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{e.end_km - e.start_km} km</div>
+                          <div className="text-xs" style={{ color: INK_SOFT }}>{e.start_km} → {e.end_km}</div>
+                        </div>
+                        {canEdit(e) && <Pencil size={13} style={{ color: "#B8B4A2" }} />}
+                      </div>
                     </div>
+                    {(e.note || e.is_expense) && (
+                      <div className="text-xs mt-1.5 pt-1.5 flex items-center justify-between" style={{ color: INK_SOFT, borderTop: "1px solid #F1F0EA" }}>
+                        <span>{e.note}</span>
+                        {e.is_expense && <span className="font-semibold" style={{ color: "#C9752F" }}>Ausgabe: {e.expense_amount} €</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )
+        )}
+
+        {isDesktop && (
+          cars.length === 0 && !isAdmin ? (
+            <p className="px-8 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
+          ) : (
+            <div className="max-w-6xl mx-auto px-8 pb-12 flex gap-8 items-start">
+              <div className="w-64 flex-shrink-0 flex flex-col gap-5">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Fahrzeuge</div>
+                  <div className="flex flex-col gap-1.5">
+                    {cars.map((c) => {
+                      const active = c.id === selectedCarId;
+                      return (
+                        <button key={c.id} onClick={() => setSelectedCarId(c.id)} className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-sm font-medium text-left" style={{ backgroundColor: active ? BLUE : `${BLUE}1A`, color: active ? "#fff" : INK, border: `1.5px solid ${active ? BLUE : `${BLUE}55`}` }}>
+                          <Car size={14} /> {c.name}
+                        </button>
+                      );
+                    })}
+                    {isAdmin && (
+                      <button onClick={() => { setShowCarForm(true); setNewCarName(""); }} className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm text-left" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
+                    )}
+                  </div>
+                </div>
+
+                {activeCar && (
+                  <div className="rounded-lg px-3.5 py-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
+                    <div className="text-xs mb-2" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
+                    <button onClick={openForm} className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
+                    <Calendar size={12} /> {rangeLabel}
+                  </button>
+                  <button onClick={() => setShowStats(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
+                    <BarChart3 size={12} /> Statistiken
+                  </button>
+                  {isAdmin && (
+                    <button onClick={() => openPicker("export")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
+                      <Download size={12} /> Als CSV exportieren
+                    </button>
                   )}
                 </div>
-              ))}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                {pendingBookings.length > 0 && (
+                  <div className="mb-5">
+                    <div className="text-xs font-semibold mb-2" style={{ color: "#C9752F" }}>Ausstehende Buchungen – noch nicht im Fahrtenbuch</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {pendingBookings.map((b) => (
+                        <button key={b.id} onClick={() => openFormFromBooking(b)} className="text-left rounded-lg px-3.5 py-3 flex items-center justify-between" style={{ backgroundColor: "#fff", border: "1.5px dashed #C9752F55" }}>
+                          <div>
+                            <div className="text-sm font-semibold">{fmtEntryDate(b.date)}{b.end_date && b.end_date !== b.date ? ` – ${fmtEntryDate(b.end_date)}` : ""}</div>
+                            <div className="text-xs" style={{ color: INK_SOFT }}>{b.name}{b.all_day ? " · ganztägig" : ` · ${b.start_time}–${b.end_time}`}</div>
+                          </div>
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2" style={{ backgroundColor: "#C9752F1A", color: "#C9752F" }}>km eintragen</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {carEntries.length === 0 ? (
+                  <div className="text-center py-14 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>
+                ) : (
+                  <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ backgroundColor: "#E9E6D9" }}>
+                          <th className="text-left font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>Datum</th>
+                          <th className="text-left font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>Fahrer</th>
+                          <th className="text-right font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>km Start</th>
+                          <th className="text-right font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>km Ende</th>
+                          <th className="text-right font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>gefahren</th>
+                          <th className="text-left font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>Bemerkung</th>
+                          <th className="px-4 py-2.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {carEntries.map((e) => (
+                          <tr key={e.id} onClick={() => canEdit(e) && openEditForm(e)} style={{ borderTop: "1px solid #F1F0EA", cursor: canEdit(e) ? "pointer" : "default" }}>
+                            <td className="px-4 py-2.5 whitespace-nowrap">{fmtEntryDate(e.date)}</td>
+                            <td className="px-4 py-2.5" style={{ color: INK_SOFT }}>{e.driver_name}</td>
+                            <td className="px-4 py-2.5 text-right" style={{ color: INK_SOFT }}>{e.start_km}</td>
+                            <td className="px-4 py-2.5 text-right" style={{ color: INK_SOFT }}>{e.end_km}</td>
+                            <td className="px-4 py-2.5 text-right font-semibold">{e.end_km - e.start_km} km</td>
+                            <td className="px-4 py-2.5" style={{ color: INK_SOFT }}>
+                              {e.note}
+                              {e.is_expense && <span className="font-semibold ml-2" style={{ color: "#C9752F" }}>Ausgabe: {e.expense_amount} €</span>}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">{canEdit(e) && <Pencil size={13} style={{ color: "#B8B4A2" }} />}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
-          </>
+          )
         )}
       </div>
 

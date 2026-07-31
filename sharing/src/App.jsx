@@ -240,9 +240,10 @@ function Hofteiler({ session }) {
         setActiveCategoryIds((prev) => {
           if (prev) return prev;
           const eventCat = cats.find((c) => c.event_mode);
+          const roomCat = cats.find((c) => c.name === "Raumbuchung");
           if (!eventCat) return cats.map((c) => c.id);
           return APP_MODE === "termine"
-            ? [eventCat.id]
+            ? [eventCat.id, ...(roomCat ? [roomCat.id] : [])]
             : cats.filter((c) => c.id !== eventCat.id).map((c) => c.id);
         });
         if (!newResCategoryId && cats.length) {
@@ -557,7 +558,7 @@ function Hofteiler({ session }) {
 
       {!isDesktop && (
       <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {(primaryCategoryIds ? categories.filter((c) => primaryCategoryIds.includes(c.id)) : categories).map((c) => {
+        {(primaryCategoryIds ? primaryCategoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) : categories).map((c) => {
           const Icon = ICONS[c.icon] || Package;
           const active = (activeCategoryIds || []).includes(c.id);
           return (

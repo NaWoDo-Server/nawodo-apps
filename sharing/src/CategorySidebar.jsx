@@ -32,7 +32,7 @@ export default function CategorySidebar({ categories, activeCategoryIds, onToggl
   const active = activeCategoryIds || [];
 
   const hasGrouping = !!primaryCategoryIds;
-  const primary = hasGrouping ? categories.filter((c) => primaryCategoryIds.includes(c.id)) : categories;
+  const primary = hasGrouping ? primaryCategoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) : categories;
   const grouped = hasGrouping ? categories.filter((c) => (groupCategoryIds || []).includes(c.id)) : [];
   const groupActiveCount = grouped.filter((c) => active.includes(c.id)).length;
 

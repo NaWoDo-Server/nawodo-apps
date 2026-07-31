@@ -2,13 +2,13 @@ import React, { useMemo } from "react";
 import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
 import { ICONS } from "./icons";
 import { INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
-import { fmtDate, addMonths, monthLabel, monthGrid, assignLanesCapped } from "./calendarUtils";
+import { fmtDate, addMonths, monthLabel, monthGrid, bookingEndDate, assignLanesCapped } from "./calendarUtils";
 
 const DOW = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const LANE_H = 20; // px pro Reiter-Zeile
 const HEADER_H = 22; // px für die Tageszahl
-const MAX_LANES = 4; // Gesamtzahl Zeilen pro Kachel (Höhe bleibt immer gleich)
-const VISIBLE_LANES = MAX_LANES - 1; // die unterste Zeile ist für "+" reserviert, falls nötig
+const MAX_LANES = 6; // Gesamtzahl Zeilen pro Kachel (Höhe bleibt immer gleich)
+const VISIBLE_LANES = MAX_LANES - 1; // die unterste Zeile ist für "+" reserviert, falls nötig (= 5 sichtbare Einträge)
 const CELL_H = HEADER_H + MAX_LANES * LANE_H + 8; // alle Kacheln exakt gleich hoch
 
 export default function DesktopMonthGrid({
@@ -34,9 +34,15 @@ export default function DesktopMonthGrid({
         covering.push({ resource: r, booking: b, isEvent });
       });
     });
-    // Termine zuerst einsortieren, damit sie bei der Lane-Vergabe Vorrang haben
-    // (immer über den normalen Buchungen, wie gefordert).
-    const combined = [...covering.filter((it) => it.isEvent), ...covering.filter((it) => !it.isEvent)];
+    // Reihenfolge bei der Lane-Vergabe (wichtig, da die zuerst einsortierten Einträge
+    // die oberen Zeilen bekommen): 1. Termine, 2. mehrtägige Buchungen, 3. eintägige
+    // Buchungen. So bleiben mehrtägige Balken über alle betroffenen Tage hinweg oben
+    // und erkennbar, eintägige Buchungen ordnen sich darunter ein.
+    const isMultiDay = (it) => bookingEndDate(it.booking) !== it.booking.date;
+    const termine = covering.filter((it) => it.isEvent);
+    const multiDay = covering.filter((it) => !it.isEvent && isMultiDay(it));
+    const singleDay = covering.filter((it) => !it.isEvent && !isMultiDay(it));
+    const combined = [...termine, ...multiDay, ...singleDay];
     return assignLanesCapped(combined, weekDates, VISIBLE_LANES);
   }), [month, bookings, calendarResources, eventCategory]);
 
@@ -66,15 +72,13 @@ export default function DesktopMonthGrid({
                     key={cell.date}
                     onClick={() => onSelectDate(cell.date)}
                     onDoubleClick={() => onOpenDialog(cell.date)}
-                    className="border-r border-b text-left px-1.5 pt-1 relative overflow-hidden"
+                    className="border-r border-b text-left relative overflow-hidden"
                     style={{
                       borderColor: BORDER_SOFT,
                       backgroundColor: isSelected ? "#EDEAD8" : isToday ? "#F6F4EA" : "#fff",
                       boxShadow: isSelected ? `inset 0 0 0 1.5px ${INK}` : "none",
                     }}
-                  >
-                    <span className="text-xs font-semibold" style={{ color: isToday ? INK : INK_SOFT }}>{cell.day}</span>
-                  </button>
+                  />
                 );
               })}
 
@@ -125,6 +129,29 @@ export default function DesktopMonthGrid({
                       }}
                     >
                       +
+                    </div>
+                  );
+                })}
+                {/* Tageszahl zuletzt gerendert, damit sie immer über den Balken liegt und
+                    nie von einer Buchung überdeckt wird (deckender Hintergrund pro Spalte) */}
+                {week.map((cell, di) => {
+                  if (!cell) return null;
+                  const isToday = cell.date === today;
+                  const isSelected = cell.date === selectedDate;
+                  return (
+                    <div
+                      key={`num-${cell.date}`}
+                      className="absolute text-xs font-semibold px-1.5 pt-1"
+                      style={{
+                        left: `${(di / 7) * 100}%`,
+                        top: 0,
+                        width: `${(1 / 7) * 100}%`,
+                        height: HEADER_H,
+                        color: isToday ? INK : INK_SOFT,
+                        backgroundColor: isSelected ? "#EDEAD8" : isToday ? "#F6F4EA" : "#fff",
+                      }}
+                    >
+                      {cell.day}
                     </div>
                   );
                 })}

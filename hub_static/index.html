@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1F6F5C" />
+  <title>NaWoDo Apps</title>
+  <link rel="icon" href="/sharing/logo-nawodo.png" type="image/png" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #F1F0EA;
+      color: #2B2B26;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 420px;
+      padding: 48px 24px 40px;
+    }
+    .wordmark {
+      display: block;
+      margin: 0 auto 4px;
+      height: 56px;
+      object-fit: contain;
+    }
+    .subtitle {
+      text-align: center;
+      color: #6B6A61;
+      font-size: 14px;
+      margin: 0 0 40px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px 20px;
+    }
+    a.app {
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .icon {
+      width: 68px;
+      height: 68px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      position: relative;
+      overflow: hidden;
+    }
+    .icon img { width: 100%; height: 100%; object-fit: cover; }
+    .icon svg { width: 32px; height: 32px; }
+    .label {
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.25;
+    }
+    .badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      background: #B54A45;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 8px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img src="/sharing/logo-nawodo.png" alt="NaWoDo" class="wordmark" />
+    <p class="subtitle">Eure Apps im Wohnprojekt</p>
+
+    <div class="grid">
+      <a class="app" href="/fahrtenbuch/">
+        <div class="icon" style="background:#2E86AB;">
+          <span style="position:relative;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M5 17a2 2 0 0 1-2-2v-1.2a1 1 0 0 1 .35-.76l1.8-1.55A2 2 0 0 0 6 10.2V9a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1.2a2 2 0 0 0 .85 1.29l1.8 1.55a1 1 0 0 1 .35.76V15a2 2 0 0 1-2 2M5 17a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2M19 17a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2M8 12h.01M16 12h.01"/></svg>
+          </span>
+          <span class="badge">bald</span>
+        </div>
+        <span class="label">Fahrtenbuch</span>
+      </a>
+
+      <a class="app" href="/sharing/">
+        <div class="icon" style="background:#fff;">
+          <img src="/sharing/logo-nawodo.png" alt="NaWoDo Sharing" />
+        </div>
+        <span class="label">NaWoDo Sharing</span>
+      </a>
+
+      <a class="app" href="/pinnwand/">
+        <div class="icon" style="background:#C9752F;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 22v-8M5 9h14l-1.5 5h-11z"/><circle cx="12" cy="6" r="1.5" fill="#fff" stroke="none"/></svg>
+          <span class="badge">bald</span>
+        </div>
+        <span class="label">Pinnwand</span>
+      </a>
+
+      <a class="app" href="/biete-suche/">
+        <div class="icon" style="background:#6C63A6;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4M7 4 3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"/></svg>
+          <span class="badge">bald</span>
+        </div>
+        <span class="label">Biete / Suche</span>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

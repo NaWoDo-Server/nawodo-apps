@@ -1,0 +1,9 @@
+{
+  "name": "NaWoDo Sharing",
+  "short_name": "NaWoDo",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F1F0EA",
+  "theme_color": "#1F6F5C",
+  "icons": [{ "src": "/sharing/logo-nawodo.png", "sizes": "512x512", "type": "image/png" }]
+}

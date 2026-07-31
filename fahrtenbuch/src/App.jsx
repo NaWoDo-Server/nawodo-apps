@@ -59,49 +59,23 @@ export default function App() {
 }
 
 function AuthGate() {
-  const [session, setSession] = useState(undefined);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loggingIn, setLoggingIn] = useState(false);
+  const [session, setSession] = useState(undefined); // undefined = wird geladen, null = kein Login
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, sess) => setSession(sess));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => setSession(sess));
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function handleLogin() {
-    setLoginError("");
-    setLoggingIn(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setLoggingIn(false);
-    if (error) setLoginError("E-Mail oder Passwort falsch.");
-  }
+  useEffect(() => {
+    // Kein Login vorhanden: zurück zur Hauptseite, dort ist jetzt der Login.
+    if (session === null) {
+      window.location.href = "/";
+    }
+  }, [session]);
 
-  if (session === undefined) {
+  if (session === undefined || session === null) {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
-        <div className="max-w-sm w-full text-center">
-          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: BLUE }}>
-            <Car size={30} color="#fff" />
-          </div>
-          <h1 className="font-bold text-lg mb-1">Fahrtenbuch</h1>
-          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Mit deinem NaWoDo-Account anmelden.</p>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" className="w-full rounded-lg px-3 py-2.5 mb-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-          <input value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="Passwort" type="password" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
-          {loginError && <p className="text-sm mb-3" style={{ color: "#A13D3D" }}>{loginError}</p>}
-          <button onClick={handleLogin} disabled={loggingIn} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: INK, opacity: loggingIn ? 0.7 : 1 }}>
-            {loggingIn && <Loader2 size={15} className="animate-spin" />} Anmelden
-          </button>
-          <a href="/" className="inline-block mt-4 text-xs" style={{ color: INK_SOFT }}>Zurück zur Startseite</a>
-        </div>
-      </div>
-    );
   }
 
   return <Fahrtenbuch session={session} />;

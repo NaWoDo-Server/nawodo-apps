@@ -55,10 +55,6 @@ export default function App() {
 
 function AuthGate() {
   const [session, setSession] = useState(undefined); // undefined = wird geladen, null = kein Login
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -66,49 +62,15 @@ function AuthGate() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function handleLogin() {
-    setLoginError("");
-    setLoggingIn(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setLoggingIn(false);
-    if (error) setLoginError("E-Mail oder Passwort falsch.");
-  }
+  useEffect(() => {
+    // Kein Login vorhanden: zurück zur Hauptseite, dort ist jetzt der Login.
+    if (session === null) {
+      window.location.href = "/";
+    }
+  }, [session]);
 
-  if (session === undefined) {
+  if (session === undefined || session === null) {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
-        <div className="max-w-sm w-full text-center">
-          <img src="/termine/logo-nawodo.png" alt="NaWoDo Termine" className="h-14 object-contain mx-auto mb-4" />
-          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Mit deinem Account anmelden.</p>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="E-Mail"
-            type="email"
-            className="w-full rounded-lg px-3 py-2.5 mb-2.5 text-sm border"
-            style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
-          />
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            placeholder="Passwort"
-            type="password"
-            className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border"
-            style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
-          />
-          {loginError && <p className="text-sm mb-3" style={{ color: "#A13D3D" }}>{loginError}</p>}
-          <button onClick={handleLogin} disabled={loggingIn} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: INK, opacity: loggingIn ? 0.7 : 1 }}>
-            {loggingIn && <Loader2 size={15} className="animate-spin" />} Anmelden
-          </button>
-          <p className="text-xs mt-4" style={{ color: INK_SOFT }}>Noch keinen Zugang? Meldet euch beim Admin, der legt euch einen Account an.</p>
-        </div>
-      </div>
-    );
   }
 
   return <Hofteiler session={session} />;

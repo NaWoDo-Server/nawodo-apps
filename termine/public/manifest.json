@@ -1,0 +1,9 @@
+{
+  "name": "NaWoDo Termine",
+  "short_name": "Termine",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F1F0EA",
+  "theme_color": "#1F6F5C",
+  "icons": [{ "src": "/termine/logo-nawodo.png", "sizes": "512x512", "type": "image/png" }]
+}

@@ -90,7 +90,7 @@ function AuthGate() {
           <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: BLUE }}>
             <Car size={30} color="#fff" />
           </div>
-          <h1 className="font-bold text-lg mb-1">NaWoDo Fahrtenbuch</h1>
+          <h1 className="font-bold text-lg mb-1">Fahrtenbuch</h1>
           <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Mit deinem NaWoDo-Account anmelden.</p>
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-Mail" type="email" className="w-full rounded-lg px-3 py-2.5 mb-2.5 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
           <input value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()} placeholder="Passwort" type="password" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
@@ -433,7 +433,7 @@ function Fahrtenbuch({ session }) {
         <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6 flex items-center justify-between" : "px-5 pt-6 pb-3 flex items-center justify-between"}>
           <div className="flex items-center gap-2.5">
             <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-11 object-contain" : "h-8 object-contain"} />
-            <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>NaWoDo Fahrtenbuch</h1>
+            <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
@@ -598,36 +598,30 @@ function Fahrtenbuch({ session }) {
                 {carEntries.length === 0 ? (
                   <div className="text-center py-14 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>
                 ) : (
-                  <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr style={{ backgroundColor: "#E9E6D9" }}>
-                          <th className="text-left font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>Datum</th>
-                          <th className="text-left font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>Fahrer</th>
-                          <th className="text-right font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>km Start</th>
-                          <th className="text-right font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>km Ende</th>
-                          <th className="text-right font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>gefahren</th>
-                          <th className="text-left font-semibold px-4 py-2.5" style={{ color: INK_SOFT }}>Bemerkung</th>
-                          <th className="px-4 py-2.5"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {carEntries.map((e) => (
-                          <tr key={e.id} onClick={() => canEdit(e) && openEditForm(e)} style={{ borderTop: "1px solid #F1F0EA", cursor: canEdit(e) ? "pointer" : "default" }}>
-                            <td className="px-4 py-2.5 whitespace-nowrap">{fmtEntryDate(e.date)}</td>
-                            <td className="px-4 py-2.5" style={{ color: INK_SOFT }}>{e.driver_name}</td>
-                            <td className="px-4 py-2.5 text-right" style={{ color: INK_SOFT }}>{e.start_km}</td>
-                            <td className="px-4 py-2.5 text-right" style={{ color: INK_SOFT }}>{e.end_km}</td>
-                            <td className="px-4 py-2.5 text-right font-semibold">{e.end_km - e.start_km} km</td>
-                            <td className="px-4 py-2.5" style={{ color: INK_SOFT }}>
-                              {e.note}
-                              {e.is_expense && <span className="font-semibold ml-2" style={{ color: "#C9752F" }}>Ausgabe: {e.expense_amount} €</span>}
-                            </td>
-                            <td className="px-4 py-2.5 text-right">{canEdit(e) && <Pencil size={13} style={{ color: "#B8B4A2" }} />}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="flex flex-col gap-2">
+                    {carEntries.map((e) => (
+                      <div key={e.id} onClick={() => canEdit(e) && openEditForm(e)} className="rounded-lg px-4 py-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,0.06)", cursor: canEdit(e) ? "pointer" : "default" }}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-semibold">{fmtEntryDate(e.date)}</div>
+                            <div className="text-xs" style={{ color: INK_SOFT }}>{e.driver_name}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <div className="text-sm font-semibold">{e.end_km - e.start_km} km</div>
+                              <div className="text-xs" style={{ color: INK_SOFT }}>{e.start_km} → {e.end_km}</div>
+                            </div>
+                            {canEdit(e) && <Pencil size={13} style={{ color: "#B8B4A2" }} />}
+                          </div>
+                        </div>
+                        {(e.note || e.is_expense) && (
+                          <div className="text-xs mt-1.5 pt-1.5 flex items-center justify-between" style={{ color: INK_SOFT, borderTop: "1px solid #F1F0EA" }}>
+                            <span>{e.note}</span>
+                            {e.is_expense && <span className="font-semibold" style={{ color: "#C9752F" }}>Ausgabe: {e.expense_amount} €</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

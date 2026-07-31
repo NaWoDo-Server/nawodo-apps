@@ -575,6 +575,12 @@ function Fahrtenbuch({ session }) {
               </div>
 
               <div className="flex-1 min-w-0">
+                <div className="mb-4">
+                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
+                    <Calendar size={12} /> {rangeLabel}
+                  </button>
+                </div>
+
                 {pendingBookings.length > 0 && (
                   <div className="mb-5">
                     <div className="text-xs font-semibold mb-2" style={{ color: "#C9752F" }}>Ausstehende Buchungen – noch nicht im Fahrtenbuch</div>
@@ -591,12 +597,6 @@ function Fahrtenbuch({ session }) {
                     </div>
                   </div>
                 )}
-
-                <div className="mb-3">
-                  <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
-                    <Calendar size={12} /> {rangeLabel}
-                  </button>
-                </div>
 
                 {carEntries.length === 0 ? (
                   <div className="text-center py-14 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>

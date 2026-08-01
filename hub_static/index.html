@@ -147,11 +147,18 @@
       color: #6B6A61;
       cursor: pointer;
     }
-    .today-toggle.active {
-      background: #1F6F5C;
-      border-color: #1F6F5C;
+    .today-toggle.active-termine {
+      background: #B54A45;
+      border-color: #B54A45;
       color: #fff;
     }
+    .today-toggle.active-raum {
+      background: #6C63A6;
+      border-color: #6C63A6;
+      color: #fff;
+    }
+    .today-row { display: flex; align-items: flex-start; gap: 8px; }
+    .today-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
 
     .footer-legal {
       text-align: center;
@@ -563,12 +570,13 @@
               var isRoom = raumCat && res && res.category_id === raumCat.id;
               var title = isRoom ? (res.name + (b.name ? " · " + b.name : "")) : (b.title || b.name);
               var time = b.all_day ? "ganztägig" : (b.start_time + "–" + b.end_time);
-              return '<div class="today-row"><div class="t-title">' + title + '</div><div class="t-time">' + time + '</div></div>';
+              var dotColor = isRoom ? "#6C63A6" : "#B54A45";
+              return '<div class="today-row"><div class="today-dot" style="background:' + dotColor + '"></div><div><div class="t-title">' + title + '</div><div class="t-time">' + time + '</div></div></div>';
             }).join("");
           }
 
-          toggleTermine.classList.toggle("active", active.termine);
-          toggleRaum.classList.toggle("active", active.raum);
+          toggleTermine.classList.toggle("active-termine", active.termine);
+          toggleRaum.classList.toggle("active-raum", active.raum);
         }
 
         toggleTermine.addEventListener("click", function () { active.termine = !active.termine; render(); });

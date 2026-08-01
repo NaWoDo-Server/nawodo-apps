@@ -311,7 +311,7 @@ function Hofteiler({ session }) {
     setFormRoomId(null);
     setFormBlockZoe(false);
     setDialogResourceId(null);
-    setDialogCategoryId(pickableCategories[0]?.id || dialogEventCategory?.id || null);
+    setDialogCategoryId(dialogEventCategory?.id || pickableCategories[0]?.id || null);
     setSelectedDate(dateStr);
     setDesktopDialogOpen(true);
   }

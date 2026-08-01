@@ -117,7 +117,13 @@ export function hslToHex(h, s, l) {
 // überschneiden, nicht überlappende "Lanes" zu, damit mehrtägige Buchungen als EIN
 // durchgehender Balken über mehrere Tagesspalten gerendert werden können.
 export function assignLanes(items, dates) {
-  const rangeStart = dates[0], rangeEnd = dates[dates.length - 1];
+  // Nur echte Tage (keine Leer-Platzhalter am Anfang/Ende einer Kalenderwoche, die
+  // zum Vor-/Folgemonat gehören) für Start/Ende der Woche berücksichtigen. Sonst
+  // rutscht ein leerer String ("") als rangeEnd rein und Balken am Zeilenende
+  // "bluten" optisch einen Tag zu weit (Bug: Balken über den nächsten, eigentlich
+  // leeren Tag hinweg gezogen).
+  const validDates = dates.filter(Boolean);
+  const rangeStart = validDates[0], rangeEnd = validDates[validDates.length - 1];
   const sorted = [...items].sort((a, b) => {
     const aStart = a.booking.date < rangeStart ? rangeStart : a.booking.date;
     const bStart = b.booking.date < rangeStart ? rangeStart : b.booking.date;

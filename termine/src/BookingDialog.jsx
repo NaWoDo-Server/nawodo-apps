@@ -37,6 +37,15 @@ export default function BookingDialog({
 
         <label className="text-xs font-medium block mb-1.5" style={{ color: INK_SOFT }}>Reiter</label>
         <div className="flex gap-2 mb-3 flex-wrap">
+          {eventCategory && (
+            <button
+              onClick={() => onCategoryChange(eventCategory.id)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ backgroundColor: isEventMode ? eventCategory.color : "transparent", color: isEventMode ? "#fff" : INK, border: `1.5px solid ${isEventMode ? eventCategory.color : BORDER_SOFT}` }}
+            >
+              {eventCategory.name}
+            </button>
+          )}
           {pickableCategories.map((c) => (
             <button
               key={c.id}
@@ -47,15 +56,6 @@ export default function BookingDialog({
               {c.name}
             </button>
           ))}
-          {eventCategory && (
-            <button
-              onClick={() => onCategoryChange(eventCategory.id)}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ backgroundColor: isEventMode ? eventCategory.color : "transparent", color: isEventMode ? "#fff" : INK, border: `1.5px solid ${isEventMode ? eventCategory.color : BORDER_SOFT}` }}
-            >
-              {eventCategory.name}
-            </button>
-          )}
         </div>
 
         {!isEventMode && categoryId && (

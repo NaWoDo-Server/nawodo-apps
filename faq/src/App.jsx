@@ -227,7 +227,7 @@ function FaqApp({ session }) {
                 <button onClick={() => toggleSection(sec.key)} className="flex items-center gap-2 min-w-0">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sec.color }} />
                   {expanded ? <ChevronDown size={14} style={{ color: sec.color }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: sec.color }} className="flex-shrink-0" />}
-                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: sec.color }}>{sec.label}</span>
+                  <span className="text-sm font-bold uppercase tracking-wide" style={{ color: INK }}>{sec.label}</span>
                 </button>
                 {isAdmin && (
                   <button onClick={() => openNewForm(sec.key)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}>

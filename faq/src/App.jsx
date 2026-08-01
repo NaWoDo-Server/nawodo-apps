@@ -8,8 +8,8 @@ const INK_SOFT = "#6B6A61";
 const TEAL = "#3E8E7E";
 
 const SECTIONS = [
-  { key: "projekt", label: "Rund ums Wohnprojekt" },
-  { key: "app", label: "Rund um diese Seite" },
+  { key: "projekt", label: "Rund ums Wohnprojekt", color: "#C9752F" },
+  { key: "app", label: "Rund um diese Seite", color: "#3E8E7E" },
 ];
 
 export default function App() {
@@ -224,9 +224,10 @@ function FaqApp({ session }) {
           return (
             <div key={sec.key} className="px-5 mb-6">
               <div className="flex items-center justify-between mb-2">
-                <button onClick={() => toggleSection(sec.key)} className="flex items-center gap-1.5 min-w-0">
-                  {expanded ? <ChevronDown size={14} style={{ color: INK_SOFT }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK_SOFT }} className="flex-shrink-0" />}
-                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>{sec.label}</span>
+                <button onClick={() => toggleSection(sec.key)} className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sec.color }} />
+                  {expanded ? <ChevronDown size={14} style={{ color: sec.color }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: sec.color }} className="flex-shrink-0" />}
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: sec.color }}>{sec.label}</span>
                 </button>
                 {isAdmin && (
                   <button onClick={() => openNewForm(sec.key)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}>

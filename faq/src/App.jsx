@@ -60,6 +60,7 @@ function FaqApp({ session }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [openIds, setOpenIds] = useState(() => new Set());
+  const [sectionOpen, setSectionOpen] = useState({ projekt: true, app: false });
 
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -90,6 +91,10 @@ function FaqApp({ session }) {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  }
+
+  function toggleSection(key) {
+    setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   const q = search.trim().toLowerCase();
@@ -215,10 +220,14 @@ function FaqApp({ session }) {
         {SECTIONS.map((sec) => {
           const items = filtered.filter((e) => e.section === sec.key);
           if (q && items.length === 0) return null;
+          const expanded = q ? true : sectionOpen[sec.key];
           return (
             <div key={sec.key} className="px-5 mb-6">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>{sec.label}</div>
+                <button onClick={() => toggleSection(sec.key)} className="flex items-center gap-1.5 min-w-0">
+                  {expanded ? <ChevronDown size={14} style={{ color: INK_SOFT }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK_SOFT }} className="flex-shrink-0" />}
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>{sec.label}</span>
+                </button>
                 {isAdmin && (
                   <button onClick={() => openNewForm(sec.key)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}>
                     <Plus size={12} /> Neue Frage
@@ -226,7 +235,7 @@ function FaqApp({ session }) {
                 )}
               </div>
 
-              {items.length === 0 ? (
+              {!expanded ? null : items.length === 0 ? (
                 <div className="text-center py-8 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
                   <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Fragen hier.</p>
                 </div>

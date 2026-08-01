@@ -225,8 +225,8 @@ function FaqApp({ session }) {
             <div key={sec.key} className="px-5 mb-6">
               <div className="flex items-center justify-between mb-2">
                 <button onClick={() => toggleSection(sec.key)} className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sec.color }} />
-                  {expanded ? <ChevronDown size={14} style={{ color: sec.color }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: sec.color }} className="flex-shrink-0" />}
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: INK }} />
+                  {expanded ? <ChevronDown size={14} style={{ color: INK }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK }} className="flex-shrink-0" />}
                   <span className="text-sm font-bold uppercase tracking-wide" style={{ color: INK }}>{sec.label}</span>
                 </button>
                 {isAdmin && (

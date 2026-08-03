@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import {
   Home, Loader2, AlertCircle, X, Pencil, RotateCcw, Undo2, Trophy,
   ChevronLeft, ChevronUp, ChevronDown, ChevronRight, KeyRound, HelpCircle,
@@ -255,6 +255,33 @@ function BulldozerApp({ session }) {
   const level = LEVELS[levelIndex];
   const parsed = useMemo(() => parseLevel(level), [levelIndex]);
 
+  const gridWrapRef = useRef(null);
+  const controlsRef = useRef(null);
+  const [cellSize, setCellSize] = useState(36);
+
+  useLayoutEffect(() => {
+    if (screen !== "game") return;
+    function recompute() {
+      const wrap = gridWrapRef.current;
+      if (!wrap) return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const controlsHeight = controlsRef.current ? controlsRef.current.getBoundingClientRect().height : 0;
+      const availableWidth = wrap.clientWidth;
+      const availableHeight = window.innerHeight - wrapRect.top - controlsHeight - 16;
+      const maxByWidth = Math.floor(availableWidth / parsed.width);
+      const maxByHeight = Math.floor(availableHeight / parsed.height);
+      const next = Math.max(14, Math.min(46, maxByWidth, maxByHeight));
+      if (Number.isFinite(next) && next > 0) setCellSize(next);
+    }
+    recompute();
+    window.addEventListener("resize", recompute);
+    window.addEventListener("orientationchange", recompute);
+    return () => {
+      window.removeEventListener("resize", recompute);
+      window.removeEventListener("orientationchange", recompute);
+    };
+  }, [screen, parsed.width, parsed.height]);
+
   function ownScoreFor(idx) {
     return scores.find((s) => s.user_id === user.id && s.level_index === idx) || null;
   }
@@ -366,7 +393,7 @@ function BulldozerApp({ session }) {
 
   // --- Rendering ---
 
-  const cellPx = "clamp(28px, 10vw, 46px)";
+  const cellPx = `${cellSize}px`;
 
   // Eigenes Sprite-Sheet (von Lars beigesteuert, Weston Campbells eigenes
   // "Bulldozer Monochrome"-Theme, mit seiner Erlaubnis) - 15 Kacheln a 32x32px,
@@ -542,29 +569,31 @@ function BulldozerApp({ session }) {
               {ownScoreFor(levelIndex) && <span>Bestzeit: <strong style={{ color: INK }}>{formatTime(ownScoreFor(levelIndex).best_time_ms)}</strong></span>}
             </div>
 
-            <div className="mb-4 overflow-x-auto">
+            <div ref={gridWrapRef} className="mb-4 overflow-x-auto">
               {renderGrid()}
             </div>
 
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <button onClick={undo} disabled={history.length === 0} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT, opacity: history.length === 0 ? 0.5 : 1 }}>
-                <Undo2 size={14} /> Rückgängig
-              </button>
-              <button onClick={restart} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
-                <RotateCcw size={14} /> Neu starten
-              </button>
-            </div>
-
-            <div className="flex flex-col items-center gap-1.5">
-              <DirButton dir="up" icon={ChevronUp} />
-              <div className="flex items-center gap-1.5">
-                <DirButton dir="left" icon={ChevronLeft} />
-                <div className="w-12 h-12" />
-                <DirButton dir="right" icon={ChevronRight} />
+            <div ref={controlsRef}>
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <button onClick={undo} disabled={history.length === 0} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT, opacity: history.length === 0 ? 0.5 : 1 }}>
+                  <Undo2 size={14} /> Rückgängig
+                </button>
+                <button onClick={restart} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
+                  <RotateCcw size={14} /> Neu starten
+                </button>
               </div>
-              <DirButton dir="down" icon={ChevronDown} />
+
+              <div className="flex flex-col items-center gap-1.5">
+                <DirButton dir="up" icon={ChevronUp} />
+                <div className="flex items-center gap-1.5">
+                  <DirButton dir="left" icon={ChevronLeft} />
+                  <div className="w-12 h-12" />
+                  <DirButton dir="right" icon={ChevronRight} />
+                </div>
+                <DirButton dir="down" icon={ChevronDown} />
+              </div>
+              <p className="text-center text-xs mt-3" style={{ color: INK_SOFT }}>Am Computer gehen auch die Pfeiltasten.</p>
             </div>
-            <p className="text-center text-xs mt-3" style={{ color: INK_SOFT }}>Am Computer gehen auch die Pfeiltasten.</p>
 
             {won && (
               <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>

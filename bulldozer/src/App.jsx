@@ -64,6 +64,76 @@ function formatTime(ms) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function LevelPreview({ level, cellSize = 8 }) {
+  const parsed = parseLevel(level);
+  const boxSet = new Set(level.boxes.map(([x, y]) => `${x},${y}`));
+  const [px, py] = level.player;
+  const w = parsed.width * cellSize;
+  const h = parsed.height * cellSize;
+  const rects = [];
+  for (let y = 0; y < parsed.height; y++) {
+    for (let x = 0; x < parsed.width; x++) {
+      const isWall = parsed.walls.has(`${x},${y}`);
+      rects.push(
+        <rect
+          key={`c${x},${y}`}
+          x={x * cellSize}
+          y={y * cellSize}
+          width={cellSize}
+          height={cellSize}
+          fill={isWall ? "#8A8874" : "#808000"}
+        />
+      );
+    }
+  }
+  const marks = [];
+  for (const [x, y] of level.targets) {
+    marks.push(
+      <circle
+        key={`t${x},${y}`}
+        cx={x * cellSize + cellSize / 2}
+        cy={y * cellSize + cellSize / 2}
+        r={cellSize * 0.32}
+        fill="none"
+        stroke="#D34E4E"
+        strokeWidth={Math.max(1, cellSize * 0.12)}
+      />
+    );
+  }
+  for (const key of boxSet) {
+    const [x, y] = key.split(",").map(Number);
+    marks.push(
+      <circle
+        key={`b${x},${y}`}
+        cx={x * cellSize + cellSize / 2}
+        cy={y * cellSize + cellSize / 2}
+        r={cellSize * 0.4}
+        fill="#B7B4A5"
+        stroke="#2B2B26"
+        strokeWidth={Math.max(0.5, cellSize * 0.06)}
+      />
+    );
+  }
+  marks.push(
+    <rect
+      key="player"
+      x={px * cellSize + cellSize * 0.18}
+      y={py * cellSize + cellSize * 0.18}
+      width={cellSize * 0.64}
+      height={cellSize * 0.64}
+      fill="#E6B800"
+      stroke="#A13D3D"
+      strokeWidth={Math.max(0.5, cellSize * 0.08)}
+    />
+  );
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", imageRendering: "pixelated" }}>
+      {rects}
+      {marks}
+    </svg>
+  );
+}
+
 // --- Auth / Zugriff (gleiches Muster wie in den anderen Apps) ----------
 
 export default function App() {
@@ -147,6 +217,7 @@ function BulldozerApp({ session }) {
   const [showAccount, setShowAccount] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showLevelTable, setShowLevelTable] = useState(false);
+  const [previewLevelIdx, setPreviewLevelIdx] = useState(null);
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -549,7 +620,7 @@ function BulldozerApp({ session }) {
               {isSuperAdmin && (
                 <button
                   onClick={() => setShowLevelTable(true)}
-                  className="w-full mt-3 rounded-lg py-2 text-xs font-semibold"
+                  className="block mx-auto mt-3 rounded-lg px-4 py-1.5 text-xs font-semibold"
                   style={{ backgroundColor: "transparent", border: `1px solid ${BORDER_SOFT}`, color: INK_SOFT }}
                 >
                   Levelcode-Tabelle
@@ -650,12 +721,21 @@ function BulldozerApp({ session }) {
       </div>
 
       {showLevelTable && isSuperAdmin && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowLevelTable(false); } }}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowLevelTable(false); setPreviewLevelIdx(null); } }}>
           <div className="w-full max-w-md rounded-2xl p-6 max-h-[85vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">Levelcode-Tabelle</h2>
-              <button onClick={() => setShowLevelTable(false)}><X size={20} /></button>
+              <button onClick={() => { setShowLevelTable(false); setPreviewLevelIdx(null); }}><X size={20} /></button>
             </div>
+            {previewLevelIdx !== null && (
+              <div className="mb-4 p-3 rounded-xl flex flex-col items-center gap-2" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                <div className="text-xs font-semibold text-center">{previewLevelIdx + 1}. {LEVELS[previewLevelIdx].title}</div>
+                <div className="overflow-x-auto max-w-full">
+                  <LevelPreview level={LEVELS[previewLevelIdx]} cellSize={9} />
+                </div>
+                <div className="text-xs font-mono" style={{ color: INK_SOFT }}>Code: {levelCode(previewLevelIdx)}</div>
+              </div>
+            )}
             <table className="w-full text-xs">
               <thead>
                 <tr style={{ color: INK_SOFT }}>
@@ -668,7 +748,15 @@ function BulldozerApp({ session }) {
                 {LEVELS.map((lvl, i) => (
                   <tr key={i} style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
                     <td className="py-1 pr-2" style={{ color: INK_SOFT }}>{i + 1}</td>
-                    <td className="py-1 pr-2">{lvl.title}</td>
+                    <td className="py-1 pr-2">
+                      <button
+                        onClick={() => setPreviewLevelIdx(previewLevelIdx === i ? null : i)}
+                        className="text-left underline decoration-dotted"
+                        style={{ color: previewLevelIdx === i ? ORANGE : INK }}
+                      >
+                        {lvl.title}
+                      </button>
+                    </td>
                     <td className="py-1 font-mono">{levelCode(i)}</td>
                   </tr>
                 ))}

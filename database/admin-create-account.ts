@@ -26,7 +26,9 @@ Deno.serve(async (req) => {
 
   // Aufrufer verifizieren + Admin-Check mit dessen EIGENEM Token (nicht dem Service-Key,
   // damit hier wirklich nur echte, gültige Sitzungen akzeptiert werden).
-  async function requireAdmin(): Promise<Response | null> {
+  // Accounts anlegen/löschen ist bewusst enger gefasst als der normale Admin-Status:
+  // nur wer "is_superadmin" gesetzt hat, darf das (aktuell nur ein einzelner Account).
+  async function requireSuperAdmin(): Promise<Response | null> {
     const authHeader = req.headers.get("Authorization") || "";
     const callerToken = authHeader.replace(/^Bearer\s+/i, "");
     if (!callerToken) return jsonResponse({ error: "Nicht angemeldet." }, 401);
@@ -36,12 +38,12 @@ Deno.serve(async (req) => {
     });
     if (!meResp.ok) return jsonResponse({ error: "Anmeldung ungültig." }, 401);
     const me = await meResp.json();
-    const isAdmin = me?.user_metadata?.is_admin === true;
-    if (!isAdmin) return jsonResponse({ error: "Nur Admins dürfen das." }, 403);
+    const isSuperAdmin = me?.user_metadata?.is_superadmin === true;
+    if (!isSuperAdmin) return jsonResponse({ error: "Dafür fehlt die Berechtigung." }, 403);
     return null;
   }
 
-  const adminError = await requireAdmin();
+  const adminError = await requireSuperAdmin();
   if (adminError) return adminError;
 
   if (req.method === "POST") {

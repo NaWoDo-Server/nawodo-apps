@@ -138,6 +138,7 @@ function MitgliederApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const isAdmin = user.user_metadata?.is_admin === true;
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true; // darf zusaetzlich Accounts anlegen/loeschen
   const initial = userName.charAt(0).toUpperCase();
 
   const [members, setMembers] = useState([]);
@@ -649,7 +650,7 @@ function MitgliederApp({ session }) {
               <button onClick={openNewFlow} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: INK }}>
                 <Plus size={14} /> Neuer Eintrag
               </button>
-              {isAdmin && (
+              {isSuperAdmin && (
                 <button
                   onClick={() => { setShowCreateAccount(true); setCreateAccountError(""); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
@@ -708,7 +709,7 @@ function MitgliederApp({ session }) {
                             Ausfüllen
                           </button>
                         )}
-                        {isAdmin && !m.is_child && m.user_id && (
+                        {isSuperAdmin && !m.is_child && m.user_id && (
                           <button onClick={() => handleDeleteAccount(m)} title="Account vollständig löschen"><UserX size={14} style={{ color: "#A13D3D" }} /></button>
                         )}
                       </div>

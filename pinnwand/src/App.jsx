@@ -145,6 +145,14 @@ function PinnwandApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const isAdmin = user.user_metadata?.is_admin === true;
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true;
+  const [myModApps, setMyModApps] = useState([]);
+  useEffect(() => {
+    supabase.from("app_moderators").select("app_key").eq("user_id", user.id).then(({ data }) => {
+      setMyModApps((data || []).map((r) => r.app_key));
+    });
+  }, [user.id]);
+  const isElevated = isAdmin || isSuperAdmin || myModApps.includes("pinnwand");
   const initial = userName.charAt(0).toUpperCase();
 
   const [posts, setPosts] = useState([]);
@@ -551,7 +559,7 @@ function PinnwandApp({ session }) {
                   key={post.id}
                   post={post}
                   postTypes={postTypes}
-                  isAdmin={isAdmin}
+                  isAdmin={isElevated}
                   ownUserId={user.id}
                   options={optionsFor(post.id)}
                   allVotes={votesFor(post.id)}
@@ -585,7 +593,7 @@ function PinnwandApp({ session }) {
         <PostForm
           editingPost={editingPost}
           postTypes={postTypes}
-          isAdmin={isAdmin}
+          isAdmin={isElevated}
           onAddType={handleAddPostType}
           onRenameType={handleRenamePostType}
           onDeleteType={handleDeletePostType}

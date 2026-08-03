@@ -4,10 +4,11 @@
 // einen bestehenden Account inkl. seines Mitglieder-Profils vollständig (unwiderruflich).
 // POST { type: "account", email, password, vorname, nachname, mitgliedstyp, app_permissions } -> Login-Account anlegen
 // POST { type: "child", vorname, nachname, parent_user_id, mitgliedstyp } -> Kind-Profil anlegen (kein Login)
+// POST { type: "toggle_admin", target_user_id, is_admin } -> globalen Admin-Status setzen/entfernen
 // DELETE { user_id } -> Account (+ Profil) löschen
 // Alle Aufrufe erwarten den Access-Token des aufrufenden Superadmins im Authorization-Header.
 
-const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder"];
+const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop"];
 
 Deno.serve(async (req) => {
   const cors = {
@@ -64,7 +65,48 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Ungültige Anfrage." }, 400);
     }
 
-    const type = body.type === "child" ? "child" : "account";
+    const type = body.type === "child" ? "child" : body.type === "toggle_admin" ? "toggle_admin" : "account";
+
+    // --- Globalen Admin-Status setzen/entfernen (nur Superadmin, siehe verifySuperAdmin oben). ---
+    if (type === "toggle_admin") {
+      const targetUserId = body.target_user_id;
+      if (!targetUserId) {
+        return jsonResponse({ error: "Keine target_user_id angegeben." }, 400);
+      }
+      const nextIsAdmin = body.is_admin === true;
+
+      // Aktuelle Metadaten holen, damit beim Update nur is_admin geaendert wird und der Rest
+      // (z.B. name, is_superadmin) nicht versehentlich ueberschrieben wird.
+      const getResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
+        headers: { apikey: SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+      });
+      const current = await getResp.json();
+      if (!getResp.ok) {
+        return jsonResponse(
+          { error: current?.msg || current?.message || "Nutzer nicht gefunden." },
+          getResp.status
+        );
+      }
+      const mergedMetadata = {
+        ...(current?.user_metadata || current?.raw_user_meta_data || {}),
+        is_admin: nextIsAdmin,
+      };
+
+      const putResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
+        method: "PUT",
+        headers: restHeaders,
+        body: JSON.stringify({ user_metadata: mergedMetadata }),
+      });
+      const updated = await putResp.json();
+      if (!putResp.ok) {
+        return jsonResponse(
+          { error: updated?.msg || updated?.message || "Admin-Status konnte nicht geaendert werden." },
+          putResp.status
+        );
+      }
+      return jsonResponse({ ok: true, is_admin: nextIsAdmin }, 200);
+    }
+
     const vorname = (body.vorname || "").trim();
     const nachname = (body.nachname || "").trim();
     const mitgliedstyp = body.mitgliedstyp === "freund" ? "freund" : "mitglied";

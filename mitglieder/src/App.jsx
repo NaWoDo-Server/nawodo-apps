@@ -22,6 +22,7 @@ const APP_LIST = [
   { key: "faq", label: "FAQ" },
   { key: "pinnwand", label: "Pinnwand" },
   { key: "mitglieder", label: "Mitglieder" },
+  { key: "workshop", label: "Workshop" },
 ];
 
 function slugifyGroupKey(label, existingKeys) {
@@ -190,6 +191,16 @@ function MitgliederApp({ session }) {
   const [allUsers, setAllUsers] = useState([]);
   const [bereicheAssign, setBereicheAssign] = useState([]);
   const [bereiche, setBereiche] = useState([]);
+  const [appModerators, setAppModerators] = useState([]);
+  const [savingRole, setSavingRole] = useState(false);
+  // Moderator = Admin-Rechte, aber nur fuer einzelne Apps (siehe app_moderators). Ein globaler
+  // Admin/Superadmin hat diese Rechte automatisch ueberall; Moderatoren nur fuer die ihnen
+  // zugewiesenen Apps.
+  const myModApps = useMemo(
+    () => appModerators.filter((r) => r.user_id === user.id).map((r) => r.app_key),
+    [appModerators, user.id]
+  );
+  const isElevatedForMitglieder = isSuperAdmin || isAdmin || myModApps.includes("mitglieder");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeBereich, setActiveBereich] = useState(null);
@@ -247,16 +258,18 @@ function MitgliederApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [m, bu, ba, gr] = await Promise.all([
+    const [m, bu, ba, gr, mods] = await Promise.all([
       supabase.from("members").select("*"),
       supabase.rpc("list_all_users"),
       supabase.from("member_bereiche").select("*"),
       supabase.from("bereiche").select("*"),
+      supabase.from("app_moderators").select("*"),
     ]);
     setMembers(m.data || []);
     setAllUsers(bu.data || []);
     setBereicheAssign(ba.data || []);
     setBereiche(gr.data || []);
+    setAppModerators(mods.data || []);
     setLoading(false);
   }
 
@@ -459,6 +472,48 @@ function MitgliederApp({ session }) {
     }
   }
 
+  // --- Rollen: globaler Admin-Status (nur Superadmin darf das setzen) + Moderator pro App
+  // (Admin oder Superadmin darf das setzen). ---
+  async function handleToggleAdmin(targetUserId, nextIsAdmin) {
+    setSavingRole(true);
+    try {
+      const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: window.__SUPABASE_ANON_KEY__,
+        },
+        body: JSON.stringify({ type: "toggle_admin", target_user_id: targetUserId, is_admin: nextIsAdmin }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || "Admin-Status konnte nicht geändert werden.");
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Admin-Status konnte nicht geändert werden.");
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
+  async function handleToggleModerator(targetUserId, appKey, nextValue) {
+    setSavingRole(true);
+    try {
+      if (nextValue) {
+        const { error } = await supabase.from("app_moderators").insert({ user_id: targetUserId, app_key: appKey });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("app_moderators").delete().eq("user_id", targetUserId).eq("app_key", appKey);
+        if (error) throw error;
+      }
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Moderator-Status konnte nicht geändert werden.");
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
   const adultMembers = useMemo(() => members.filter((m) => !m.is_child && m.user_id), [members]);
 
   const q = search.trim().toLowerCase();
@@ -534,7 +589,7 @@ function MitgliederApp({ session }) {
   }
 
   async function saveBereicheFor(memberId) {
-    if (!isAdmin || !memberId) return;
+    if (!isSuperAdmin || !memberId) return;
     const current = bereicheForMember(memberId);
     const toAdd = formBereiche.filter((k) => !current.includes(k));
     const toRemove = current.filter((k) => !formBereiche.includes(k));
@@ -568,7 +623,7 @@ function MitgliederApp({ session }) {
         geburtstag: formGeburtstag || null,
         foto_url: fotoUrl,
       };
-      if (isAdmin) payload.mitgliedstyp = formMitgliedstyp;
+      if (isSuperAdmin) payload.mitgliedstyp = formMitgliedstyp;
 
       let savedId = editingMember?.id || null;
 
@@ -589,7 +644,7 @@ function MitgliederApp({ session }) {
         savedId = data.id;
       }
 
-      if (isAdmin && !formIsChild && savedId) {
+      if (isSuperAdmin && !formIsChild && savedId) {
         await saveBereicheFor(savedId);
       }
 
@@ -715,7 +770,7 @@ function MitgliederApp({ session }) {
                 </button>
               );
             })}
-            {isAdmin && (
+            {isElevatedForMitglieder && (
               <button
                 onClick={() => setShowAddGroup(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mt-2 w-fit"
@@ -758,8 +813,8 @@ function MitgliederApp({ session }) {
               <div className="mb-4 flex items-center gap-2">
                 <button
                   onClick={() => { resetNewAccountForm(); setShowCreateAccount(true); }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white"
-                  style={{ backgroundColor: INK }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold"
+                  style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
                 >
                   <Plus size={14} /> Neues Mitglied
                 </button>
@@ -779,8 +834,8 @@ function MitgliederApp({ session }) {
                 </div>
               )}
               {visibleMembers.map((m) => {
-                const canManage = !m.isPlaceholder && (isAdmin || m.created_by === user.id || (m.is_child && (m.parent1_user_id === user.id || m.parent2_user_id === user.id)));
-                const canFill = m.isPlaceholder && (isAdmin || m.user_id === user.id);
+                const canManage = !m.isPlaceholder && (isSuperAdmin || m.user_id === user.id || m.created_by === user.id || (m.is_child && (m.parent1_user_id === user.id || m.parent2_user_id === user.id)));
+                const canFill = m.isPlaceholder && (isSuperAdmin || m.user_id === user.id);
                 const parents = m.is_child ? parentNames(m) : [];
                 const myBereiche = m.id ? bereicheForMember(m.id) : [];
                 const cardKey = m.id || `placeholder-${m.user_id}`;
@@ -853,7 +908,7 @@ function MitgliederApp({ session }) {
               })}
             </div>
 
-            {isAdmin && (
+            {isSuperAdmin && (
               <div className="mt-4">
                 <button onClick={exportAllCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
                   <Download size={12} /> CSV
@@ -1093,6 +1148,39 @@ function MitgliederApp({ session }) {
                 </div>
               </div>
             )}
+            {(isAdmin || isSuperAdmin) && profileMember.user_id && (
+              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
+                <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Rollen</div>
+                {isSuperAdmin && (
+                  <label className="flex items-center gap-2 text-sm mb-2">
+                    <input
+                      type="checkbox"
+                      disabled={savingRole}
+                      checked={allUsers.find((u) => u.id === profileMember.user_id)?.is_admin === true}
+                      onChange={(e) => handleToggleAdmin(profileMember.user_id, e.target.checked)}
+                    />
+                    Admin (global, in jeder App)
+                  </label>
+                )}
+                <div className="text-xs mb-1.5" style={{ color: INK_SOFT }}>Moderator für einzelne Apps:</div>
+                <div className="flex flex-col gap-1.5">
+                  {APP_LIST.map((a) => {
+                    const isMod = appModerators.some((r) => r.user_id === profileMember.user_id && r.app_key === a.key);
+                    return (
+                      <label key={a.key} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          disabled={savingRole}
+                          checked={isMod}
+                          onChange={(e) => handleToggleModerator(profileMember.user_id, a.key, e.target.checked)}
+                        />
+                        {a.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {!profileMember.isPlaceholder && (
               <button
                 onClick={() => exportVCard(profileMember)}
@@ -1176,9 +1264,9 @@ function MitgliederApp({ session }) {
               </>
             )}
 
-            {isAdmin && (
+            {isSuperAdmin && (
               <div className="mb-3">
-                <label className="text-xs font-medium block mb-1">Typ (nur für Admins änderbar)</label>
+                <label className="text-xs font-medium block mb-1">Typ (nur für Superadmin änderbar)</label>
                 <select value={formMitgliedstyp} onChange={(e) => setFormMitgliedstyp(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
                   <option value="mitglied">Genossenschaftsmitglied</option>
                   <option value="freund">Freund</option>
@@ -1186,9 +1274,9 @@ function MitgliederApp({ session }) {
               </div>
             )}
 
-            {isAdmin && !formIsChild && (
+            {isSuperAdmin && !formIsChild && (
               <div className="mb-3">
-                <label className="text-xs font-medium block mb-1.5">Gruppen (nur für Admins sichtbar/änderbar)</label>
+                <label className="text-xs font-medium block mb-1.5">Gruppen (nur für Superadmin sichtbar/änderbar)</label>
                 <div className="flex flex-wrap gap-1.5">
                   {sortedBereiche.map((b) => {
                     const active = formBereiche.includes(b.key);

@@ -113,6 +113,14 @@ function Fahrtenbuch({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const isAdmin = user.user_metadata?.is_admin === true;
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true;
+  const [myModApps, setMyModApps] = useState([]);
+  useEffect(() => {
+    supabase.from("app_moderators").select("app_key").eq("user_id", user.id).then(({ data }) => {
+      setMyModApps((data || []).map((r) => r.app_key));
+    });
+  }, [user.id]);
+  const isElevated = isAdmin || isSuperAdmin || myModApps.includes("fahrtenbuch");
   const initial = userName.charAt(0).toUpperCase();
   const isDesktop = useIsDesktop();
 
@@ -283,13 +291,13 @@ function Fahrtenbuch({ session }) {
   })();
 
   function canEdit(entry) {
-    return isAdmin || entry.user_id === user.id;
+    return isElevated || entry.user_id === user.id;
   }
 
   // Nur wer das Fahrzeug gebucht hat (oder ein Admin) darf die km dazu eintragen.
   // Alte Buchungen ohne user_id (vor der Umstellung angelegt) bleiben für alle offen.
   function canLogBooking(b) {
-    return isAdmin || !b.user_id || b.user_id === user.id;
+    return isElevated || !b.user_id || b.user_id === user.id;
   }
 
   const todayStr = fmtDate(new Date());
@@ -469,7 +477,7 @@ function Fahrtenbuch({ session }) {
         </div>
 
         {!isDesktop && (
-          cars.length === 0 && !isAdmin ? (
+          cars.length === 0 && !isElevated ? (
             <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
           ) : (
             <>
@@ -482,7 +490,7 @@ function Fahrtenbuch({ session }) {
                     </button>
                   );
                 })}
-                {isAdmin && (
+                {isElevated && (
                   <button onClick={() => { setShowCarForm(true); setNewCarName(""); }} className="flex items-center gap-1 px-3 py-2 rounded-full text-sm flex-shrink-0" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
                 )}
               </div>
@@ -561,7 +569,7 @@ function Fahrtenbuch({ session }) {
         )}
 
         {isDesktop && (
-          cars.length === 0 && !isAdmin ? (
+          cars.length === 0 && !isElevated ? (
             <p className="px-8 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
           ) : (
             <div className="max-w-6xl mx-auto px-8 pb-12 flex gap-8 items-start">
@@ -577,7 +585,7 @@ function Fahrtenbuch({ session }) {
                         </button>
                       );
                     })}
-                    {isAdmin && (
+                    {isElevated && (
                       <button onClick={() => { setShowCarForm(true); setNewCarName(""); }} className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm text-left" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neu</button>
                     )}
                   </div>
@@ -593,7 +601,7 @@ function Fahrtenbuch({ session }) {
                   <button onClick={() => setShowStats(true)} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
                     <BarChart3 size={12} /> Statistiken
                   </button>
-                  {isAdmin && (
+                  {isElevated && (
                     <button onClick={() => openPicker("export")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ border: "1.5px solid #D8D5C7", color: INK_SOFT }}>
                       <Download size={12} /> Als CSV exportieren
                     </button>

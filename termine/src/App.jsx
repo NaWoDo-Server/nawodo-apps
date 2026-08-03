@@ -108,6 +108,16 @@ function Hofteiler({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const isAdmin = user.user_metadata?.is_admin === true;
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true;
+  const [myModApps, setMyModApps] = useState([]);
+  useEffect(() => {
+    supabase.from("app_moderators").select("app_key").eq("user_id", user.id).then(({ data }) => {
+      setMyModApps((data || []).map((r) => r.app_key));
+    });
+  }, [user.id]);
+  // Moderator fuer "sharing" ODER "termine" hat hier dieselben Rechte wie ein globaler Admin,
+  // weil Kategorien/Artikel zwischen beiden Apps geteilt werden.
+  const isElevated = isAdmin || isSuperAdmin || myModApps.includes("sharing") || myModApps.includes("termine");
 
   // Admins koennen eine Buchung fuer ein anderes Mitglied anlegen/umtragen.
   // Liste wird nur fuer Admins geladen (RPC prueft das serverseitig zusaetzlich ab).
@@ -550,7 +560,7 @@ function Hofteiler({ session }) {
   }
 
   function requireAdmin(action) {
-    if (isAdmin) { action(); return; }
+    if (isElevated) { action(); return; }
     alert("Das dürfen nur Admin-Accounts. Melde dich beim Admin, falls du das brauchst.");
   }
 
@@ -642,7 +652,7 @@ function Hofteiler({ session }) {
               groupLabel="Sharing"
               groupCategoryIds={groupCategoryIds}
             />
-            {isAdmin && (
+            {isElevated && (
               <button onClick={() => requireAdmin(() => setShowResourceForm(true))} className="mt-4 flex items-center gap-1 px-3 py-2 rounded-full text-sm" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}><Plus size={14} /> Neuer Artikel</button>
             )}
           </div>

@@ -25,6 +25,7 @@ const APP_LIST = [
   { key: "pinnwand", label: "Pinnwand" },
   { key: "mitglieder", label: "Mitglieder" },
   { key: "workshop", label: "Workshop" },
+  { key: "bulldozer", label: "Bulldozer" },
 ];
 
 function ModeratorList() {

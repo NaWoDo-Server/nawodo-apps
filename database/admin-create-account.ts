@@ -10,7 +10,7 @@
 // DELETE { user_id } -> Account (+ Profil) löschen
 // Alle Aufrufe erwarten den Access-Token des aufrufenden Superadmins im Authorization-Header.
 
-const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop"];
+const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer"];
 const MITGLIEDSTYP_VALUES = ["mitglied", "gast", "bewohner"];
 
 Deno.serve(async (req) => {

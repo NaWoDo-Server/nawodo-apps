@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   User, Users, Phone, Smartphone, Mail, MapPin, Building2, Calendar,
   Download, Search, Plus, X, Pencil, Trash2, Loader2, AlertCircle, Home,
-  LayoutGrid, Image as ImageIcon, Camera, ChevronDown,
+  LayoutGrid, Image as ImageIcon, Camera, ChevronDown, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
@@ -149,6 +149,8 @@ function MitgliederApp({ session }) {
   const [activeBereich, setActiveBereich] = useState(null);
   const [typeFilter, setTypeFilter] = useState("mitglieder"); // "mitglieder" | "kinder" | "alle"
   const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [showMobileNav, setShowMobileNav] = useState(false);
+  const [profileMember, setProfileMember] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
   const [showTypePick, setShowTypePick] = useState(false);
@@ -214,9 +216,14 @@ function MitgliederApp({ session }) {
     });
     const children = members.filter((m) => m.is_child);
     return [...adults, ...children].sort((a, b) => {
-      const an = `${(a.nachname || "").trim()} ${(a.vorname || "").trim()}`.trim();
-      const bn = `${(b.nachname || "").trim()} ${(b.vorname || "").trim()}`.trim();
-      return an.localeCompare(bn, "de", { sensitivity: "base" });
+      const av = (a.vorname || "").trim();
+      const an = (a.nachname || "").trim();
+      const bv = (b.vorname || "").trim();
+      const bn = (b.nachname || "").trim();
+      return (
+        av.localeCompare(bv, "de", { sensitivity: "base" }) ||
+        an.localeCompare(bn, "de", { sensitivity: "base" })
+      );
     });
   }, [members, allUsers]);
 
@@ -495,11 +502,31 @@ function MitgliederApp({ session }) {
           </div>
         </div>
 
-        <div className="flex items-start gap-3 px-5">
-          {/* Navigation links: Bereiche als Filter, oben "Alle Mitglieder" */}
-          <div className="flex flex-col gap-1 flex-shrink-0 w-36 sm:w-48 sticky top-3 max-h-[85vh] overflow-y-auto pb-4">
+        <div className="flex items-start gap-3 px-5 relative">
+          {/* Mobiler Aufklapp-Pfeil für die Gruppen-Navigation */}
+          <button
+            onClick={() => setShowMobileNav((v) => !v)}
+            className="sm:hidden fixed left-0 top-1/2 -translate-y-1/2 z-50 w-7 h-10 rounded-r-full flex items-center justify-center shadow"
+            style={{ backgroundColor: INK, color: "#fff" }}
+          >
+            {showMobileNav ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+          </button>
+          {showMobileNav && (
+            <div
+              className="sm:hidden fixed inset-0 z-40"
+              style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+              onClick={() => setShowMobileNav(false)}
+            />
+          )}
+
+          {/* Navigation links: Gruppen als Filter, oben "Alle Mitglieder". Auf Mobil ein
+              einschiebbares Seitenmenü, auf Desktop immer sichtbar. */}
+          <div
+            className={`flex flex-col gap-1 flex-shrink-0 w-64 sm:w-48 sm:sticky sm:top-3 max-h-[85vh] overflow-y-auto pb-4 fixed sm:static inset-y-0 left-0 z-50 sm:z-auto p-4 sm:p-0 transition-transform duration-200 ${showMobileNav ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0`}
+            style={{ backgroundColor: PAPER }}
+          >
             <button
-              onClick={() => setActiveBereich(null)}
+              onClick={() => { setActiveBereich(null); setShowMobileNav(false); }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-left"
               style={{ backgroundColor: activeBereich === null ? INK : "transparent", color: activeBereich === null ? "#fff" : INK }}
             >
@@ -512,7 +539,7 @@ function MitgliederApp({ session }) {
               return (
                 <button
                   key={b.key}
-                  onClick={() => setActiveBereich(b.key)}
+                  onClick={() => { setActiveBereich(b.key); setShowMobileNav(false); }}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-left"
                   style={{ backgroundColor: active ? `${b.color}22` : "transparent", color: active ? b.color : INK_SOFT }}
                 >
@@ -525,10 +552,10 @@ function MitgliederApp({ session }) {
             {isAdmin && (
               <button
                 onClick={() => setShowAddGroup(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold text-white mt-2 w-fit"
-                style={{ backgroundColor: INK }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mt-2 w-fit"
+                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
               >
-                <Plus size={13} /> Neue Gruppe
+                <Plus size={12} /> Neue Gruppe
               </button>
             )}
           </div>
@@ -594,7 +621,7 @@ function MitgliederApp({ session }) {
                 return (
                   <div key={cardKey} className="rounded-xl p-4" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", opacity: m.isPlaceholder ? 0.75 : 1 }}>
                     <div className="flex items-start justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer sm:cursor-default" onClick={() => toggleExpand(cardKey)}>
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer" onClick={() => toggleExpand(cardKey)} onDoubleClick={() => setProfileMember(m)} title="Doppelklick für vollständiges Profil">
                         {m.foto_url ? (
                           <img src={m.foto_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                         ) : (
@@ -690,6 +717,62 @@ function MitgliederApp({ session }) {
             >
               {savingGroup && <Loader2 size={15} className="animate-spin" />} {savingGroup ? "Anlegen…" : "Gruppe anlegen"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {profileMember && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setProfileMember(null)}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">Profil</h2>
+              <button onClick={() => setProfileMember(null)}><X size={20} /></button>
+            </div>
+            <div className="flex flex-col items-center text-center mb-4">
+              {profileMember.foto_url ? (
+                <img src={profileMember.foto_url} alt="" className="w-20 h-20 rounded-full object-cover mb-2" />
+              ) : (
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center mb-2"
+                  style={{ backgroundColor: profileMember.is_child ? "#6C63A61A" : "#2E86AB1A", color: profileMember.is_child ? "#6C63A6" : BLUE }}
+                >
+                  {profileMember.is_child ? <Users size={28} /> : <User size={28} />}
+                </div>
+              )}
+              <div className="font-bold text-base">{profileMember.vorname} {profileMember.nachname}</div>
+              {profileMember.is_child && (
+                <div className="text-xs" style={{ color: INK_SOFT }}>
+                  Kind{parentNames(profileMember).length > 0 ? ` von ${parentNames(profileMember).join(" & ")}` : ""}
+                </div>
+              )}
+              {profileMember.isPlaceholder && <div className="text-xs" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}
+            </div>
+            <div className="flex flex-col gap-2 text-sm mb-4" style={{ color: INK_SOFT }}>
+              {profileMember.wohneinheit && <div className="flex items-center gap-2"><Building2 size={14} /> WE {profileMember.wohneinheit}</div>}
+              {profileMember.anschrift && <div className="flex items-center gap-2"><MapPin size={14} /> {profileMember.anschrift}</div>}
+              {profileMember.email && <div className="flex items-center gap-2"><Mail size={14} /> {profileMember.email}</div>}
+              {profileMember.telefon && <div className="flex items-center gap-2"><Phone size={14} /> {profileMember.telefon}</div>}
+              {profileMember.handy && <div className="flex items-center gap-2"><Smartphone size={14} /> {profileMember.handy}</div>}
+              {profileMember.geburtstag && <div className="flex items-center gap-2"><Calendar size={14} /> {fmtBirthday(profileMember.geburtstag)}</div>}
+            </div>
+            {profileMember.id && bereicheForMember(profileMember.id).length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-4">
+                {bereicheForMember(profileMember.id).map((k) => {
+                  const b = bereichInfo(k);
+                  if (!b) return null;
+                  return <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>{b.label}</span>;
+                })}
+              </div>
+            )}
+            {!profileMember.isPlaceholder && (
+              <button
+                onClick={() => exportVCard(profileMember)}
+                className="w-full rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+              >
+                <Download size={14} /> Als vCard speichern
+              </button>
+            )}
           </div>
         </div>
       )}

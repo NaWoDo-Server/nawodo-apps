@@ -588,15 +588,10 @@ function MitgliederApp({ session }) {
               ))}
             </div>
 
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-4">
               <button onClick={openNewFlow} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: INK }}>
                 <Plus size={14} /> Neuer Eintrag
               </button>
-              {isAdmin && (
-                <button onClick={exportAllCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
-                  <Download size={12} /> CSV
-                </button>
-              )}
             </div>
 
             {activeBereich && (
@@ -677,6 +672,14 @@ function MitgliederApp({ session }) {
                 );
               })}
             </div>
+
+            {isAdmin && (
+              <div className="mt-4">
+                <button onClick={exportAllCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
+                  <Download size={12} /> CSV
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

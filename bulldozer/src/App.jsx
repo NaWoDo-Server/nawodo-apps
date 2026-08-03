@@ -341,7 +341,8 @@ function BulldozerApp({ session }) {
       const availableHeight = window.innerHeight - wrapRect.top - controlsHeight - 16;
       const maxByWidth = Math.floor(availableWidth / parsed.width);
       const maxByHeight = Math.floor(availableHeight / parsed.height);
-      const next = Math.max(14, Math.min(46, maxByWidth, maxByHeight));
+      const maxCap = window.innerWidth >= 1024 ? 78 : 46;
+      const next = Math.max(14, Math.min(maxCap, maxByWidth, maxByHeight));
       if (Number.isFinite(next) && next > 0) setCellSize(next);
     }
     recompute();
@@ -493,18 +494,18 @@ function BulldozerApp({ session }) {
 
   function ImgButton({ onClick, src, alt, sub }) {
     return (
-      <div className="flex items-center justify-center mb-3">
-        <div className="w-14 flex-shrink-0" aria-hidden="true" />
+      <div className="flex items-center justify-center mb-3 lg:mb-5">
+        <div className="w-14 lg:w-24 flex-shrink-0" aria-hidden="true" />
         <button
           onClick={onClick}
-          className="w-full max-w-[130px] rounded-xl overflow-hidden block flex-shrink-0"
+          className="w-full max-w-[130px] lg:max-w-[220px] rounded-xl overflow-hidden block flex-shrink-0"
           style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
         >
           <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
         </button>
-        <div className="w-14 flex-shrink-0 pl-2">
+        <div className="w-14 lg:w-24 flex-shrink-0 pl-2 lg:pl-3">
           {sub && (
-            <span className="text-xs font-semibold" style={{ color: INK }}>
+            <span className="text-xs lg:text-base font-semibold" style={{ color: INK }}>
               {sub}
             </span>
           )}
@@ -556,10 +557,10 @@ function BulldozerApp({ session }) {
     return (
       <button
         onClick={() => !won && move(dir)}
-        className={`w-12 h-12 rounded-lg flex items-center justify-center ${className || ""}`}
+        className={`w-12 h-12 lg:w-20 lg:h-20 rounded-lg flex items-center justify-center ${className || ""}`}
         style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
       >
-        <Icon size={20} style={{ color: INK }} />
+        <Icon size={20} className="lg:w-8 lg:h-8" style={{ color: INK }} />
       </button>
     );
   }
@@ -574,12 +575,12 @@ function BulldozerApp({ session }) {
                 <ChevronLeft size={16} style={{ color: INK_SOFT }} />
               </button>
             )}
-            <img src="/bulldozer/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
-            <h1 className="font-bold text-lg">Bulldozer</h1>
+            <img src="/bulldozer/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
+            <h1 className="font-bold text-lg lg:text-2xl">Bulldozer</h1>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
+            <a href="/" className="p-2 lg:p-3 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
               {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
             </button>
           </div>
@@ -590,7 +591,7 @@ function BulldozerApp({ session }) {
             <img
               src="/bulldozer/bulldozer-logo.png"
               alt="Bulldozer"
-              className="w-full max-w-[320px] mb-6 px-4"
+              className="w-full max-w-[320px] lg:max-w-[480px] mb-6 px-4"
               style={{ imageRendering: "pixelated" }}
             />
             <ImgButton onClick={() => setShowHelp(true)} src="/bulldozer/btn-anleitung.png" alt="Spielanleitung" />
@@ -603,25 +604,25 @@ function BulldozerApp({ session }) {
             />
             <ImgButton onClick={() => setScreen("leaderboard")} src="/bulldozer/btn-highscore.png" alt="Highscore" />
 
-            <div className="w-full max-w-[260px] mt-2">
-              <div className="flex gap-2">
+            <div className="w-full max-w-[260px] lg:max-w-[420px] mt-2">
+              <div className="flex gap-2 lg:gap-3">
                 <input
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && jumpToCode()}
                   placeholder="Level-Code…"
-                  className="flex-1 rounded-lg px-3 py-2 text-xs border uppercase"
+                  className="flex-1 rounded-lg px-3 py-2 lg:py-3 text-xs lg:text-base border uppercase"
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
                 <button onClick={jumpToCode} className="rounded-lg overflow-hidden flex-shrink-0" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}>
-                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-[18px] w-auto block" style={{ imageRendering: "pixelated" }} />
+                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-[18px] lg:h-8 w-auto block" style={{ imageRendering: "pixelated" }} />
                 </button>
               </div>
-              {codeError && <p className="text-xs mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}
+              {codeError && <p className="text-xs lg:text-sm mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}
               {isSuperAdmin && (
                 <button
                   onClick={() => setShowLevelTable(true)}
-                  className="block mx-auto mt-3 rounded-lg px-4 py-1.5 text-xs font-semibold"
+                  className="block mx-auto mt-3 rounded-lg px-4 py-1.5 lg:px-6 lg:py-2.5 text-xs lg:text-sm font-semibold"
                   style={{ backgroundColor: "transparent", border: `1px solid ${BORDER_SOFT}`, color: INK_SOFT }}
                 >
                   Levelcode-Tabelle
@@ -634,11 +635,11 @@ function BulldozerApp({ session }) {
         {screen === "game" && gameState && (
           <div>
             <div className="text-center mb-3">
-              <div className="font-semibold text-sm">{levelIndex + 1}. {level.title}</div>
-              <div className="text-xs" style={{ color: INK_SOFT }}>Code: {levelCode(levelIndex)}</div>
+              <div className="font-semibold text-sm lg:text-xl">{levelIndex + 1}. {level.title}</div>
+              <div className="text-xs lg:text-base" style={{ color: INK_SOFT }}>Code: {levelCode(levelIndex)}</div>
             </div>
 
-            <div className="flex items-center justify-center gap-4 mb-4 text-sm" style={{ color: INK_SOFT }}>
+            <div className="flex items-center justify-center gap-4 lg:gap-8 mb-4 text-sm lg:text-lg" style={{ color: INK_SOFT }}>
               <span>Züge: <strong style={{ color: INK }}>{moves}</strong></span>
               <span>Zeit: <strong style={{ color: INK }}>{formatTime(elapsedMs)}</strong></span>
               {ownScoreFor(levelIndex) && <span>Bestzeit: <strong style={{ color: INK }}>{formatTime(ownScoreFor(levelIndex).best_time_ms)}</strong></span>}
@@ -649,25 +650,25 @@ function BulldozerApp({ session }) {
             </div>
 
             <div ref={controlsRef}>
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <button onClick={undo} disabled={history.length === 0} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT, opacity: history.length === 0 ? 0.5 : 1 }}>
+              <div className="flex items-center justify-center gap-2 lg:gap-4 mb-4 lg:mb-6">
+                <button onClick={undo} disabled={history.length === 0} className="flex items-center gap-1.5 px-3 py-2 lg:px-5 lg:py-3 rounded-lg text-xs lg:text-base font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT, opacity: history.length === 0 ? 0.5 : 1 }}>
                   <Undo2 size={14} /> Rückgängig
                 </button>
-                <button onClick={restart} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
+                <button onClick={restart} className="flex items-center gap-1.5 px-3 py-2 lg:px-5 lg:py-3 rounded-lg text-xs lg:text-base font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
                   <RotateCcw size={14} /> Neu starten
                 </button>
               </div>
 
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-1.5 lg:gap-2.5">
                 <DirButton dir="up" icon={ChevronUp} />
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 lg:gap-2.5">
                   <DirButton dir="left" icon={ChevronLeft} />
-                  <div className="w-12 h-12" />
+                  <div className="w-12 h-12 lg:w-20 lg:h-20" />
                   <DirButton dir="right" icon={ChevronRight} />
                 </div>
                 <DirButton dir="down" icon={ChevronDown} />
               </div>
-              <p className="text-center text-xs mt-3" style={{ color: INK_SOFT }}>Am Computer gehen auch die Pfeiltasten.</p>
+              <p className="text-center text-xs lg:text-base mt-3" style={{ color: INK_SOFT }}>Am Computer gehen auch die Pfeiltasten.</p>
             </div>
 
             {won && (
@@ -703,14 +704,14 @@ function BulldozerApp({ session }) {
             ) : overallRanking.length === 0 ? (
               <p className="text-sm text-center py-8" style={{ color: INK_SOFT }}>Noch keine Ergebnisse – sei der/die Erste!</p>
             ) : (
-              <div className="flex flex-col gap-2 mx-auto" style={{ maxWidth: "50%" }}>
+              <div className="flex flex-col gap-2 lg:gap-3 mx-auto" style={{ maxWidth: "50%" }}>
                 {overallRanking.map((r, i) => (
-                  <div key={r.user_id} className="rounded-xl p-3.5 flex items-center justify-between" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ backgroundColor: i === 0 ? "#C9752F1A" : "#E4E1D3", color: i === 0 ? ORANGE : INK_SOFT }}>{i + 1}</div>
-                      <div className="font-semibold text-sm truncate">{nameFor(r.user_id)}</div>
+                  <div key={r.user_id} className="rounded-xl p-3.5 lg:p-5 flex items-center justify-between" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                    <div className="flex items-center gap-3 lg:gap-4 min-w-0">
+                      <div className="w-7 h-7 lg:w-10 lg:h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xs lg:text-base font-bold" style={{ backgroundColor: i === 0 ? "#C9752F1A" : "#E4E1D3", color: i === 0 ? ORANGE : INK_SOFT }}>{i + 1}</div>
+                      <div className="font-semibold text-sm lg:text-lg truncate">{nameFor(r.user_id)}</div>
                     </div>
-                    <div className="text-xs text-right flex-shrink-0" style={{ color: INK_SOFT }}>
+                    <div className="text-xs lg:text-base text-right flex-shrink-0" style={{ color: INK_SOFT }}>
                       {r.levelsSolved} / {LEVELS.length} Level<br />Gesamtzeit {formatTime(r.totalTimeMs)}
                     </div>
                   </div>

@@ -397,19 +397,22 @@ function BulldozerApp({ session }) {
 
   function ImgButton({ onClick, src, alt, sub }) {
     return (
-      <div className="flex items-center justify-center gap-2 mb-3">
+      <div className="flex items-center justify-center mb-3">
+        <div className="w-14 flex-shrink-0" aria-hidden="true" />
         <button
           onClick={onClick}
-          className="w-full max-w-[130px] rounded-xl overflow-hidden block"
+          className="w-full max-w-[130px] rounded-xl overflow-hidden block flex-shrink-0"
           style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
         >
           <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
         </button>
-        {sub && (
-          <span className="text-xs font-semibold" style={{ color: INK }}>
-            {sub}
-          </span>
-        )}
+        <div className="w-14 flex-shrink-0 pl-2">
+          {sub && (
+            <span className="text-xs font-semibold" style={{ color: INK }}>
+              {sub}
+            </span>
+          )}
+        </div>
       </div>
     );
   }

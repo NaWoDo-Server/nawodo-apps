@@ -1,0 +1,680 @@
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Search, Gift, Megaphone, Users, Star, BookOpen, BarChart3,
+  Plus, X, Pencil, Trash2, Loader2, AlertCircle, Home, Paperclip,
+  Image as ImageIcon, Archive, ChevronDown, ChevronRight,
+} from "lucide-react";
+import { supabase, configMissing, BUCKET } from "./supabaseClient";
+import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
+
+const ARCHIVE_DAYS = 30;
+
+// Alle 7 Beitragstypen: Icon, Farbe, Anzeigename + Beschriftung fürs Titel-Feld im Formular.
+const POST_TYPES = [
+  { key: "gesuch", label: "Gesuch", titleLabel: "Titel des Gesuchs", Icon: Search, color: "#2E86AB" },
+  { key: "angebot", label: "Angebot", titleLabel: "Titel des Angebots", Icon: Gift, color: "#C9A227" },
+  { key: "ankuendigung", label: "Ankündigung", titleLabel: "Titel der Ankündigung", Icon: Megaphone, color: "#B54A45" },
+  { key: "mitarbeiter_gesuch", label: "Mitarbeitende gesucht", titleLabel: "Titel des Gesuchs", Icon: Users, color: "#6C63A6" },
+  { key: "empfehlung", label: "Empfehlung", titleLabel: "Titel der Empfehlung", Icon: Star, color: "#3E8E7E" },
+  { key: "buchempfehlung", label: "Buchempfehlung", titleLabel: "Buchtitel", Icon: BookOpen, color: "#C9752F" },
+  { key: "umfrage", label: "Umfrage", titleLabel: "Frage der Umfrage", Icon: BarChart3, color: "#1F6F5C" },
+];
+const typeInfo = (key) => POST_TYPES.find((t) => t.key === key) || POST_TYPES[0];
+
+function fmtRelative(iso) {
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays <= 0) return "heute";
+  if (diffDays === 1) return "gestern";
+  if (diffDays < 7) return `vor ${diffDays} Tagen`;
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+function isArchived(post) {
+  const diffDays = (Date.now() - new Date(post.created_at).getTime()) / 86400000;
+  return diffDays > ARCHIVE_DAYS;
+}
+async function uploadFile(file, pathPrefix) {
+  const ext = file.name.split(".").pop();
+  const path = `${pathPrefix}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export default function App() {
+  if (configMissing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+        <div className="max-w-sm text-center">
+          <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
+          <p className="font-semibold mb-1">Noch nicht eingerichtet</p>
+          <p className="text-sm" style={{ color: INK_SOFT }}>Trage die Supabase-Adresse und den Anon-Key in <code>config.js</code> ein.</p>
+        </div>
+      </div>
+    );
+  }
+  return <AuthGate />;
+}
+
+function AuthGate() {
+  const [session, setSession] = useState(undefined);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => setSession(sess));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (session === null) window.location.href = "/";
+  }, [session]);
+  if (session === undefined || session === null) {
+    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
+  }
+  return <PinnwandApp session={session} />;
+}
+
+function PinnwandApp({ session }) {
+  const user = session.user;
+  const userName = user.user_metadata?.name || user.email;
+  const isAdmin = user.user_metadata?.is_admin === true;
+  const initial = userName.charAt(0).toUpperCase();
+
+  const [posts, setPosts] = useState([]);
+  const [options, setOptions] = useState([]);
+  const [votes, setVotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [activeTypes, setActiveTypes] = useState(() => new Set(POST_TYPES.map((t) => t.key)));
+  const [showArchive, setShowArchive] = useState(false);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [formType, setFormType] = useState("gesuch");
+  const [formTitle, setFormTitle] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formPriceNote, setFormPriceNote] = useState("");
+  const [formIsFree, setFormIsFree] = useState(false);
+  const [formPollMode, setFormPollMode] = useState("single");
+  const [formPollOptions, setFormPollOptions] = useState(["", ""]);
+  const [formImageFile, setFormImageFile] = useState(null);
+  const [formImagePreview, setFormImagePreview] = useState(null);
+  const [formAttachmentFile, setFormAttachmentFile] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const [showAccount, setShowAccount] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const imageInputRef = useRef(null);
+  const attachmentInputRef = useRef(null);
+
+  useEffect(() => { loadAll(); }, []);
+
+  async function loadAll() {
+    const [p, o, v] = await Promise.all([
+      supabase.from("posts").select("*").order("created_at", { ascending: false }),
+      supabase.from("poll_options").select("*").order("sort_order"),
+      supabase.from("poll_votes").select("*"),
+    ]);
+    setPosts(p.data || []);
+    setOptions(o.data || []);
+    setVotes(v.data || []);
+    setLoading(false);
+  }
+
+  function optionsFor(postId) { return options.filter((o) => o.post_id === postId); }
+  function votesFor(postId) { return votes.filter((v) => v.post_id === postId); }
+  function myVotesFor(postId) { return votesFor(postId).filter((v) => v.user_id === user.id).map((v) => v.option_id); }
+
+  function toggleExpanded(id) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleType(key) {
+    setActiveTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  const q = search.trim().toLowerCase();
+  const visiblePosts = useMemo(() => {
+    return posts
+      .filter((p) => activeTypes.has(p.type))
+      .filter((p) => (showArchive ? isArchived(p) : !isArchived(p)))
+      .filter((p) => !q || p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+  }, [posts, activeTypes, showArchive, q]);
+
+  function resetForm() {
+    setFormType("gesuch");
+    setFormTitle("");
+    setFormDescription("");
+    setFormPriceNote("");
+    setFormIsFree(false);
+    setFormPollMode("single");
+    setFormPollOptions(["", ""]);
+    setFormImageFile(null);
+    setFormImagePreview(null);
+    setFormAttachmentFile(null);
+    setFormError("");
+  }
+
+  function openNewForm() {
+    resetForm();
+    setEditingPost(null);
+    setShowForm(true);
+  }
+
+  function openEditForm(post) {
+    setEditingPost(post);
+    setFormType(post.type);
+    setFormTitle(post.title);
+    setFormDescription(post.description);
+    setFormPriceNote(post.price_note || "");
+    setFormIsFree(!!post.is_free);
+    setFormPollMode(post.poll_mode || "single");
+    setFormPollOptions(optionsFor(post.id).map((o) => o.label));
+    setFormImageFile(null);
+    setFormImagePreview(post.image_url || null);
+    setFormAttachmentFile(null);
+    setFormError("");
+    setShowForm(true);
+  }
+
+  function updatePollOption(idx, value) {
+    setFormPollOptions((prev) => prev.map((o, i) => (i === idx ? value : o)));
+  }
+  function addPollOption() { setFormPollOptions((prev) => [...prev, ""]); }
+  function removePollOption(idx) { setFormPollOptions((prev) => prev.filter((_, i) => i !== idx)); }
+
+  function onImageSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFormImageFile(file);
+    setFormImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handleSave() {
+    setFormError("");
+    if (!formTitle.trim()) return setFormError("Bitte einen Titel eintragen.");
+    if (!formDescription.trim()) return setFormError("Bitte eine Beschreibung eintragen.");
+    let pollOptionsClean = [];
+    if (formType === "umfrage" && !editingPost) {
+      pollOptionsClean = formPollOptions.map((o) => o.trim()).filter(Boolean);
+      if (pollOptionsClean.length < 2) return setFormError("Bitte mindestens 2 Antwortmöglichkeiten eintragen.");
+    }
+    setSaving(true);
+    try {
+      let imageUrl = editingPost ? editingPost.image_url : null;
+      if (formImageFile) imageUrl = await uploadFile(formImageFile, "pinnwand-bild");
+      let attachmentUrl = editingPost ? editingPost.attachment_url : null;
+      let attachmentName = editingPost ? editingPost.attachment_name : null;
+      if (formAttachmentFile) {
+        attachmentUrl = await uploadFile(formAttachmentFile, "pinnwand-anhang");
+        attachmentName = formAttachmentFile.name;
+      }
+      const payload = {
+        type: formType,
+        title: formTitle.trim(),
+        description: formDescription.trim(),
+        image_url: imageUrl,
+        attachment_url: attachmentUrl,
+        attachment_name: attachmentName,
+        price_note: formType === "angebot" && !formIsFree ? (formPriceNote.trim() || null) : null,
+        is_free: formType === "angebot" ? formIsFree : false,
+        poll_mode: formType === "umfrage" ? formPollMode : null,
+      };
+      if (editingPost) {
+        const { error } = await supabase.from("posts").update(payload).eq("id", editingPost.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from("posts").insert({ ...payload, created_by: user.id, created_by_name: userName }).select().single();
+        if (error) throw error;
+        if (formType === "umfrage" && pollOptionsClean.length > 0) {
+          const rows = pollOptionsClean.map((label, i) => ({ post_id: data.id, label, sort_order: i }));
+          const { error: optErr } = await supabase.from("poll_options").insert(rows);
+          if (optErr) throw optErr;
+        }
+      }
+      setShowForm(false);
+      setEditingPost(null);
+      await loadAll();
+    } catch (e) {
+      setFormError(e.message || "Speichern hat nicht geklappt.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(post) {
+    if (!window.confirm(`"${post.title}" wirklich löschen?`)) return;
+    try {
+      await supabase.from("posts").delete().eq("id", post.id);
+      await loadAll();
+    } catch {}
+  }
+
+  async function handleVote(post, selectedOptionIds) {
+    try {
+      await supabase.from("poll_votes").delete().eq("post_id", post.id).eq("user_id", user.id);
+      if (selectedOptionIds.length > 0) {
+        const rows = selectedOptionIds.map((option_id) => ({ post_id: post.id, option_id, user_id: user.id }));
+        await supabase.from("poll_votes").insert(rows);
+      }
+      await loadAll();
+    } catch {}
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }
+
+  async function handleChangePassword() {
+    setPasswordError("");
+    setPasswordSuccess(false);
+    if (newPassword.length < 6) return setPasswordError("Mindestens 6 Zeichen.");
+    if (newPassword !== newPasswordConfirm) return setPasswordError("Passwörter stimmen nicht überein.");
+    setSavingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPasswordSuccess(true);
+      setNewPassword("");
+      setNewPasswordConfirm("");
+    } catch (e) {
+      setPasswordError(e.message || "Hat nicht geklappt.");
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
+  }
+
+  return (
+    <div className="min-h-screen pb-24" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <div className="sm:max-w-2xl mx-auto sm:border-x" style={{ borderColor: "#E4E1D3" }}>
+        <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <img src="/pinnwand/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
+            <h1 className="font-bold text-lg">Pinnwand</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0" style={{ backgroundColor: INK }}>{initial}</button>
+          </div>
+        </div>
+
+        <div className="px-5 mb-3">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Beiträge durchsuchen…"
+              className="w-full rounded-full pl-9 pr-3 py-2.5 text-sm border"
+              style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
+            />
+          </div>
+        </div>
+
+        <div className="px-5 mb-3 flex gap-2 flex-wrap">
+          {POST_TYPES.map((t) => {
+            const active = activeTypes.has(t.key);
+            return (
+              <button
+                key={t.key}
+                onClick={() => toggleType(t.key)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ backgroundColor: active ? t.color : `${t.color}1A`, color: active ? "#fff" : INK, border: `1.5px solid ${active ? t.color : `${t.color}55`}` }}
+              >
+                <t.Icon size={12} /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="px-5 mb-4 flex items-center gap-2">
+          <button
+            onClick={() => setShowArchive(false)}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: !showArchive ? INK : "transparent", color: !showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${!showArchive ? INK : BORDER_SOFT}` }}
+          >
+            Aktuell
+          </button>
+          <button
+            onClick={() => setShowArchive(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: showArchive ? INK : "transparent", color: showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${showArchive ? INK : BORDER_SOFT}` }}
+          >
+            <Archive size={12} /> Archiv
+          </button>
+        </div>
+
+        <div className="px-5 flex flex-col gap-3">
+          {visiblePosts.length === 0 && (
+            <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
+              <p className="text-sm" style={{ color: INK_SOFT }}>{showArchive ? "Keine archivierten Beiträge." : "Noch keine Beiträge."}</p>
+            </div>
+          )}
+          {visiblePosts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              isAdmin={isAdmin}
+              ownUserId={user.id}
+              options={optionsFor(post.id)}
+              allVotes={votesFor(post.id)}
+              myVotes={myVotesFor(post.id)}
+              expanded={expandedIds.has(post.id)}
+              onToggleExpand={() => toggleExpanded(post.id)}
+              onEdit={() => openEditForm(post)}
+              onDelete={() => handleDelete(post)}
+              onVote={(ids) => handleVote(post, ids)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={openNewForm}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg z-40"
+        style={{ backgroundColor: INK }}
+      >
+        <Plus size={26} />
+      </button>
+
+      {showForm && (
+        <PostForm
+          editingPost={editingPost}
+          formType={formType} setFormType={setFormType}
+          formTitle={formTitle} setFormTitle={setFormTitle}
+          formDescription={formDescription} setFormDescription={setFormDescription}
+          formPriceNote={formPriceNote} setFormPriceNote={setFormPriceNote}
+          formIsFree={formIsFree} setFormIsFree={setFormIsFree}
+          formPollMode={formPollMode} setFormPollMode={setFormPollMode}
+          formPollOptions={formPollOptions}
+          updatePollOption={updatePollOption} addPollOption={addPollOption} removePollOption={removePollOption}
+          formImagePreview={formImagePreview} onImageSelected={onImageSelected} imageInputRef={imageInputRef}
+          formAttachmentFile={formAttachmentFile} setFormAttachmentFile={setFormAttachmentFile} attachmentInputRef={attachmentInputRef}
+          formError={formError} saving={saving}
+          onSave={handleSave}
+          onClose={() => { setShowForm(false); setEditingPost(null); }}
+        />
+      )}
+
+      {showAccount && (
+        <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAccount(false)}>
+          <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Konto</h2><button onClick={() => setShowAccount(false)}><X size={20} /></button></div>
+            <div className="mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
+              <div className="text-sm font-semibold">{userName}{isAdmin ? " · Admin" : ""}</div>
+              <div className="text-xs" style={{ color: INK_SOFT }}>{user.email}</div>
+            </div>
+            <label className="text-xs font-medium block mb-1">Passwort ändern</label>
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Neues Passwort" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
+            <input type="password" value={newPasswordConfirm} onChange={(e) => setNewPasswordConfirm(e.target.value)} placeholder="Neues Passwort wiederholen" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
+            {passwordError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{passwordError}</p>}
+            {passwordSuccess && <p className="text-xs mb-2" style={{ color: "#2E7D4F" }}>Passwort geändert!</p>}
+            <button onClick={handleChangePassword} disabled={savingPassword} className="w-full rounded-lg py-2.5 mb-4 text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: INK, opacity: savingPassword ? 0.7 : 1 }}>
+              {savingPassword && <Loader2 size={15} className="animate-spin" />} {savingPassword ? "Speichern…" : "Passwort speichern"}
+            </button>
+            <button onClick={handleLogout} className="w-full rounded-lg py-2.5 text-sm border" style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}>Abmelden</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostCard({ post, isAdmin, ownUserId, options, allVotes, myVotes, expanded, onToggleExpand, onEdit, onDelete, onVote }) {
+  const info = typeInfo(post.type);
+  const canManage = isAdmin || post.created_by === ownUserId;
+  const archived = isArchived(post);
+  const longDescription = post.description.length > 160;
+  const shownDescription = expanded || !longDescription ? post.description : post.description.slice(0, 160) + "…";
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+      {post.image_url && <img src={post.image_url} alt="" className="w-full h-40 object-cover" />}
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: info.color }}>
+            <info.Icon size={11} /> {info.label}
+          </span>
+          <div className="flex items-center gap-2">
+            {archived && <span className="text-xs flex items-center gap-1" style={{ color: INK_SOFT }}><Archive size={11} /> archiviert</span>}
+            {canManage && (
+              <>
+                <button onClick={onEdit}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
+                <button onClick={onDelete}><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <h3 className="font-bold text-base mb-1">{post.title}</h3>
+
+        {post.type === "angebot" && (post.is_free || post.price_note) && (
+          <span className="inline-block mb-2 px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: "#E9E6D9", color: INK }}>
+            {post.is_free ? "Zu verschenken" : post.price_note}
+          </span>
+        )}
+
+        <p className="text-sm mb-2 whitespace-pre-wrap" style={{ color: INK_SOFT }}>
+          {shownDescription}
+          {longDescription && (
+            <button onClick={onToggleExpand} className="ml-1 text-xs font-semibold" style={{ color: info.color }}>
+              {expanded ? "weniger" : "mehr"}
+            </button>
+          )}
+        </p>
+
+        {post.type === "umfrage" && (
+          <PollWidget post={post} options={options} allVotes={allVotes} myVotes={myVotes} onVote={onVote} color={info.color} />
+        )}
+
+        {post.attachment_url && (
+          <a href={post.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 mt-2 text-xs font-semibold" style={{ color: info.color }}>
+            <Paperclip size={12} /> {post.attachment_name || "Anhang öffnen"}
+          </a>
+        )}
+
+        <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: "1px solid #F1F0EA" }}>
+          <span className="text-xs font-medium">{post.created_by_name}</span>
+          <span className="text-xs" style={{ color: INK_SOFT }}>{fmtRelative(post.created_at)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PollWidget({ post, options, allVotes, myVotes, onVote, color }) {
+  const [selected, setSelected] = useState(myVotes);
+  useEffect(() => { setSelected(myVotes); }, [myVotes.join(",")]);
+
+  const totalVoters = new Set(allVotes.map((v) => v.user_id)).size;
+  const countFor = (optId) => allVotes.filter((v) => v.option_id === optId).length;
+  const changed = selected.slice().sort().join(",") !== myVotes.slice().sort().join(",");
+
+  function toggleOption(id) {
+    if (post.poll_mode === "multiple") {
+      setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    } else {
+      setSelected((prev) => (prev.includes(id) ? [] : [id]));
+    }
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="flex flex-col gap-1.5 mb-2">
+        {options.map((opt) => {
+          const count = countFor(opt.id);
+          const pct = totalVoters > 0 ? Math.round((count / totalVoters) * 100) : 0;
+          const isSelected = selected.includes(opt.id);
+          return (
+            <button
+              key={opt.id}
+              onClick={() => toggleOption(opt.id)}
+              className="relative w-full text-left rounded-lg px-3 py-2 text-sm overflow-hidden"
+              style={{ border: `1.5px solid ${isSelected ? color : BORDER_SOFT}`, backgroundColor: "#fff" }}
+            >
+              <div className="absolute inset-y-0 left-0" style={{ width: `${pct}%`, backgroundColor: `${color}22` }} />
+              <div className="relative flex items-center justify-between">
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-xs" style={{ color: INK_SOFT }}>{pct}%</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs" style={{ color: INK_SOFT }}>{totalVoters} {totalVoters === 1 ? "Stimme" : "Stimmen"} · {post.poll_mode === "multiple" ? "Mehrfachauswahl" : "Einfache Auswahl"}</span>
+        {changed && (
+          <button onClick={() => onVote(selected)} className="text-xs font-semibold px-3 py-1.5 rounded-full text-white" style={{ backgroundColor: color }}>
+            {myVotes.length > 0 ? "Ändern" : "Abstimmen"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PostForm({
+  editingPost, formType, setFormType, formTitle, setFormTitle, formDescription, setFormDescription,
+  formPriceNote, setFormPriceNote, formIsFree, setFormIsFree, formPollMode, setFormPollMode,
+  formPollOptions, updatePollOption, addPollOption, removePollOption,
+  formImagePreview, onImageSelected, imageInputRef,
+  formAttachmentFile, setFormAttachmentFile, attachmentInputRef,
+  formError, saving, onSave, onClose,
+}) {
+  const info = typeInfo(formType);
+  const isEditing = !!editingPost;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-lg">{isEditing ? "Beitrag bearbeiten" : "Neuer Beitrag"}</h2>
+          <button onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <label className="text-xs font-medium block mb-1.5" style={{ color: INK_SOFT }}>Art des Beitrags</label>
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {POST_TYPES.map((t) => (
+            <button
+              key={t.key}
+              disabled={isEditing}
+              onClick={() => setFormType(t.key)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{
+                backgroundColor: formType === t.key ? t.color : "transparent",
+                color: formType === t.key ? "#fff" : INK,
+                border: `1.5px solid ${formType === t.key ? t.color : BORDER_SOFT}`,
+                opacity: isEditing && formType !== t.key ? 0.4 : 1,
+              }}
+            >
+              <t.Icon size={12} /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        <label className="text-xs font-medium block mb-1">Titelbild (optional)</label>
+        <div className="mb-3">
+          {formImagePreview ? (
+            <div className="relative mb-1.5">
+              <img src={formImagePreview} alt="" className="w-full h-32 object-cover rounded-lg" />
+              <button onClick={() => imageInputRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-semibold px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: INK }}>Ändern</button>
+            </div>
+          ) : (
+            <button onClick={() => imageInputRef.current?.click()} className="w-full py-4 rounded-lg text-xs font-semibold flex items-center justify-center gap-2" style={{ border: `1.5px dashed ${BORDER_SOFT}`, color: INK_SOFT }}>
+              <ImageIcon size={14} /> Bild hochladen
+            </button>
+          )}
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={onImageSelected} />
+        </div>
+
+        <label className="text-xs font-medium block mb-1">{info.titleLabel}</label>
+        <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Titel eintragen" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+
+        {formType === "angebot" && (
+          <div className="mb-3">
+            <label className="text-xs font-medium block mb-1">Gewünschte Geldleistung (optional)</label>
+            <input
+              value={formPriceNote}
+              onChange={(e) => setFormPriceNote(e.target.value)}
+              disabled={formIsFree}
+              placeholder="z.B. 20€ VB"
+              className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: formIsFree ? "#EFEEE7" : "#fff" }}
+            />
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={formIsFree} onChange={(e) => setFormIsFree(e.target.checked)} className="w-4 h-4" />
+              <span className="text-sm font-medium">Zu verschenken</span>
+            </label>
+          </div>
+        )}
+
+        <label className="text-xs font-medium block mb-1">Beschreibung</label>
+        <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Beschreibung…" rows={4} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+
+        {formType === "umfrage" && !isEditing && (
+          <div className="mb-3">
+            <label className="text-xs font-medium block mb-1.5">Abstimmung</label>
+            <div className="flex gap-2 mb-3">
+              <button onClick={() => setFormPollMode("single")} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: formPollMode === "single" ? info.color : "transparent", color: formPollMode === "single" ? "#fff" : INK, border: `1.5px solid ${formPollMode === "single" ? info.color : BORDER_SOFT}` }}>Einfache Auswahl</button>
+              <button onClick={() => setFormPollMode("multiple")} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: formPollMode === "multiple" ? info.color : "transparent", color: formPollMode === "multiple" ? "#fff" : INK, border: `1.5px solid ${formPollMode === "multiple" ? info.color : BORDER_SOFT}` }}>Mehrfachauswahl</button>
+            </div>
+            <label className="text-xs font-medium block mb-1.5">Antwortmöglichkeiten</label>
+            <div className="flex flex-col gap-2 mb-2">
+              {formPollOptions.map((opt, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input value={opt} onChange={(e) => updatePollOption(idx, e.target.value)} placeholder={`Option ${idx + 1}`} className="flex-1 rounded-lg px-3 py-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                  {formPollOptions.length > 2 && (
+                    <button onClick={() => removePollOption(idx)}><X size={16} style={{ color: "#B8B4A2" }} /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button onClick={addPollOption} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: `1.5px dashed ${BORDER_SOFT}`, color: INK_SOFT }}>+ Option hinzufügen</button>
+          </div>
+        )}
+        {formType === "umfrage" && isEditing && (
+          <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Die Antwortmöglichkeiten lassen sich nach dem Anlegen nicht mehr ändern (wegen bereits abgegebener Stimmen).</p>
+        )}
+
+        <label className="text-xs font-medium block mb-1">Dateianhang (optional)</label>
+        <div className="mb-3">
+          <button onClick={() => attachmentInputRef.current?.click()} className="w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2" style={{ border: `1.5px dashed ${BORDER_SOFT}`, color: INK_SOFT }}>
+            <Paperclip size={13} /> {formAttachmentFile ? formAttachmentFile.name : "Datei anhängen"}
+          </button>
+          <input ref={attachmentInputRef} type="file" className="hidden" onChange={(e) => setFormAttachmentFile(e.target.files?.[0] || null)} />
+        </div>
+
+        {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
+
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2"
+          style={{ backgroundColor: info.color, opacity: saving ? 0.7 : 1 }}
+        >
+          {saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Speichern…" : isEditing ? "Speichern" : "Veröffentlichen"}
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -395,22 +395,15 @@ function BulldozerApp({ session }) {
     };
   }
 
-  // Buttons im "Steinelook": mit der Fels-Kachel aus dem Theme texturiert.
   function StoneButton({ onClick, children, sub }) {
     return (
       <button
         onClick={onClick}
         className="w-full max-w-[260px] mx-auto rounded-xl py-4 px-6 flex flex-col items-center justify-center gap-0.5 mb-3"
-        style={{
-          backgroundImage: "url(/bulldozer/rock-tile.png)",
-          backgroundSize: "56px 56px",
-          backgroundRepeat: "repeat",
-          imageRendering: "pixelated",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.3), inset 0 0 0 2px rgba(0,0,0,0.15)",
-        }}
+        style={{ backgroundColor: ORANGE, boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
       >
-        <span className="font-bold text-base tracking-wide" style={{ color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>{children}</span>
-        {sub && <span className="text-xs font-semibold" style={{ color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.85)" }}>{sub}</span>}
+        <span className="font-bold text-base tracking-wide text-white">{children}</span>
+        {sub && <span className="text-xs font-semibold text-white">{sub}</span>}
       </button>
     );
   }

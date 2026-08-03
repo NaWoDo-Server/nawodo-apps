@@ -100,7 +100,7 @@ function SettingsApp({ session }) {
   const [actionError, setActionError] = useState("");
   const [savingAction, setSavingAction] = useState(false);
 
-  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedRowKey, setSelectedRowKey] = useState(null);
   const [pendingIsAdmin, setPendingIsAdmin] = useState(false);
   const [pendingMods, setPendingMods] = useState([]);
   const [pendingDenied, setPendingDenied] = useState([]);
@@ -147,9 +147,6 @@ function SettingsApp({ session }) {
     setLoading(false);
   }
 
-  function memberFor(userId) {
-    return members.find((m) => m.user_id === userId && !m.is_child) || null;
-  }
   function modAppsFor(userId) {
     return appModerators.filter((r) => r.user_id === userId).map((r) => r.app_key);
   }
@@ -160,22 +157,47 @@ function SettingsApp({ session }) {
     return memberBereiche.filter((r) => r.member_id === memberId).map((r) => r.bereich_key);
   }
 
+  // rowKey identifiziert eine Zeile eindeutig - entweder ueber die Auth-User-ID
+  // (Account mit Login) oder, falls keiner existiert (z.B. Kinder ohne eigenen
+  // Login), ueber die Mitglieder-ID.
+  function rowKey(r) {
+    return r.authUser ? `u:${r.authUser.id}` : `m:${r.member.id}`;
+  }
+
+  // Jede Zeile in der Liste ist entweder: ein Mitglieder-Profil (inkl. Kinder ohne
+  // Login) mit optional verknuepftem Login, oder ein Login-Account, der noch kein
+  // Mitglieder-Profil angelegt hat.
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return allUsers
-      .filter((u) => !q || `${u.name || ""} ${u.email || ""}`.toLowerCase().includes(q))
-      .sort((a, b) => (a.name || a.email || "").localeCompare(b.name || b.email || "", "de"));
-  }, [allUsers, search]);
+    const seenUserIds = new Set();
+    const combined = members.map((m) => {
+      const authUser = m.user_id ? allUsers.find((u) => u.id === m.user_id) || null : null;
+      if (authUser) seenUserIds.add(authUser.id);
+      return { member: m, authUser };
+    });
+    allUsers.forEach((u) => {
+      if (!seenUserIds.has(u.id)) combined.push({ member: null, authUser: u });
+    });
+    return combined
+      .map((r) => ({
+        ...r,
+        displayName: (r.member && [r.member.vorname, r.member.nachname].filter(Boolean).join(" ").trim()) || r.authUser?.name || r.authUser?.email || "Unbenannt",
+      }))
+      .filter((r) => !q || `${r.displayName} ${r.authUser?.email || ""}`.toLowerCase().includes(q))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, "de"));
+  }, [members, allUsers, search]);
 
-  const selectedUser = allUsers.find((u) => u.id === selectedUserId) || null;
-  const selectedMember = selectedUserId ? memberFor(selectedUserId) : null;
+  const selectedRow = selectedRowKey ? rows.find((r) => rowKey(r) === selectedRowKey) || null : null;
+  const selectedAuthUser = selectedRow?.authUser || null;
+  const selectedMember = selectedRow?.member || null;
 
   useEffect(() => {
-    if (selectedUserId) {
-      const u = allUsers.find((x) => x.id === selectedUserId);
-      if (u) loadPendingFor(u);
+    if (selectedRowKey) {
+      const r = rows.find((x) => rowKey(x) === selectedRowKey);
+      if (r?.authUser) loadPendingFor(r.authUser);
     }
-  }, [selectedUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRowKey]);
 
   async function callAdminFn(body, method = "POST") {
     const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
@@ -200,23 +222,23 @@ function SettingsApp({ session }) {
   }
 
   async function handleApplyRoles() {
-    if (!selectedUser) return;
+    if (!selectedAuthUser) return;
     setActionError("");
     setSavingAction(true);
     try {
-      const currentIsAdmin = selectedUser.is_admin === true;
+      const currentIsAdmin = selectedAuthUser.is_admin === true;
       if (pendingIsAdmin !== currentIsAdmin) {
-        await callAdminFn({ type: "toggle_admin", target_user_id: selectedUser.id, is_admin: pendingIsAdmin });
+        await callAdminFn({ type: "toggle_admin", target_user_id: selectedAuthUser.id, is_admin: pendingIsAdmin });
       }
-      const currentMods = modAppsFor(selectedUser.id);
+      const currentMods = modAppsFor(selectedAuthUser.id);
       const toAdd = pendingMods.filter((k) => !currentMods.includes(k));
       const toRemove = currentMods.filter((k) => !pendingMods.includes(k));
       for (const k of toAdd) {
-        const { error } = await supabase.from("app_moderators").insert({ user_id: selectedUser.id, app_key: k });
+        const { error } = await supabase.from("app_moderators").insert({ user_id: selectedAuthUser.id, app_key: k });
         if (error) throw error;
       }
       for (const k of toRemove) {
-        const { error } = await supabase.from("app_moderators").delete().eq("user_id", selectedUser.id).eq("app_key", k);
+        const { error } = await supabase.from("app_moderators").delete().eq("user_id", selectedAuthUser.id).eq("app_key", k);
         if (error) throw error;
       }
       await loadAll();
@@ -228,14 +250,14 @@ function SettingsApp({ session }) {
   }
 
   async function handleApplyPermissions() {
-    if (!selectedUser) return;
+    if (!selectedAuthUser) return;
     setActionError("");
     setSavingAction(true);
     try {
-      const currentDenied = deniedAppsFor(selectedUser.id);
+      const currentDenied = deniedAppsFor(selectedAuthUser.id);
       const changed = APP_LIST.filter((a) => currentDenied.includes(a.key) !== pendingDenied.includes(a.key));
       for (const a of changed) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedUser.id, app_key: a.key, allowed: !pendingDenied.includes(a.key) });
+        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: a.key, allowed: !pendingDenied.includes(a.key) });
       }
       await loadAll();
     } catch (e) {
@@ -303,10 +325,29 @@ function SettingsApp({ session }) {
     setSavingAction(true);
     try {
       await callAdminFn({ user_id: targetUser.id }, "DELETE");
-      setSelectedUserId(null);
+      setSelectedRowKey(null);
       await loadAll();
     } catch (e) {
       setActionError(e.message || "Account konnte nicht gelöscht werden.");
+    } finally {
+      setSavingAction(false);
+    }
+  }
+
+  // Fuer Eintraege ohne eigenen Login (z.B. Kinder) - hier gibt es keinen
+  // Auth-Account zum Loeschen, nur die Zeile in der members-Tabelle.
+  async function handleDeleteMemberOnly(targetMember) {
+    const displayName = [targetMember.vorname, targetMember.nachname].filter(Boolean).join(" ").trim() || "diesen Eintrag";
+    if (!window.confirm(`${displayName} wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) return;
+    setActionError("");
+    setSavingAction(true);
+    try {
+      const { error } = await supabase.from("members").delete().eq("id", targetMember.id);
+      if (error) throw error;
+      setSelectedRowKey(null);
+      await loadAll();
+    } catch (e) {
+      setActionError(e.message || "Eintrag konnte nicht gelöscht werden.");
     } finally {
       setSavingAction(false);
     }
@@ -442,13 +483,14 @@ function SettingsApp({ session }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          {rows.map((u) => {
-            const m = memberFor(u.id);
-            const mods = modAppsFor(u.id);
+          {rows.map((r) => {
+            const m = r.member;
+            const u = r.authUser;
+            const mods = u ? modAppsFor(u.id) : [];
             return (
               <button
-                key={u.id}
-                onClick={() => setSelectedUserId(u.id)}
+                key={rowKey(r)}
+                onClick={() => setSelectedRowKey(rowKey(r))}
                 className="w-full text-left rounded-xl p-3.5 flex items-center justify-between"
                 style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
               >
@@ -462,11 +504,15 @@ function SettingsApp({ session }) {
                   )}
                   <div className="min-w-0">
                     <div className="font-semibold text-sm truncate flex items-center gap-1.5">
-                      {u.name || u.email}
-                      {u.is_admin && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#B54A451A", color: "#B54A45" }}>Admin</span>}
+                      {r.displayName}
+                      {u?.is_admin && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#B54A451A", color: "#B54A45" }}>Admin</span>}
                       {mods.length > 0 && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#C9A2271A", color: "#C9A227" }}>Mod · {mods.length}</span>}
+                      {m?.is_child && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#3E8E7E1A", color: "#3E8E7E" }}>Kind</span>}
                     </div>
-                    <div className="text-xs truncate" style={{ color: INK_SOFT }}>{u.email}{m?.mitgliedstyp === "gast" ? " · Gast" : m?.mitgliedstyp === "bewohner" ? " · Bewohner" : ""}</div>
+                    <div className="text-xs truncate" style={{ color: INK_SOFT }}>
+                      {u?.email || "Kein eigener Login"}
+                      {m?.mitgliedstyp === "gast" ? " · Gast" : m?.mitgliedstyp === "bewohner" ? " · Bewohner" : ""}
+                    </div>
                   </div>
                 </div>
                 <ChevronRight size={16} style={{ color: INK_SOFT }} className="flex-shrink-0" />
@@ -476,15 +522,15 @@ function SettingsApp({ session }) {
         </div>
       </div>
 
-      {selectedUser && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setSelectedUserId(null); } }}>
+      {selectedRow && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setSelectedRowKey(null); } }}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">{selectedUser.name || selectedUser.email}</h2>
-              <button onClick={() => setSelectedUserId(null)}><X size={20} /></button>
+              <h2 className="font-bold text-lg">{selectedRow.displayName}</h2>
+              <button onClick={() => setSelectedRowKey(null)}><X size={20} /></button>
             </div>
             <div className="mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
-              <div className="text-xs" style={{ color: INK_SOFT }}>{selectedUser.email}</div>
+              <div className="text-xs" style={{ color: INK_SOFT }}>{selectedAuthUser?.email || "Kein eigener Login"}</div>
             </div>
 
             {selectedMember ? (
@@ -531,6 +577,8 @@ function SettingsApp({ session }) {
               <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Kein Mitglieder-Profil vorhanden (Mitgliedstyp/Gruppen erst verfügbar, sobald eins angelegt ist).</p>
             )}
 
+            {selectedAuthUser ? (
+            <>
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
               <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Rollen</div>
               <label className="flex items-center gap-2 text-sm mb-2">
@@ -613,7 +661,7 @@ function SettingsApp({ session }) {
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
                 <button
-                  onClick={() => handleSetPassword(selectedUser.id)}
+                  onClick={() => handleSetPassword(selectedAuthUser.id)}
                   disabled={savingAction}
                   className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
                   style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
@@ -623,17 +671,32 @@ function SettingsApp({ session }) {
               </div>
               <p className="text-xs mt-1.5" style={{ color: INK_SOFT }}>Bitte der Person das neue Passwort mitteilen.</p>
             </div>
+            </>
+            ) : (
+              <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Kein eigener Login vorhanden – Rollen, App-Zugriff und Passwort gelten nur für Accounts mit Login.</p>
+            )}
 
             {actionError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {actionError}</div>}
 
-            <button
-              onClick={() => handleDeleteAccount(selectedUser)}
-              disabled={savingAction}
-              className="w-full rounded-lg py-2.5 text-sm border flex items-center justify-center gap-2"
-              style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}
-            >
-              <UserX size={14} /> Account vollständig löschen
-            </button>
+            {selectedAuthUser ? (
+              <button
+                onClick={() => handleDeleteAccount(selectedAuthUser)}
+                disabled={savingAction}
+                className="w-full rounded-lg py-2.5 text-sm border flex items-center justify-center gap-2"
+                style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}
+              >
+                <UserX size={14} /> Account vollständig löschen
+              </button>
+            ) : selectedMember ? (
+              <button
+                onClick={() => handleDeleteMemberOnly(selectedMember)}
+                disabled={savingAction}
+                className="w-full rounded-lg py-2.5 text-sm border flex items-center justify-center gap-2"
+                style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}
+              >
+                <UserX size={14} /> Eintrag löschen
+              </button>
+            ) : null}
           </div>
         </div>
       )}

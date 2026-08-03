@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   User, Users, Phone, Smartphone, Mail, MapPin, Building2, Calendar,
   Download, Search, Plus, X, Pencil, Trash2, Loader2, AlertCircle, Home,
-  LayoutGrid, Image as ImageIcon, Camera,
+  LayoutGrid, Image as ImageIcon, Camera, ChevronDown,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
@@ -147,6 +147,8 @@ function MitgliederApp({ session }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeBereich, setActiveBereich] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("mitglieder"); // "mitglieder" | "kinder" | "alle"
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
 
   const [showForm, setShowForm] = useState(false);
   const [showTypePick, setShowTypePick] = useState(false);
@@ -211,7 +213,11 @@ function MitgliederApp({ session }) {
       };
     });
     const children = members.filter((m) => m.is_child);
-    return [...adults, ...children].sort((a, b) => (`${a.nachname}${a.vorname}`).localeCompare(`${b.nachname}${b.vorname}`, "de"));
+    return [...adults, ...children].sort((a, b) => {
+      const an = `${(a.nachname || "").trim()} ${(a.vorname || "").trim()}`.trim();
+      const bn = `${(b.nachname || "").trim()} ${(b.vorname || "").trim()}`.trim();
+      return an.localeCompare(bn, "de", { sensitivity: "base" });
+    });
   }, [members, allUsers]);
 
   function memberByUserId(id) { return members.find((m) => m.user_id === id && !m.is_child); }
@@ -229,6 +235,13 @@ function MitgliederApp({ session }) {
     return roster.filter((m) => m.id && bereicheForMember(m.id).includes(key)).length;
   }
   function bereichInfo(key) { return bereiche.find((b) => b.key === key); }
+  function toggleExpand(key) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
   const sortedBereiche = useMemo(
     () => [...bereiche].sort((a, b) => a.label.localeCompare(b.label, "de")),
     [bereiche]
@@ -260,9 +273,10 @@ function MitgliederApp({ session }) {
   const q = search.trim().toLowerCase();
   const visibleMembers = useMemo(() => {
     return roster
+      .filter((m) => typeFilter === "alle" || (typeFilter === "mitglieder" ? !m.is_child : m.is_child))
       .filter((m) => !activeBereich || (m.id && bereicheForMember(m.id).includes(activeBereich)))
       .filter((m) => !q || `${m.vorname} ${m.nachname} ${m.anschrift || ""} ${m.wohneinheit || ""} ${m.email || ""}`.toLowerCase().includes(q));
-  }, [roster, activeBereich, q, bereicheAssign]);
+  }, [roster, activeBereich, q, bereicheAssign, typeFilter]);
 
   function resetForm() {
     setFormIsChild(false);
@@ -491,12 +505,7 @@ function MitgliederApp({ session }) {
             >
               <LayoutGrid size={13} /> Alle Mitglieder
             </button>
-            <div className="flex items-center justify-between px-3 mt-2 mb-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Gruppen</span>
-              {isAdmin && (
-                <button onClick={() => setShowAddGroup(true)} title="Gruppe hinzufügen" className="text-sm font-bold leading-none px-1" style={{ color: INK_SOFT }}>+</button>
-              )}
-            </div>
+            <div className="text-[10px] font-bold uppercase tracking-wide px-3 mt-2 mb-0.5" style={{ color: INK_SOFT }}>Gruppen</div>
             {sortedBereiche.map((b) => {
               const active = activeBereich === b.key;
               const count = countForBereich(b.key);
@@ -513,6 +522,15 @@ function MitgliederApp({ session }) {
                 </button>
               );
             })}
+            {isAdmin && (
+              <button
+                onClick={() => setShowAddGroup(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold text-white mt-2 w-fit"
+                style={{ backgroundColor: INK }}
+              >
+                <Plus size={13} /> Neue Gruppe
+              </button>
+            )}
           </div>
 
           {/* Mitgliederliste */}
@@ -528,6 +546,19 @@ function MitgliederApp({ session }) {
                   style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
                 />
               </div>
+            </div>
+
+            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
+              {[["mitglieder", "Mitglieder"], ["kinder", "Kinder"], ["alle", "Alle"]].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setTypeFilter(key)}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ backgroundColor: typeFilter === key ? INK : "transparent", color: typeFilter === key ? "#fff" : INK_SOFT }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             <div className="mb-4 flex items-center justify-between gap-2">
@@ -558,10 +589,12 @@ function MitgliederApp({ session }) {
                 const canFill = m.isPlaceholder && (isAdmin || m.user_id === user.id);
                 const parents = m.is_child ? parentNames(m) : [];
                 const myBereiche = m.id ? bereicheForMember(m.id) : [];
+                const cardKey = m.id || `placeholder-${m.user_id}`;
+                const isExpanded = expandedIds.has(cardKey);
                 return (
-                  <div key={m.id || `placeholder-${m.user_id}`} className="rounded-xl p-4" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", opacity: m.isPlaceholder ? 0.75 : 1 }}>
+                  <div key={cardKey} className="rounded-xl p-4" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", opacity: m.isPlaceholder ? 0.75 : 1 }}>
                     <div className="flex items-start justify-between mb-1.5">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer sm:cursor-default" onClick={() => toggleExpand(cardKey)}>
                         {m.foto_url ? (
                           <img src={m.foto_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                         ) : (
@@ -569,11 +602,10 @@ function MitgliederApp({ session }) {
                             {m.is_child ? <Users size={16} /> : <User size={16} />}
                           </div>
                         )}
-                        <div>
-                          <div className="font-bold text-sm">{m.vorname} {m.nachname}</div>
-                          {m.is_child && <div className="text-xs" style={{ color: INK_SOFT }}>Kind{parents.length > 0 ? ` von ${parents.join(" & ")}` : ""}</div>}
-                          {m.isPlaceholder && <div className="text-xs" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm truncate">{m.vorname} {m.nachname}</div>
                         </div>
+                        <ChevronDown size={14} className={`sm:hidden flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} style={{ color: INK_SOFT }} />
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {!m.isPlaceholder && <button onClick={() => exportVCard(m)} title="Als vCard herunterladen"><Download size={14} style={{ color: "#B8B4A2" }} /></button>}
@@ -591,23 +623,28 @@ function MitgliederApp({ session }) {
                       </div>
                     </div>
 
-                    {myBereiche.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {myBereiche.map((k) => {
-                          const b = bereichInfo(k);
-                          if (!b) return null;
-                          return <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>{b.label}</span>;
-                        })}
-                      </div>
-                    )}
+                    <div className={`${isExpanded ? "block" : "hidden"} sm:block`}>
+                      {m.is_child && <div className="text-xs mb-1" style={{ color: INK_SOFT }}>Kind{parents.length > 0 ? ` von ${parents.join(" & ")}` : ""}</div>}
+                      {m.isPlaceholder && <div className="text-xs mb-1" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}
 
-                    <div className="flex flex-col gap-1 mt-2 text-xs" style={{ color: INK_SOFT }}>
-                      {m.wohneinheit && <div className="flex items-center gap-1.5"><Building2 size={12} /> WE {m.wohneinheit}</div>}
-                      {m.anschrift && <div className="flex items-center gap-1.5"><MapPin size={12} /> {m.anschrift}</div>}
-                      {m.email && <div className="flex items-center gap-1.5"><Mail size={12} /> {m.email}</div>}
-                      {m.telefon && <div className="flex items-center gap-1.5"><Phone size={12} /> {m.telefon}</div>}
-                      {m.handy && <div className="flex items-center gap-1.5"><Smartphone size={12} /> {m.handy}</div>}
-                      {m.geburtstag && <div className="flex items-center gap-1.5"><Calendar size={12} /> {fmtBirthday(m.geburtstag)}</div>}
+                      <div className="flex flex-col gap-1 mt-1 text-xs" style={{ color: INK_SOFT }}>
+                        {m.wohneinheit && <div className="flex items-center gap-1.5"><Building2 size={12} /> WE {m.wohneinheit}</div>}
+                        {m.anschrift && <div className="flex items-center gap-1.5"><MapPin size={12} /> {m.anschrift}</div>}
+                        {m.email && <div className="flex items-center gap-1.5"><Mail size={12} /> {m.email}</div>}
+                        {m.telefon && <div className="flex items-center gap-1.5"><Phone size={12} /> {m.telefon}</div>}
+                        {m.handy && <div className="flex items-center gap-1.5"><Smartphone size={12} /> {m.handy}</div>}
+                        {m.geburtstag && <div className="flex items-center gap-1.5"><Calendar size={12} /> {fmtBirthday(m.geburtstag)}</div>}
+                      </div>
+
+                      {myBereiche.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {myBereiche.map((k) => {
+                            const b = bereichInfo(k);
+                            if (!b) return null;
+                            return <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>{b.label}</span>;
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

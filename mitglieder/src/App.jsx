@@ -14,6 +14,16 @@ const BLUE = "#2E86AB";
 // rotierend aus dieser Palette vergeben.
 const GROUP_COLOR_PALETTE = ["#2E86AB", "#6C63A6", "#B54A45", "#C9A227", "#1F6F5C", "#C9752F", "#3E8E7E", "#A13D3D"];
 
+// Die sechs NaWoDo-Apps, deren Nutzung der Superadmin pro Mitglied freigeben/sperren kann.
+const APP_LIST = [
+  { key: "sharing", label: "Sharing" },
+  { key: "termine", label: "Termine" },
+  { key: "fahrtenbuch", label: "Fahrtenbuch" },
+  { key: "faq", label: "FAQ" },
+  { key: "pinnwand", label: "Pinnwand" },
+  { key: "mitglieder", label: "Mitglieder" },
+];
+
 function slugifyGroupKey(label, existingKeys) {
   const base = label
     .toLowerCase()
@@ -119,18 +129,53 @@ export default function App() {
 }
 
 function AuthGate() {
-  const [session, setSession] = useState(undefined);
+  const [session, setSession] = useState(undefined); // undefined = wird geladen, null = kein Login
+  const [access, setAccess] = useState(undefined); // undefined = wird geprueft, true/false = Zugriff erlaubt/gesperrt
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => setSession(sess));
     return () => sub.subscription.unsubscribe();
   }, []);
+
   useEffect(() => {
-    if (session === null) window.location.href = "/";
+    // Kein Login vorhanden: zurueck zur Hauptseite, dort ist jetzt der Login.
+    if (session === null) {
+      window.location.href = "/";
+    }
   }, [session]);
-  if (session === undefined || session === null) {
+
+  useEffect(() => {
+    // App-Berechtigung pruefen: fehlt eine Zeile, ist der Zugriff erlaubt (bestehende Mitglieder
+    // sind unveraendert), nur ein explizites allowed=false sperrt die App.
+    if (!session) return;
+    supabase
+      .from("member_permissions")
+      .select("allowed")
+      .eq("user_id", session.user.id)
+      .eq("app_key", "mitglieder")
+      .maybeSingle()
+      .then(({ data }) => setAccess(!data || data.allowed !== false))
+      .catch(() => setAccess(true));
+  }, [session]);
+
+  if (session === undefined || session === null || access === undefined) {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
   }
+
+  if (access === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+        <div className="max-w-sm text-center">
+          <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
+          <p className="font-semibold mb-1">Kein Zugriff</p>
+          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Für diese App wurde dir noch kein Zugriff freigeschaltet.</p>
+          <a href="/" className="text-sm font-semibold" style={{ color: INK }}>Zurück zur Startseite</a>
+        </div>
+      </div>
+    );
+  }
+
   return <MitgliederApp session={session} />;
 }
 
@@ -154,7 +199,6 @@ function MitgliederApp({ session }) {
   const [profileMember, setProfileMember] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
-  const [showTypePick, setShowTypePick] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [targetSelfUserId, setTargetSelfUserId] = useState(null);
   const [formIsChild, setFormIsChild] = useState(false);
@@ -170,11 +214,17 @@ function MitgliederApp({ session }) {
   const [formFotoFile, setFormFotoFile] = useState(null);
   const [formFotoPreview, setFormFotoPreview] = useState(null);
   const [formBereiche, setFormBereiche] = useState([]);
+  const [formMitgliedstyp, setFormMitgliedstyp] = useState("mitglied");
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
-  const [newAccountName, setNewAccountName] = useState("");
+  const [newAccountType, setNewAccountType] = useState("account"); // "account" | "child"
+  const [newAccountVorname, setNewAccountVorname] = useState("");
+  const [newAccountNachname, setNewAccountNachname] = useState("");
   const [newAccountEmail, setNewAccountEmail] = useState("");
   const [newAccountPassword, setNewAccountPassword] = useState("");
+  const [newAccountParentUserId, setNewAccountParentUserId] = useState("");
+  const [newAccountMitgliedstyp, setNewAccountMitgliedstyp] = useState("mitglied");
+  const [newAccountPerms, setNewAccountPerms] = useState(() => Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
   const [savingAccount, setSavingAccount] = useState(false);
   const [createAccountError, setCreateAccountError] = useState("");
   const [newGroupLabel, setNewGroupLabel] = useState("");
@@ -241,6 +291,16 @@ function MitgliederApp({ session }) {
     if (m.parent2_user_id) { const p = memberByUserId(m.parent2_user_id); if (p) names.push(`${p.vorname} ${p.nachname}`); }
     return names;
   }
+  function parentMembers(m) {
+    const list = [];
+    if (m.parent1_user_id) { const p = memberByUserId(m.parent1_user_id); if (p) list.push(p); }
+    if (m.parent2_user_id) { const p = memberByUserId(m.parent2_user_id); if (p) list.push(p); }
+    return list;
+  }
+  function childrenOf(m) {
+    if (!m.user_id) return [];
+    return members.filter((c) => c.is_child && (c.parent1_user_id === m.user_id || c.parent2_user_id === m.user_id));
+  }
   function bereicheForMember(memberId) {
     if (!memberId) return [];
     return bereicheAssign.filter((b) => b.member_id === memberId).map((b) => b.bereich_key);
@@ -282,11 +342,38 @@ function MitgliederApp({ session }) {
     }
   }
 
+  function resetNewAccountForm() {
+    setNewAccountType("account");
+    setNewAccountVorname("");
+    setNewAccountNachname("");
+    setNewAccountEmail("");
+    setNewAccountPassword("");
+    setNewAccountParentUserId("");
+    setNewAccountMitgliedstyp("mitglied");
+    setNewAccountPerms(Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
+    setCreateAccountError("");
+  }
+
   async function handleCreateAccount() {
     setCreateAccountError("");
-    const email = newAccountEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) return setCreateAccountError("Bitte eine gültige Email-Adresse angeben.");
-    if (!newAccountPassword || newAccountPassword.length < 6) return setCreateAccountError("Passwort muss mindestens 6 Zeichen haben.");
+    if (!newAccountVorname.trim()) return setCreateAccountError("Bitte einen Vornamen angeben.");
+    const body = {
+      type: newAccountType,
+      vorname: newAccountVorname.trim(),
+      nachname: newAccountNachname.trim(),
+      mitgliedstyp: newAccountMitgliedstyp,
+    };
+    if (newAccountType === "child") {
+      if (!newAccountParentUserId) return setCreateAccountError("Bitte einen Elternteil auswählen.");
+      body.parent_user_id = newAccountParentUserId;
+    } else {
+      const email = newAccountEmail.trim().toLowerCase();
+      if (!email || !email.includes("@")) return setCreateAccountError("Bitte eine gültige Email-Adresse angeben.");
+      if (!newAccountPassword || newAccountPassword.length < 6) return setCreateAccountError("Passwort muss mindestens 6 Zeichen haben.");
+      body.email = email;
+      body.password = newAccountPassword;
+      body.app_permissions = newAccountPerms;
+    }
     setSavingAccount(true);
     try {
       const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
@@ -296,17 +383,15 @@ function MitgliederApp({ session }) {
           Authorization: `Bearer ${session.access_token}`,
           apikey: window.__SUPABASE_ANON_KEY__,
         },
-        body: JSON.stringify({ email, password: newAccountPassword, name: newAccountName.trim() }),
+        body: JSON.stringify(body),
       });
       const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error(data.error || "Account konnte nicht angelegt werden.");
-      setNewAccountName("");
-      setNewAccountEmail("");
-      setNewAccountPassword("");
+      if (!resp.ok) throw new Error(data.error || "Konnte nicht angelegt werden.");
+      resetNewAccountForm();
       setShowCreateAccount(false);
       await loadAll();
     } catch (e) {
-      setCreateAccountError(e.message || "Account konnte nicht angelegt werden.");
+      setCreateAccountError(e.message || "Konnte nicht angelegt werden.");
     } finally {
       setSavingAccount(false);
     }
@@ -357,23 +442,8 @@ function MitgliederApp({ session }) {
     setFormFotoFile(null);
     setFormFotoPreview(null);
     setFormBereiche([]);
+    setFormMitgliedstyp("mitglied");
     setFormError("");
-  }
-
-  const myOwnEntry = members.find((m) => m.user_id === user.id && !m.is_child);
-
-  function openNewFlow() {
-    setEditingMember(null);
-    setTargetSelfUserId(null);
-    resetForm();
-    setShowTypePick(true);
-  }
-
-  function pickType(isChild) {
-    setFormIsChild(isChild);
-    setTargetSelfUserId(isChild ? null : user.id);
-    setShowTypePick(false);
-    setShowForm(true);
   }
 
   // Admin (oder man selbst) kann den Platzhalter-Eintrag eines registrierten Accounts ausfüllen.
@@ -403,6 +473,7 @@ function MitgliederApp({ session }) {
     const otherParent = [m.parent1_user_id, m.parent2_user_id].find((id) => id && id !== user.id);
     setFormParent2(otherParent || "");
     setFormBereiche(bereicheForMember(m.id));
+    setFormMitgliedstyp(m.mitgliedstyp || "mitglied");
     setFormError("");
     setShowForm(true);
   }
@@ -453,6 +524,7 @@ function MitgliederApp({ session }) {
         geburtstag: formGeburtstag || null,
         foto_url: fotoUrl,
       };
+      if (isAdmin) payload.mitgliedstyp = formMitgliedstyp;
 
       let savedId = editingMember?.id || null;
 
@@ -463,14 +535,6 @@ function MitgliederApp({ session }) {
         }
         const { error } = await supabase.from("members").update(payload).eq("id", editingMember.id);
         if (error) throw error;
-      } else if (formIsChild) {
-        payload.is_child = true;
-        payload.created_by = user.id;
-        payload.parent1_user_id = user.id;
-        payload.parent2_user_id = formParent2 || null;
-        const { data, error } = await supabase.from("members").insert(payload).select().single();
-        if (error) throw error;
-        savedId = data.id;
       } else {
         const uid = targetSelfUserId || user.id;
         payload.is_child = false;
@@ -508,10 +572,10 @@ function MitgliederApp({ session }) {
   }
 
   function exportAllCSV() {
-    const header = ["Nachname", "Vorname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Eltern", "Gruppen"];
+    const header = ["Nachname", "Vorname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Mitgliedstyp", "Eltern", "Gruppen"];
     const rows = roster.map((m) => [
       m.nachname, m.vorname, m.anschrift || "", m.wohneinheit || "", m.email || "", m.telefon || "", m.handy || "",
-      m.geburtstag || "", m.is_child ? "Kind" : "Erwachsen", parentNames(m).join(" / "),
+      m.geburtstag || "", m.is_child ? "Kind" : "Erwachsen", m.mitgliedstyp === "freund" ? "Freund" : "Mitglied", parentNames(m).join(" / "),
       m.id ? bereicheForMember(m.id).map((k) => bereichInfo(k)?.label || k).join(" / ") : "",
     ]);
     const csv = [header, ...rows].map((r) => r.map(csvEscape).join(";")).join("\r\n");
@@ -646,20 +710,17 @@ function MitgliederApp({ session }) {
               ))}
             </div>
 
-            <div className="mb-4 flex items-center gap-2">
-              <button onClick={openNewFlow} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: INK }}>
-                <Plus size={14} /> Neuer Eintrag
-              </button>
-              {isSuperAdmin && (
+            {isSuperAdmin && (
+              <div className="mb-4 flex items-center gap-2">
                 <button
-                  onClick={() => { setShowCreateAccount(true); setCreateAccountError(""); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+                  onClick={() => { resetNewAccountForm(); setShowCreateAccount(true); }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white"
+                  style={{ backgroundColor: INK }}
                 >
-                  <Plus size={12} /> Account anlegen
+                  <Plus size={14} /> Neues Mitglied
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {activeBereich && (
               <div className="mb-3 text-xs" style={{ color: INK_SOFT }}>
@@ -674,7 +735,7 @@ function MitgliederApp({ session }) {
                 </div>
               )}
               {visibleMembers.map((m) => {
-                const canManage = !m.isPlaceholder && (isAdmin || m.created_by === user.id);
+                const canManage = !m.isPlaceholder && (isAdmin || m.created_by === user.id || (m.is_child && (m.parent1_user_id === user.id || m.parent2_user_id === user.id)));
                 const canFill = m.isPlaceholder && (isAdmin || m.user_id === user.id);
                 const parents = m.is_child ? parentNames(m) : [];
                 const myBereiche = m.id ? bereicheForMember(m.id) : [];
@@ -692,7 +753,12 @@ function MitgliederApp({ session }) {
                           </div>
                         )}
                         <div className="min-w-0">
-                          <div className="font-bold text-sm truncate">{m.vorname} {m.nachname}</div>
+                          <div className="font-bold text-sm truncate flex items-center gap-1.5">
+                            {m.vorname} {m.nachname}
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.mitgliedstyp === "freund" ? "#C9752F1A" : "#2E86AB1A", color: m.mitgliedstyp === "freund" ? "#C9752F" : BLUE }}>
+                              {m.mitgliedstyp === "freund" ? "Freund" : "Mitglied"}
+                            </span>
+                          </div>
                         </div>
                         <ChevronDown size={14} className={`sm:hidden flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} style={{ color: INK_SOFT }} />
                       </div>
@@ -754,26 +820,6 @@ function MitgliederApp({ session }) {
         </div>
       </div>
 
-      {showTypePick && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowTypePick(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neuer Eintrag</h2><button onClick={() => setShowTypePick(false)}><X size={20} /></button></div>
-            <div className="flex flex-col gap-2">
-              {!myOwnEntry ? (
-                <button onClick={() => pickType(false)} className="flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-semibold text-left" style={{ border: `1.5px solid ${BORDER_SOFT}` }}>
-                  <User size={16} style={{ color: BLUE }} /> Eigener Eintrag
-                </button>
-              ) : (
-                <p className="text-xs px-1" style={{ color: INK_SOFT }}>Du hast bereits einen eigenen Eintrag.</p>
-              )}
-              <button onClick={() => pickType(true)} className="flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-semibold text-left" style={{ border: `1.5px solid ${BORDER_SOFT}` }}>
-                <Users size={16} style={{ color: "#6C63A6" }} /> Kind hinzufügen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showAddGroup && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAddGroup(false)}>
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
@@ -796,15 +842,73 @@ function MitgliederApp({ session }) {
 
       {showCreateAccount && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowCreateAccount(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neuen Account anlegen</h2><button onClick={() => setShowCreateAccount(false)}><X size={20} /></button></div>
-            <label className="text-xs font-medium block mb-1">Name (optional)</label>
-            <input value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
-            <label className="text-xs font-medium block mb-1">Email</label>
-            <input type="email" value={newAccountEmail} onChange={(e) => setNewAccountEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
-            <label className="text-xs font-medium block mb-1">Startpasswort</label>
-            <input type="text" value={newAccountPassword} onChange={(e) => setNewAccountPassword(e.target.value)} placeholder="mind. 6 Zeichen" className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
-            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Bitte dem Mitglied mitteilen, damit es sich einloggen und das Passwort selbst ändern kann.</p>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neues Mitglied</h2><button onClick={() => setShowCreateAccount(false)}><X size={20} /></button></div>
+
+            <div className="flex items-center gap-1 p-1 rounded-full w-fit mb-4" style={{ backgroundColor: "#E4E1D3" }}>
+              {[["account", "Login-Account"], ["child", "Kind (kein Login)"]].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setNewAccountType(key)}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ backgroundColor: newAccountType === key ? "#fff" : "transparent", color: newAccountType === key ? INK : INK_SOFT }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 mb-3">
+              <div className="flex-1">
+                <label className="text-xs font-medium block mb-1">Vorname</label>
+                <input value={newAccountVorname} onChange={(e) => setNewAccountVorname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-medium block mb-1">Nachname</label>
+                <input value={newAccountNachname} onChange={(e) => setNewAccountNachname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+            </div>
+
+            <label className="text-xs font-medium block mb-1">Typ</label>
+            <select value={newAccountMitgliedstyp} onChange={(e) => setNewAccountMitgliedstyp(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+              <option value="mitglied">Genossenschaftsmitglied</option>
+              <option value="freund">Freund</option>
+            </select>
+
+            {newAccountType === "child" ? (
+              <>
+                <label className="text-xs font-medium block mb-1">Elternteil</label>
+                <select value={newAccountParentUserId} onChange={(e) => setNewAccountParentUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+                  <option value="">Bitte auswählen…</option>
+                  {adultMembers.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>{m.vorname} {m.nachname}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <label className="text-xs font-medium block mb-1">Email</label>
+                <input type="email" value={newAccountEmail} onChange={(e) => setNewAccountEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                <label className="text-xs font-medium block mb-1">Startpasswort</label>
+                <input type="text" value={newAccountPassword} onChange={(e) => setNewAccountPassword(e.target.value)} placeholder="mind. 6 Zeichen" className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Bitte dem Mitglied mitteilen, damit es sich einloggen und das Passwort selbst ändern kann.</p>
+
+                <label className="text-xs font-medium block mb-1.5">App-Zugriff</label>
+                <div className="flex flex-col gap-1.5 mb-3">
+                  {APP_LIST.map((a) => (
+                    <label key={a.key} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={newAccountPerms[a.key] !== false}
+                        onChange={(e) => setNewAccountPerms((prev) => ({ ...prev, [a.key]: e.target.checked }))}
+                      />
+                      {a.label}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+
             {createAccountError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {createAccountError}</div>}
             <button
               onClick={handleCreateAccount}
@@ -812,7 +916,7 @@ function MitgliederApp({ session }) {
               className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2"
               style={{ backgroundColor: BLUE, opacity: savingAccount ? 0.7 : 1 }}
             >
-              {savingAccount && <Loader2 size={15} className="animate-spin" />} {savingAccount ? "Anlegen…" : "Account anlegen"}
+              {savingAccount && <Loader2 size={15} className="animate-spin" />} {savingAccount ? "Anlegen…" : "Anlegen"}
             </button>
           </div>
         </div>
@@ -837,12 +941,25 @@ function MitgliederApp({ session }) {
                 </div>
               )}
               <div className="font-bold text-base">{profileMember.vorname} {profileMember.nachname}</div>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: profileMember.mitgliedstyp === "freund" ? "#C9752F1A" : "#2E86AB1A", color: profileMember.mitgliedstyp === "freund" ? "#C9752F" : BLUE }}>
+                {profileMember.mitgliedstyp === "freund" ? "Freund" : "Genossenschaftsmitglied"}
+              </span>
               {profileMember.is_child && (
-                <div className="text-xs" style={{ color: INK_SOFT }}>
-                  Kind{parentNames(profileMember).length > 0 ? ` von ${parentNames(profileMember).join(" & ")}` : ""}
+                <div className="text-xs mt-1 flex flex-wrap items-center justify-center gap-1" style={{ color: INK_SOFT }}>
+                  {parentMembers(profileMember).length > 0 ? (
+                    <>
+                      Kind von{" "}
+                      {parentMembers(profileMember).map((p, i) => (
+                        <span key={p.id}>
+                          <button onClick={() => setProfileMember(p)} className="font-semibold underline" style={{ color: BLUE }}>{p.vorname} {p.nachname}</button>
+                          {i < parentMembers(profileMember).length - 1 ? " & " : ""}
+                        </span>
+                      ))}
+                    </>
+                  ) : "Kind"}
                 </div>
               )}
-              {profileMember.isPlaceholder && <div className="text-xs" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}
+              {profileMember.isPlaceholder && <div className="text-xs mt-1" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}
             </div>
             <div className="flex flex-col gap-2 text-sm mb-4" style={{ color: INK_SOFT }}>
               {profileMember.wohneinheit && <div className="flex items-center gap-2"><Building2 size={14} /> WE {profileMember.wohneinheit}</div>}
@@ -859,6 +976,23 @@ function MitgliederApp({ session }) {
                   if (!b) return null;
                   return <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>{b.label}</span>;
                 })}
+              </div>
+            )}
+            {!profileMember.is_child && childrenOf(profileMember).length > 0 && (
+              <div className="mb-4">
+                <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Kinder</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {childrenOf(profileMember).map((child) => (
+                    <button
+                      key={child.id}
+                      onClick={() => setProfileMember(child)}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+                    >
+                      {child.vorname} {child.nachname}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {!profileMember.isPlaceholder && (
@@ -878,7 +1012,7 @@ function MitgliederApp({ session }) {
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowForm(false)}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">{editingMember ? "Eintrag bearbeiten" : formIsChild ? "Kind hinzufügen" : "Eigener Eintrag"}</h2>
+              <h2 className="font-bold text-lg">{editingMember ? "Eintrag bearbeiten" : "Eigener Eintrag"}</h2>
               <button onClick={() => setShowForm(false)}><X size={20} /></button>
             </div>
 
@@ -939,6 +1073,16 @@ function MitgliederApp({ session }) {
                 </select>
                 <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Du bist automatisch als Elternteil verknüpft.</p>
               </>
+            )}
+
+            {isAdmin && (
+              <div className="mb-3">
+                <label className="text-xs font-medium block mb-1">Typ (nur für Admins änderbar)</label>
+                <select value={formMitgliedstyp} onChange={(e) => setFormMitgliedstyp(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+                  <option value="mitglied">Genossenschaftsmitglied</option>
+                  <option value="freund">Freund</option>
+                </select>
+              </div>
             )}
 
             {isAdmin && !formIsChild && (

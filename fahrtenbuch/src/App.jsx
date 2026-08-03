@@ -60,6 +60,7 @@ export default function App() {
 
 function AuthGate() {
   const [session, setSession] = useState(undefined); // undefined = wird geladen, null = kein Login
+  const [access, setAccess] = useState(undefined); // undefined = wird geprueft, true/false = Zugriff erlaubt/gesperrt
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -68,14 +69,41 @@ function AuthGate() {
   }, []);
 
   useEffect(() => {
-    // Kein Login vorhanden: zurück zur Hauptseite, dort ist jetzt der Login.
+    // Kein Login vorhanden: zurueck zur Hauptseite, dort ist jetzt der Login.
     if (session === null) {
       window.location.href = "/";
     }
   }, [session]);
 
-  if (session === undefined || session === null) {
+  useEffect(() => {
+    // App-Berechtigung pruefen: fehlt eine Zeile, ist der Zugriff erlaubt (bestehende Mitglieder
+    // sind unveraendert), nur ein explizites allowed=false sperrt die App.
+    if (!session) return;
+    supabase
+      .from("member_permissions")
+      .select("allowed")
+      .eq("user_id", session.user.id)
+      .eq("app_key", "fahrtenbuch")
+      .maybeSingle()
+      .then(({ data }) => setAccess(!data || data.allowed !== false))
+      .catch(() => setAccess(true));
+  }, [session]);
+
+  if (session === undefined || session === null || access === undefined) {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
+  }
+
+  if (access === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+        <div className="max-w-sm text-center">
+          <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
+          <p className="font-semibold mb-1">Kein Zugriff</p>
+          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Für diese App wurde dir noch kein Zugriff freigeschaltet.</p>
+          <a href="/" className="text-sm font-semibold" style={{ color: INK }}>Zurück zur Startseite</a>
+        </div>
+      </div>
+    );
   }
 
   return <Fahrtenbuch session={session} />;

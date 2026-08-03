@@ -9,29 +9,25 @@ import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
 
 const BLUE = "#2E86AB";
 
-// Bereiche/Ausschüsse aus dem Mailverteiler - fungieren als Filter in der linken Leiste.
-// Zuweisung eines Mitglieds zu einem Bereich kann nur ein Admin vornehmen.
-const BEREICHE = [
-  { key: "pruefungsausschuss", label: "Prüfungsausschuss", email: "pruefung@nawodo.de", color: "#2E86AB" },
-  { key: "datenschutz_it", label: "Datenschutzgruppe / IT-Gruppe", email: "datenschutz@nawodo.de", color: "#6C63A6" },
-  { key: "komex", label: "KomEx", email: "kommex@nawodo.de", color: "#B54A45" },
-  { key: "belegungsausschuss", label: "Belegungsausschuss", email: null, color: "#C9A227" },
-  { key: "vorstand", label: "Vorstand", email: null, color: "#1F6F5C" },
-  { key: "aufsichtsrat", label: "Aufsichtsrat", email: null, color: "#C9752F" },
-  { key: "finanzgruppe", label: "Finanzgruppe", email: "finanzgruppe@nawodo.de", color: "#3E8E7E" },
-  { key: "komin", label: "KomIn", email: "kommin@nawodo.de", color: "#A13D3D" },
-  { key: "elterngruppe", label: "Elterngruppe", email: "eltern@nawodo.de", color: "#6C63A6" },
-  { key: "kinderversammlung", label: "Kinderversammlung", email: "Kinderversammlung@nawodo.de", color: "#C9A227" },
-  { key: "gartengruppe", label: "Gartengruppe", email: "gartengruppe@nawodo.de", color: "#3E8E7E" },
-  { key: "ueberweisung", label: "Überweisungsgruppe", email: "ueberweisung@nawodo.de", color: "#2E86AB" },
-  { key: "gmw", label: "GMW", email: "GMW@nawodo.de", color: "#C9752F" },
-  { key: "mobilitaet", label: "Mobilitätsgruppe", email: "mobilitaet@nawodo.de", color: "#1F6F5C" },
-  { key: "schadensmeldung", label: "Schadensmeldung", email: "schadensmeldung@nawodo.de", color: "#B54A45" },
-  { key: "kuemmerer", label: "Kümmerer", email: "kuemmerer@nawodo.de", color: "#C9A227" },
-  { key: "verwaltung", label: "Verwaltungsgruppe", email: "verwaltung@nawodo.de", color: "#6C63A6" },
-  { key: "vwg", label: "VWG", email: "vwg@nawodo.de", color: "#3E8E7E" },
-];
-const bereichInfo = (key) => BEREICHE.find((b) => b.key === key);
+// Gruppen (frueher "Bereiche") kommen jetzt aus der Datenbank (Tabelle "bereiche"),
+// damit Admins jederzeit neue Gruppen anlegen koennen. Farben werden beim Anlegen
+// rotierend aus dieser Palette vergeben.
+const GROUP_COLOR_PALETTE = ["#2E86AB", "#6C63A6", "#B54A45", "#C9A227", "#1F6F5C", "#C9752F", "#3E8E7E", "#A13D3D"];
+
+function slugifyGroupKey(label, existingKeys) {
+  const base = label
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "gruppe";
+  let key = base;
+  let i = 2;
+  while (existingKeys.includes(key)) {
+    key = `${base}_${i}`;
+    i += 1;
+  }
+  return key;
+}
 
 function fmtBirthday(iso) {
   if (!iso) return "";
@@ -147,6 +143,7 @@ function MitgliederApp({ session }) {
   const [members, setMembers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [bereicheAssign, setBereicheAssign] = useState([]);
+  const [bereiche, setBereiche] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeBereich, setActiveBereich] = useState(null);
@@ -168,6 +165,10 @@ function MitgliederApp({ session }) {
   const [formFotoFile, setFormFotoFile] = useState(null);
   const [formFotoPreview, setFormFotoPreview] = useState(null);
   const [formBereiche, setFormBereiche] = useState([]);
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [newGroupLabel, setNewGroupLabel] = useState("");
+  const [newGroupEmail, setNewGroupEmail] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -181,14 +182,16 @@ function MitgliederApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [m, bu, ba] = await Promise.all([
+    const [m, bu, ba, gr] = await Promise.all([
       supabase.from("members").select("*"),
       supabase.rpc("list_all_users"),
       supabase.from("member_bereiche").select("*"),
+      supabase.from("bereiche").select("*"),
     ]);
     setMembers(m.data || []);
     setAllUsers(bu.data || []);
     setBereicheAssign(ba.data || []);
+    setBereiche(gr.data || []);
     setLoading(false);
   }
 
@@ -224,6 +227,32 @@ function MitgliederApp({ session }) {
   }
   function countForBereich(key) {
     return roster.filter((m) => m.id && bereicheForMember(m.id).includes(key)).length;
+  }
+  function bereichInfo(key) { return bereiche.find((b) => b.key === key); }
+  const sortedBereiche = useMemo(
+    () => [...bereiche].sort((a, b) => a.label.localeCompare(b.label, "de")),
+    [bereiche]
+  );
+
+  async function handleAddGroup() {
+    if (!newGroupLabel.trim()) return;
+    setSavingGroup(true);
+    try {
+      const key = slugifyGroupKey(newGroupLabel.trim(), bereiche.map((b) => b.key));
+      const color = GROUP_COLOR_PALETTE[bereiche.length % GROUP_COLOR_PALETTE.length];
+      const { error } = await supabase
+        .from("bereiche")
+        .insert({ key, label: newGroupLabel.trim(), email: newGroupEmail.trim() || null, color });
+      if (error) throw error;
+      setNewGroupLabel("");
+      setNewGroupEmail("");
+      setShowAddGroup(false);
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Gruppe konnte nicht angelegt werden.");
+    } finally {
+      setSavingGroup(false);
+    }
   }
 
   const adultMembers = useMemo(() => members.filter((m) => !m.is_child && m.user_id), [members]);
@@ -400,7 +429,7 @@ function MitgliederApp({ session }) {
   }
 
   function exportAllCSV() {
-    const header = ["Nachname", "Vorname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Eltern", "Bereiche"];
+    const header = ["Nachname", "Vorname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Eltern", "Gruppen"];
     const rows = roster.map((m) => [
       m.nachname, m.vorname, m.anschrift || "", m.wohneinheit || "", m.email || "", m.telefon || "", m.handy || "",
       m.geburtstag || "", m.is_child ? "Kind" : "Erwachsen", parentNames(m).join(" / "),
@@ -462,8 +491,13 @@ function MitgliederApp({ session }) {
             >
               <LayoutGrid size={13} /> Alle Mitglieder
             </button>
-            <div className="text-[10px] font-bold uppercase tracking-wide px-3 mt-2 mb-0.5" style={{ color: INK_SOFT }}>Bereiche</div>
-            {BEREICHE.map((b) => {
+            <div className="flex items-center justify-between px-3 mt-2 mb-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Gruppen</span>
+              {isAdmin && (
+                <button onClick={() => setShowAddGroup(true)} title="Gruppe hinzufügen" className="text-sm font-bold leading-none px-1" style={{ color: INK_SOFT }}>+</button>
+              )}
+            </div>
+            {sortedBereiche.map((b) => {
               const active = activeBereich === b.key;
               const count = countForBereich(b.key);
               return (
@@ -509,7 +543,7 @@ function MitgliederApp({ session }) {
 
             {activeBereich && (
               <div className="mb-3 text-xs" style={{ color: INK_SOFT }}>
-                {bereichInfo(activeBereich)?.email ? <>Kontakt: <a href={`mailto:${bereichInfo(activeBereich).email}`} className="font-semibold" style={{ color: bereichInfo(activeBereich).color }}>{bereichInfo(activeBereich).email}</a></> : "Kein E-Mail-Verteiler für diesen Bereich hinterlegt."}
+                {bereichInfo(activeBereich)?.email ? <>Kontakt: <a href={`mailto:${bereichInfo(activeBereich).email}`} className="font-semibold" style={{ color: bereichInfo(activeBereich).color }}>{bereichInfo(activeBereich).email}</a></> : "Kein E-Mail-Verteiler für diese Gruppe hinterlegt."}
               </div>
             )}
 
@@ -603,6 +637,26 @@ function MitgliederApp({ session }) {
         </div>
       )}
 
+      {showAddGroup && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAddGroup(false)}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neue Gruppe</h2><button onClick={() => setShowAddGroup(false)}><X size={20} /></button></div>
+            <label className="text-xs font-medium block mb-1">Name der Gruppe</label>
+            <input value={newGroupLabel} onChange={(e) => setNewGroupLabel(e.target.value)} placeholder="z.B. Fahrradwerkstatt" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <label className="text-xs font-medium block mb-1">Kontakt-Email (optional)</label>
+            <input value={newGroupEmail} onChange={(e) => setNewGroupEmail(e.target.value)} placeholder="gruppe@nawodo.de" className="w-full rounded-lg px-3 py-2.5 mb-4 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <button
+              onClick={handleAddGroup}
+              disabled={savingGroup || !newGroupLabel.trim()}
+              className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2"
+              style={{ backgroundColor: BLUE, opacity: savingGroup || !newGroupLabel.trim() ? 0.6 : 1 }}
+            >
+              {savingGroup && <Loader2 size={15} className="animate-spin" />} {savingGroup ? "Anlegen…" : "Gruppe anlegen"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowForm(false)}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
@@ -672,9 +726,9 @@ function MitgliederApp({ session }) {
 
             {isAdmin && !formIsChild && (
               <div className="mb-3">
-                <label className="text-xs font-medium block mb-1.5">Bereiche (nur für Admins sichtbar/änderbar)</label>
+                <label className="text-xs font-medium block mb-1.5">Gruppen (nur für Admins sichtbar/änderbar)</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {BEREICHE.map((b) => {
+                  {sortedBereiche.map((b) => {
                     const active = formBereiche.includes(b.key);
                     return (
                       <button

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   User, Users, UserX, Phone, Smartphone, Mail, MapPin, Building2, Calendar,
   Download, Search, Plus, X, Pencil, Trash2, Loader2, AlertCircle, Home,
-  LayoutGrid, Image as ImageIcon, Camera, ChevronDown, ChevronLeft, ChevronRight,
+  LayoutGrid, Image as ImageIcon, Camera, ChevronDown, ChevronLeft, ChevronRight, Tag,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
@@ -236,6 +236,7 @@ function MitgliederApp({ session }) {
   const [formBereiche, setFormBereiche] = useState([]);
   const [formMitgliedstyp, setFormMitgliedstyp] = useState("mitglied");
   const [showAddGroup, setShowAddGroup] = useState(false);
+  const [groupAssignFor, setGroupAssignFor] = useState(null);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [newAccountType, setNewAccountType] = useState("account"); // "account" | "child"
   const [newAccountVorname, setNewAccountVorname] = useState("");
@@ -394,6 +395,21 @@ function MitgliederApp({ session }) {
       await loadAll();
     } catch (e) {
       alert(e.message || "Konnte nicht gelöscht werden.");
+    }
+  }
+
+  async function handleToggleMemberGroup(memberId, bereichKey, nextValue) {
+    try {
+      if (nextValue) {
+        const { error } = await supabase.from("member_bereiche").insert({ member_id: memberId, bereich_key: bereichKey });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("member_bereiche").delete().eq("member_id", memberId).eq("bereich_key", bereichKey);
+        if (error) throw error;
+      }
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Gruppe konnte nicht geändert werden.");
     }
   }
 
@@ -654,7 +670,7 @@ function MitgliederApp({ session }) {
         savedId = data.id;
       }
 
-      if (isElevatedForMitglieder && !formIsChild && savedId) {
+      if (isSuperAdmin && !formIsChild && savedId) {
         await saveBereicheFor(savedId);
       }
 
@@ -902,6 +918,9 @@ function MitgliederApp({ session }) {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {!m.isPlaceholder && <button onClick={() => exportVCard(m)} title="Als vCard herunterladen"><Download size={14} style={{ color: "#B8B4A2" }} /></button>}
+                        {isElevatedForMitglieder && !m.isPlaceholder && m.id && !m.is_child && (
+                          <button onClick={() => setGroupAssignFor(m)} title="Gruppen zuweisen"><Tag size={14} style={{ color: "#B8B4A2" }} /></button>
+                        )}
                         {canManage && (
                           <>
                             <button onClick={() => openEditForm(m)}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
@@ -999,6 +1018,37 @@ function MitgliederApp({ session }) {
             >
               {savingGroup && <Loader2 size={15} className="animate-spin" />} {savingGroup ? "Anlegen…" : "Gruppe anlegen"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {groupAssignFor && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setGroupAssignFor(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">Gruppen: {groupAssignFor.vorname} {groupAssignFor.nachname}</h2>
+              <button onClick={() => setGroupAssignFor(null)}><X size={20} /></button>
+            </div>
+            {sortedBereiche.length === 0 ? (
+              <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Gruppen angelegt.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {sortedBereiche.map((b) => {
+                  const active = bereicheForMember(groupAssignFor.id).includes(b.key);
+                  return (
+                    <button
+                      key={b.key}
+                      type="button"
+                      onClick={() => handleToggleMemberGroup(groupAssignFor.id, b.key, !active)}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{ backgroundColor: active ? b.color : "transparent", color: active ? "#fff" : INK_SOFT, border: `1.5px solid ${active ? b.color : BORDER_SOFT}` }}
+                    >
+                      {b.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1313,9 +1363,9 @@ function MitgliederApp({ session }) {
               </div>
             )}
 
-            {isElevatedForMitglieder && !formIsChild && (
+            {isSuperAdmin && !formIsChild && (
               <div className="mb-3">
-                <label className="text-xs font-medium block mb-1.5">Gruppen</label>
+                <label className="text-xs font-medium block mb-1.5">Gruppen (nur für Superadmin sichtbar/änderbar)</label>
                 <div className="flex flex-wrap gap-1.5">
                   {sortedBereiche.map((b) => {
                     const active = formBereiche.includes(b.key);

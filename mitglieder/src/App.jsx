@@ -487,9 +487,8 @@ function MitgliederApp({ session }) {
 
   async function handleSave() {
     setFormError("");
-    if (!formNachname.trim() && !formIsChild) { /* Nachname bei Erwachsenen erwuenscht, aber nicht hart erzwungen falls nur Vorname bekannt */ }
     if (!formVorname.trim()) return setFormError("Bitte einen Vornamen eintragen.");
-    if (!formIsChild && !formNachname.trim()) return setFormError("Bitte einen Nachnamen eintragen.");
+    if (!formIsChild && !formEmail.trim()) return setFormError("Bitte eine E-Mail-Adresse eintragen.");
     setSaving(true);
     try {
       let fotoUrl = editingMember ? editingMember.foto_url : null;
@@ -982,10 +981,12 @@ function MitgliederApp({ session }) {
       {showForm && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowForm(false); } }}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="font-bold text-lg">{editingMember ? "Eintrag bearbeiten" : "Eigener Eintrag"}</h2>
               <button onClick={() => setShowForm(false)}><X size={20} /></button>
             </div>
+            {!formIsChild && <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Nur Vorname und E-Mail (*) sind Pflicht, alle anderen Angaben sind freiwillig.</p>}
+            {formIsChild && <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Nur der Vorname (*) ist Pflicht, alle anderen Angaben sind freiwillig.</p>}
 
             <label className="text-xs font-medium block mb-1">Profilbild (optional)</label>
             <div className="flex items-center gap-3 mb-3">
@@ -1002,11 +1003,11 @@ function MitgliederApp({ session }) {
 
             <div className="flex gap-3 mb-3">
               <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Vorname</label>
+                <label className="text-xs font-medium block mb-1">Vorname *</label>
                 <input value={formVorname} onChange={(e) => setFormVorname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Nachname</label>
+                <label className="text-xs font-medium block mb-1">Nachname (optional)</label>
                 <input value={formNachname} onChange={(e) => setFormNachname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
             </div>
@@ -1016,21 +1017,21 @@ function MitgliederApp({ session }) {
 
             <div className="flex gap-3 mb-3">
               <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Straße</label>
+                <label className="text-xs font-medium block mb-1">Straße (optional)</label>
                 <input value={formStrasse} onChange={(e) => setFormStrasse(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
               <div className="w-24">
-                <label className="text-xs font-medium block mb-1">Hausnr.</label>
+                <label className="text-xs font-medium block mb-1">Hausnr. (optional)</label>
                 <input value={formHausnummer} onChange={(e) => setFormHausnummer(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
             </div>
             <div className="flex gap-3 mb-3">
               <div className="w-28">
-                <label className="text-xs font-medium block mb-1">PLZ</label>
+                <label className="text-xs font-medium block mb-1">PLZ (optional)</label>
                 <input value={formPlz} onChange={(e) => setFormPlz(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-medium block mb-1">Wohnort</label>
+                <label className="text-xs font-medium block mb-1">Wohnort (optional)</label>
                 <input value={formWohnort} onChange={(e) => setFormWohnort(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
             </div>
@@ -1038,21 +1039,21 @@ function MitgliederApp({ session }) {
               <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Bisherige Angabe (noch nicht ins neue Format übertragen): {editingMember.anschrift}</p>
             )}
 
-            <label className="text-xs font-medium block mb-1">Wohneinheit (WE)</label>
+            <label className="text-xs font-medium block mb-1">Wohneinheit (WE) (optional)</label>
             <input value={formWohneinheit} onChange={(e) => setFormWohneinheit(e.target.value)} placeholder="z.B. WE 12" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
-            <label className="text-xs font-medium block mb-1">Geburtstag</label>
+            <label className="text-xs font-medium block mb-1">Geburtstag (optional)</label>
             <input type="date" value={formGeburtstag} onChange={(e) => setFormGeburtstag(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
             {!formIsChild && (
               <>
-                <label className="text-xs font-medium block mb-1">E-Mail</label>
+                <label className="text-xs font-medium block mb-1">E-Mail *</label>
                 <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
-                <label className="text-xs font-medium block mb-1">Telefon (Festnetz)</label>
+                <label className="text-xs font-medium block mb-1">Telefon (Festnetz) (optional)</label>
                 <input value={formTelefon} onChange={(e) => setFormTelefon(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
-                <label className="text-xs font-medium block mb-1">Handy</label>
+                <label className="text-xs font-medium block mb-1">Handy (optional)</label>
                 <input value={formHandy} onChange={(e) => setFormHandy(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </>
             )}

@@ -204,6 +204,7 @@ function MitgliederApp({ session }) {
   const [formIsChild, setFormIsChild] = useState(false);
   const [formNachname, setFormNachname] = useState("");
   const [formVorname, setFormVorname] = useState("");
+  const [formSpitzname, setFormSpitzname] = useState("");
   const [formAnschrift, setFormAnschrift] = useState("");
   const [formWohneinheit, setFormWohneinheit] = useState("");
   const [formEmail, setFormEmail] = useState("");
@@ -223,6 +224,7 @@ function MitgliederApp({ session }) {
   const [newAccountEmail, setNewAccountEmail] = useState("");
   const [newAccountPassword, setNewAccountPassword] = useState("");
   const [newAccountParentUserId, setNewAccountParentUserId] = useState("");
+  const [newAccountChildLogin, setNewAccountChildLogin] = useState(false); // Kind bekommt zusaetzlich einen eigenen Login
   const [newAccountMitgliedstyp, setNewAccountMitgliedstyp] = useState("mitglied");
   const [newAccountPerms, setNewAccountPerms] = useState(() => Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
   const [savingAccount, setSavingAccount] = useState(false);
@@ -230,6 +232,8 @@ function MitgliederApp({ session }) {
   const [newGroupLabel, setNewGroupLabel] = useState("");
   const [newGroupEmail, setNewGroupEmail] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
+  const [groupRenameKey, setGroupRenameKey] = useState(null);
+  const [groupRenameLabel, setGroupRenameLabel] = useState("");
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -259,18 +263,24 @@ function MitgliederApp({ session }) {
   // Vorbelegte Gesamtliste: jeder registrierte Account erscheint schon, auch wenn er sein
   // Profil noch nicht ausgefüllt hat (dann als "Platzhalter" mit Namen aus dem Account).
   const roster = useMemo(() => {
+    const anyMemberByUserId = {};
+    members.forEach((m) => { if (m.user_id) anyMemberByUserId[m.user_id] = m; });
     const selfByUserId = {};
     members.forEach((m) => { if (!m.is_child && m.user_id) selfByUserId[m.user_id] = m; });
-    const adults = allUsers.map((u) => {
-      const existing = selfByUserId[u.id];
-      if (existing) return { ...existing, isPlaceholder: false };
-      return {
-        id: null, user_id: u.id, created_by: null, is_child: false, isPlaceholder: true,
-        vorname: u.name, nachname: "", anschrift: null, wohneinheit: null,
-        email: u.email, telefon: null, handy: null, geburtstag: null, foto_url: null,
-        parent1_user_id: null, parent2_user_id: null,
-      };
-    });
+    // Nutzer, deren einziger Eintrag ein Kind-Profil mit eigenem Login ist, tauchen nur
+    // ueber "children" unten auf - sonst gaebe es sie doppelt (einmal als Platzhalter-Erwachsener).
+    const adults = allUsers
+      .filter((u) => !(anyMemberByUserId[u.id] && anyMemberByUserId[u.id].is_child))
+      .map((u) => {
+        const existing = selfByUserId[u.id];
+        if (existing) return { ...existing, isPlaceholder: false };
+        return {
+          id: null, user_id: u.id, created_by: null, is_child: false, isPlaceholder: true,
+          vorname: u.name, nachname: "", anschrift: null, wohneinheit: null,
+          email: u.email, telefon: null, handy: null, geburtstag: null, foto_url: null,
+          parent1_user_id: null, parent2_user_id: null,
+        };
+      });
     const children = members.filter((m) => m.is_child);
     return [...adults, ...children].sort((a, b) => {
       const av = (a.vorname || "").trim();
@@ -333,12 +343,34 @@ function MitgliederApp({ session }) {
       if (error) throw error;
       setNewGroupLabel("");
       setNewGroupEmail("");
-      setShowAddGroup(false);
       await loadAll();
     } catch (e) {
       alert(e.message || "Gruppe konnte nicht angelegt werden.");
     } finally {
       setSavingGroup(false);
+    }
+  }
+
+  async function handleRenameGroup(key) {
+    if (!groupRenameLabel.trim()) return;
+    try {
+      const { error } = await supabase.from("bereiche").update({ label: groupRenameLabel.trim() }).eq("key", key);
+      if (error) throw error;
+      setGroupRenameKey(null);
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Konnte nicht umbenannt werden.");
+    }
+  }
+
+  async function handleDeleteGroup(key, label) {
+    if (!window.confirm(`Gruppe "${label}" wirklich löschen? Die Zuordnung aller Mitglieder zu dieser Gruppe geht dabei verloren. Das kann nicht rückgängig gemacht werden.`)) return;
+    try {
+      const { error } = await supabase.from("bereiche").delete().eq("key", key);
+      if (error) throw error;
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Konnte nicht gelöscht werden.");
     }
   }
 
@@ -349,6 +381,7 @@ function MitgliederApp({ session }) {
     setNewAccountEmail("");
     setNewAccountPassword("");
     setNewAccountParentUserId("");
+    setNewAccountChildLogin(false);
     setNewAccountMitgliedstyp("mitglied");
     setNewAccountPerms(Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
     setCreateAccountError("");
@@ -366,6 +399,14 @@ function MitgliederApp({ session }) {
     if (newAccountType === "child") {
       if (!newAccountParentUserId) return setCreateAccountError("Bitte einen Elternteil auswählen.");
       body.parent_user_id = newAccountParentUserId;
+      if (newAccountChildLogin) {
+        const email = newAccountEmail.trim().toLowerCase();
+        if (!email || !email.includes("@")) return setCreateAccountError("Bitte eine gültige Email-Adresse angeben.");
+        if (!newAccountPassword || newAccountPassword.length < 6) return setCreateAccountError("Passwort muss mindestens 6 Zeichen haben.");
+        body.email = email;
+        body.password = newAccountPassword;
+        body.app_permissions = newAccountPerms;
+      }
     } else {
       const email = newAccountEmail.trim().toLowerCase();
       if (!email || !email.includes("@")) return setCreateAccountError("Bitte eine gültige Email-Adresse angeben.");
@@ -432,6 +473,7 @@ function MitgliederApp({ session }) {
     setFormIsChild(false);
     setFormNachname("");
     setFormVorname("");
+    setFormSpitzname("");
     setFormAnschrift("");
     setFormWohneinheit("");
     setFormEmail("");
@@ -462,6 +504,7 @@ function MitgliederApp({ session }) {
     setFormIsChild(m.is_child);
     setFormNachname(m.nachname);
     setFormVorname(m.vorname);
+    setFormSpitzname(m.spitzname || "");
     setFormAnschrift(m.anschrift || "");
     setFormWohneinheit(m.wohneinheit || "");
     setFormEmail(m.email || "");
@@ -516,6 +559,7 @@ function MitgliederApp({ session }) {
       const payload = {
         nachname: formNachname.trim(),
         vorname: formVorname.trim(),
+        spitzname: formSpitzname.trim() || null,
         anschrift: formAnschrift.trim() || null,
         wohneinheit: formWohneinheit.trim() || null,
         email: formEmail.trim() || null,
@@ -572,9 +616,9 @@ function MitgliederApp({ session }) {
   }
 
   function exportAllCSV() {
-    const header = ["Nachname", "Vorname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Mitgliedstyp", "Eltern", "Gruppen"];
+    const header = ["Nachname", "Vorname", "Spitzname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Mitgliedstyp", "Eltern", "Gruppen"];
     const rows = roster.map((m) => [
-      m.nachname, m.vorname, m.anschrift || "", m.wohneinheit || "", m.email || "", m.telefon || "", m.handy || "",
+      m.nachname, m.vorname, m.spitzname || "", m.anschrift || "", m.wohneinheit || "", m.email || "", m.telefon || "", m.handy || "",
       m.geburtstag || "", m.is_child ? "Kind" : "Erwachsen", m.mitgliedstyp === "freund" ? "Freund" : "Mitglied", parentNames(m).join(" / "),
       m.id ? bereicheForMember(m.id).map((k) => bereichInfo(k)?.label || k).join(" / ") : "",
     ]);
@@ -754,7 +798,7 @@ function MitgliederApp({ session }) {
                         )}
                         <div className="min-w-0">
                           <div className="font-bold text-sm truncate flex items-center gap-1.5">
-                            {m.vorname} {m.nachname}
+                            {m.vorname}{m.spitzname ? ` „${m.spitzname}“` : ""} {m.nachname}
                             <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.mitgliedstyp === "freund" ? "#C9752F1A" : "#2E86AB1A", color: m.mitgliedstyp === "freund" ? "#C9752F" : BLUE }}>
                               {m.mitgliedstyp === "freund" ? "Freund" : "Mitglied"}
                             </span>
@@ -775,7 +819,7 @@ function MitgliederApp({ session }) {
                             Ausfüllen
                           </button>
                         )}
-                        {isSuperAdmin && !m.is_child && m.user_id && (
+                        {isSuperAdmin && m.user_id && (
                           <button onClick={() => handleDeleteAccount(m)} title="Account vollständig löschen"><UserX size={14} style={{ color: "#A13D3D" }} /></button>
                         )}
                       </div>
@@ -822,9 +866,34 @@ function MitgliederApp({ session }) {
 
       {showAddGroup && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAddGroup(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neue Gruppe</h2><button onClick={() => setShowAddGroup(false)}><X size={20} /></button></div>
-            <label className="text-xs font-medium block mb-1">Name der Gruppe</label>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Gruppen</h2><button onClick={() => setShowAddGroup(false)}><X size={20} /></button></div>
+
+            {sortedBereiche.length > 0 && (
+              <div className="mb-4 flex flex-col gap-1.5">
+                {sortedBereiche.map((b) => (
+                  <div key={b.key} className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
+                    {groupRenameKey === b.key ? (
+                      <input
+                        autoFocus
+                        value={groupRenameLabel}
+                        onChange={(e) => setGroupRenameLabel(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleRenameGroup(b.key)}
+                        onBlur={() => handleRenameGroup(b.key)}
+                        className="flex-1 rounded-lg px-2 py-1 text-xs border"
+                        style={{ borderColor: BORDER_SOFT }}
+                      />
+                    ) : (
+                      <button type="button" onClick={() => { setGroupRenameKey(b.key); setGroupRenameLabel(b.label); }} className="flex-1 text-left text-xs font-medium">{b.label}</button>
+                    )}
+                    <button type="button" onClick={() => handleDeleteGroup(b.key, b.label)}><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="text-xs font-medium block mb-1">Neue Gruppe</label>
             <input value={newGroupLabel} onChange={(e) => setNewGroupLabel(e.target.value)} placeholder="z.B. Fahrradwerkstatt" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
             <label className="text-xs font-medium block mb-1">Kontakt-Email (optional)</label>
             <input value={newGroupEmail} onChange={(e) => setNewGroupEmail(e.target.value)} placeholder="gruppe@nawodo.de" className="w-full rounded-lg px-3 py-2.5 mb-4 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
@@ -846,7 +915,7 @@ function MitgliederApp({ session }) {
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neues Mitglied</h2><button onClick={() => setShowCreateAccount(false)}><X size={20} /></button></div>
 
             <div className="flex items-center gap-1 p-1 rounded-full w-fit mb-4" style={{ backgroundColor: "#E4E1D3" }}>
-              {[["account", "Login-Account"], ["child", "Kind (kein Login)"]].map(([key, label]) => (
+              {[["account", "Login-Account"], ["child", "Kind"]].map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setNewAccountType(key)}
@@ -884,6 +953,35 @@ function MitgliederApp({ session }) {
                     <option key={m.user_id} value={m.user_id}>{m.vorname} {m.nachname}</option>
                   ))}
                 </select>
+
+                <label className="flex items-center gap-2 text-sm mb-3">
+                  <input type="checkbox" checked={newAccountChildLogin} onChange={(e) => setNewAccountChildLogin(e.target.checked)} />
+                  Braucht einen eigenen Login (individuell, nicht jedes Kind braucht das)
+                </label>
+
+                {newAccountChildLogin && (
+                  <>
+                    <label className="text-xs font-medium block mb-1">Email</label>
+                    <input type="email" value={newAccountEmail} onChange={(e) => setNewAccountEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                    <label className="text-xs font-medium block mb-1">Startpasswort</label>
+                    <input type="text" value={newAccountPassword} onChange={(e) => setNewAccountPassword(e.target.value)} placeholder="mind. 6 Zeichen" className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                    <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Bitte dem Kind bzw. den Eltern mitteilen, damit es sich einloggen und das Passwort selbst ändern kann.</p>
+
+                    <label className="text-xs font-medium block mb-1.5">App-Zugriff</label>
+                    <div className="flex flex-col gap-1.5 mb-3">
+                      {APP_LIST.map((a) => (
+                        <label key={a.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={newAccountPerms[a.key] !== false}
+                            onChange={(e) => setNewAccountPerms((prev) => ({ ...prev, [a.key]: e.target.checked }))}
+                          />
+                          {a.label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -940,7 +1038,7 @@ function MitgliederApp({ session }) {
                   {profileMember.is_child ? <Users size={28} /> : <User size={28} />}
                 </div>
               )}
-              <div className="font-bold text-base">{profileMember.vorname} {profileMember.nachname}</div>
+              <div className="font-bold text-base">{profileMember.vorname}{profileMember.spitzname ? ` „${profileMember.spitzname}“` : ""} {profileMember.nachname}</div>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: profileMember.mitgliedstyp === "freund" ? "#C9752F1A" : "#2E86AB1A", color: profileMember.mitgliedstyp === "freund" ? "#C9752F" : BLUE }}>
                 {profileMember.mitgliedstyp === "freund" ? "Freund" : "Genossenschaftsmitglied"}
               </span>
@@ -1039,6 +1137,9 @@ function MitgliederApp({ session }) {
                 <input value={formNachname} onChange={(e) => setFormNachname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
             </div>
+
+            <label className="text-xs font-medium block mb-1">Spitzname (optional)</label>
+            <input value={formSpitzname} onChange={(e) => setFormSpitzname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
             <label className="text-xs font-medium block mb-1">Anschrift</label>
             <input value={formAnschrift} onChange={(e) => setFormAnschrift(e.target.value)} placeholder="Straße, PLZ Ort" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />

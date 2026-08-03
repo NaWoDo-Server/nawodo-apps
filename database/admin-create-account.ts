@@ -73,11 +73,44 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Bitte einen Vornamen angeben." }, 400);
     }
 
-    // --- Kind anlegen: kein Login-Account, nur ein Profil in der members-Tabelle. ---
+    // --- Kind anlegen: nur ein Profil in der members-Tabelle - optional (individuell,
+    // nicht jedes Kind braucht das) zusaetzlich mit eigenem Login. ---
     if (type === "child") {
       const parentUserId = body.parent_user_id || null;
       if (!parentUserId) {
         return jsonResponse({ error: "Bitte einen Elternteil auswählen." }, 400);
+      }
+
+      let childUserId: string | null = null;
+
+      if (body.email) {
+        const childEmail = (body.email || "").trim().toLowerCase();
+        const childPassword = body.password || "";
+        if (!childEmail || !childEmail.includes("@")) {
+          return jsonResponse({ error: "Bitte eine gültige Email-Adresse angeben." }, 400);
+        }
+        if (!childPassword || childPassword.length < 6) {
+          return jsonResponse({ error: "Passwort muss mindestens 6 Zeichen haben." }, 400);
+        }
+        const childFullName = [vorname, nachname].filter(Boolean).join(" ");
+        const childCreateResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+          method: "POST",
+          headers: restHeaders,
+          body: JSON.stringify({
+            email: childEmail,
+            password: childPassword,
+            email_confirm: true,
+            user_metadata: childFullName ? { name: childFullName } : {},
+          }),
+        });
+        const childCreated = await childCreateResp.json();
+        if (!childCreateResp.ok) {
+          return jsonResponse(
+            { error: childCreated?.msg || childCreated?.message || "Account konnte nicht angelegt werden." },
+            childCreateResp.status
+          );
+        }
+        childUserId = childCreated.id;
       }
 
       const insertResp = await fetch(`${SUPABASE_URL}/rest/v1/members`, {
@@ -90,6 +123,7 @@ Deno.serve(async (req) => {
           created_by: callerId,
           parent1_user_id: parentUserId,
           mitgliedstyp,
+          ...(childUserId ? { user_id: childUserId } : {}),
         }),
       });
       const inserted = await insertResp.json();
@@ -99,6 +133,21 @@ Deno.serve(async (req) => {
           insertResp.status
         );
       }
+
+      if (childUserId) {
+        const perms = body.app_permissions || {};
+        const deniedRows = APP_KEYS
+          .filter((k) => perms[k] === false)
+          .map((k) => ({ user_id: childUserId, app_key: k, allowed: false }));
+        if (deniedRows.length > 0) {
+          await fetch(`${SUPABASE_URL}/rest/v1/member_permissions`, {
+            method: "POST",
+            headers: restHeaders,
+            body: JSON.stringify(deniedRows),
+          });
+        }
+      }
+
       return jsonResponse({ id: Array.isArray(inserted) ? inserted[0]?.id : inserted?.id }, 200);
     }
 

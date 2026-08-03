@@ -172,6 +172,12 @@ function Hofteiler({ session }) {
   const [newResCategoryId, setNewResCategoryId] = useState("");
   const [newResPhoto, setNewResPhoto] = useState(null);
 
+  const [manageCategories, setManageCategories] = useState(false);
+  const [catRenameId, setCatRenameId] = useState(null);
+  const [catRenameName, setCatRenameName] = useState("");
+  const [newCatName, setNewCatName] = useState("");
+  const [savingCat, setSavingCat] = useState(false);
+
   const [editResName, setEditResName] = useState("");
   const [editResIcon, setEditResIcon] = useState("zap");
   const [editResCategoryId, setEditResCategoryId] = useState("");
@@ -443,6 +449,48 @@ function Hofteiler({ session }) {
       : `${booking.start_time}–${booking.end_time}`;
     if (!window.confirm(`Buchung von ${booking.name} wirklich löschen?\n${label}`)) return;
     try { await supabase.from("bookings").delete().eq("id", booking.id); await refreshBookings(); } catch {}
+  }
+
+  const CATEGORY_COLOR_PALETTE = ["#2E86AB", "#6C63A6", "#B54A45", "#C9A227", "#1F6F5C", "#C9752F", "#3E8E7E", "#A13D3D"];
+
+  async function handleAddCategory() {
+    if (!newCatName.trim()) return;
+    setSavingCat(true);
+    try {
+      const color = CATEGORY_COLOR_PALETTE[categories.length % CATEGORY_COLOR_PALETTE.length];
+      const { data, error } = await supabase.from("categories").insert({ name: newCatName.trim(), color, sort_order: categories.length }).select().single();
+      if (error) throw error;
+      setCategories((prev) => [...prev, data]);
+      setNewCatName("");
+    } catch (e) {
+      alert(e.message || "Kategorie konnte nicht angelegt werden.");
+    } finally {
+      setSavingCat(false);
+    }
+  }
+
+  async function handleRenameCategory(id) {
+    if (!catRenameName.trim()) return;
+    try {
+      const { error } = await supabase.from("categories").update({ name: catRenameName.trim() }).eq("id", id);
+      if (error) throw error;
+      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name: catRenameName.trim() } : c)));
+      setCatRenameId(null);
+    } catch (e) {
+      alert(e.message || "Konnte nicht umbenannt werden.");
+    }
+  }
+
+  async function handleDeleteCategory(id, name) {
+    if (!window.confirm(`Kategorie "${name}" wirklich löschen? Alle Items (und deren Buchungen) in dieser Kategorie werden dabei mitgelöscht. Das kann nicht rückgängig gemacht werden.`)) return;
+    try {
+      const { error } = await supabase.from("categories").delete().eq("id", id);
+      if (error) throw error;
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setResources((prev) => prev.filter((r) => r.category_id !== id));
+    } catch (e) {
+      alert(e.message || "Konnte nicht gelöscht werden.");
+    }
   }
 
   async function handleAddResource() {
@@ -834,12 +882,53 @@ function Hofteiler({ session }) {
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowResourceForm(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neues Item</h2><button onClick={() => setShowResourceForm(false)}><X size={20} /></button></div>
-            <label className="text-xs font-medium block mb-1">Bereich</label>
-            <div className="flex gap-2 mb-3 flex-wrap">
-              {pickableCategories.map((c) => (
-                <button key={c.id} onClick={() => setNewResCategoryId(c.id)} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: newResCategoryId === c.id ? c.color : "transparent", color: newResCategoryId === c.id ? "#fff" : INK, border: `1.5px solid ${newResCategoryId === c.id ? c.color : "#D8D5C7"}` }}>{c.name}</button>
-              ))}
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium block">Bereich</label>
+              <button type="button" onClick={() => setManageCategories((v) => !v)} className="text-[11px] font-semibold underline" style={{ color: INK_SOFT }}>
+                {manageCategories ? "Fertig" : "Kategorien verwalten"}
+              </button>
             </div>
+            {manageCategories ? (
+              <div className="mb-3 flex flex-col gap-1.5">
+                {categories.filter((c) => c.id !== eventCategory?.id && c.id !== roomCategory?.id).map((c) => (
+                  <div key={c.id} className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
+                    {catRenameId === c.id ? (
+                      <input
+                        autoFocus
+                        value={catRenameName}
+                        onChange={(e) => setCatRenameName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleRenameCategory(c.id)}
+                        onBlur={() => handleRenameCategory(c.id)}
+                        className="flex-1 rounded-lg px-2 py-1 text-xs border"
+                        style={{ borderColor: "#D8D5C7" }}
+                      />
+                    ) : (
+                      <button type="button" onClick={() => { setCatRenameId(c.id); setCatRenameName(c.name); }} className="flex-1 text-left text-xs font-medium">{c.name}</button>
+                    )}
+                    <button type="button" onClick={() => handleDeleteCategory(c.id, c.name)}><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Neue Kategorie…"
+                    className="flex-1 rounded-lg px-2 py-1.5 text-xs border"
+                    style={{ borderColor: "#D8D5C7" }}
+                  />
+                  <button type="button" onClick={handleAddCategory} disabled={savingCat || !newCatName.trim()} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ backgroundColor: INK, opacity: savingCat || !newCatName.trim() ? 0.6 : 1 }}>
+                    <Plus size={13} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 mb-3 flex-wrap">
+                {pickableCategories.map((c) => (
+                  <button key={c.id} onClick={() => setNewResCategoryId(c.id)} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: newResCategoryId === c.id ? c.color : "transparent", color: newResCategoryId === c.id ? "#fff" : INK, border: `1.5px solid ${newResCategoryId === c.id ? c.color : "#D8D5C7"}` }}>{c.name}</button>
+                ))}
+              </div>
+            )}
             <label className="text-xs font-medium block mb-1">Name</label>
             <input value={newResName} onChange={(e) => setNewResName(e.target.value)} placeholder="z.B. Lastenrad" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
             <label className="text-xs font-medium block mb-1">Symbol</label>

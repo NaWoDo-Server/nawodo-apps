@@ -9,17 +9,18 @@ import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
 
 const ARCHIVE_DAYS = 30;
 
-// Alle 7 Beitragstypen: Icon, Farbe, Anzeigename + Beschriftung fürs Titel-Feld im Formular.
-const POST_TYPES = [
-  { key: "gesuch", label: "Gesuch", titleLabel: "Titel des Gesuchs", Icon: Search, color: "#2E86AB" },
-  { key: "angebot", label: "Angebot", titleLabel: "Titel des Angebots", Icon: Gift, color: "#C9A227" },
-  { key: "ankuendigung", label: "Ankündigung", titleLabel: "Titel der Ankündigung", Icon: Megaphone, color: "#B54A45" },
-  { key: "mitarbeiter_gesuch", label: "Mitarbeitende gesucht", titleLabel: "Titel des Gesuchs", Icon: Users, color: "#6C63A6" },
-  { key: "empfehlung", label: "Empfehlung", titleLabel: "Titel der Empfehlung", Icon: Star, color: "#3E8E7E" },
-  { key: "buchempfehlung", label: "Buchempfehlung", titleLabel: "Buchtitel", Icon: BookOpen, color: "#C9752F" },
-  { key: "umfrage", label: "Umfrage", titleLabel: "Frage der Umfrage", Icon: BarChart3, color: "#1F6F5C" },
-];
-const typeInfo = (key) => POST_TYPES.find((t) => t.key === key) || POST_TYPES[0];
+// Rubriken kommen jetzt aus der Datenbank (Tabelle "post_types"), damit Admins sie selbst
+// verwalten koennen. Die Icons bleiben eine feste, kleine Auswahl (als Text-Key in der DB).
+const TYPE_ICON_MAP = {
+  search: Search, gift: Gift, megaphone: Megaphone, users: Users, star: Star,
+  "book-open": BookOpen, "bar-chart-3": BarChart3, pin: Pin, "layout-grid": LayoutGrid,
+};
+const TYPE_ICON_KEYS = Object.keys(TYPE_ICON_MAP);
+const FALLBACK_TYPE = { key: "gesuch", label: "Beitrag", titleLabel: "Titel", icon: "search", color: "#2E86AB", Icon: Search };
+function typeInfo(list, key) {
+  const t = (list || []).find((t) => t.key === key);
+  return t || (list && list[0]) || FALLBACK_TYPE;
+}
 
 function fmtRelative(iso) {
   const d = new Date(iso);
@@ -147,6 +148,7 @@ function PinnwandApp({ session }) {
   const initial = userName.charAt(0).toUpperCase();
 
   const [posts, setPosts] = useState([]);
+  const [postTypesRaw, setPostTypesRaw] = useState([]);
   const [options, setOptions] = useState([]);
   const [votes, setVotes] = useState([]);
   const [pins, setPins] = useState([]);
@@ -186,14 +188,16 @@ function PinnwandApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [p, o, v, pi, c] = await Promise.all([
+    const [p, pt, o, v, pi, c] = await Promise.all([
       supabase.from("posts").select("*").order("created_at", { ascending: false }),
+      supabase.from("post_types").select("*").order("sort_order"),
       supabase.from("poll_options").select("*").order("sort_order"),
       supabase.from("poll_votes").select("*"),
       supabase.from("post_pins").select("*"),
       supabase.from("post_comments").select("*").order("created_at"),
     ]);
     setPosts(p.data || []);
+    setPostTypesRaw(pt.data || []);
     setOptions(o.data || []);
     setVotes(v.data || []);
     setPins(pi.data || []);
@@ -206,6 +210,52 @@ function PinnwandApp({ session }) {
   function myVotesFor(postId) { return votesFor(postId).filter((v) => v.user_id === user.id).map((v) => v.option_id); }
   function commentsFor(postId) { return comments.filter((c) => c.post_id === postId); }
   const pinnedIds = useMemo(() => new Set(pins.filter((p) => p.user_id === user.id).map((p) => p.post_id)), [pins, user.id]);
+
+  const postTypes = useMemo(
+    () => postTypesRaw.map((t) => ({ ...t, titleLabel: t.title_label, Icon: TYPE_ICON_MAP[t.icon] || Search })),
+    [postTypesRaw]
+  );
+
+  async function handleAddPostType(label, icon) {
+    if (!label.trim()) return;
+    const key = label.trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `rubrik_${Date.now()}`;
+    const palette = ["#2E86AB", "#6C63A6", "#B54A45", "#C9A227", "#1F6F5C", "#C9752F", "#3E8E7E"];
+    const color = palette[postTypesRaw.length % palette.length];
+    try {
+      const { error } = await supabase.from("post_types").insert({
+        key, label: label.trim(), title_label: `Titel: ${label.trim()}`, icon: icon || "search",
+        color, sort_order: postTypesRaw.length,
+      });
+      if (error) throw error;
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Rubrik konnte nicht angelegt werden.");
+    }
+  }
+
+  async function handleRenamePostType(key, label) {
+    if (!label.trim()) return;
+    try {
+      const { error } = await supabase.from("post_types").update({ label: label.trim() }).eq("key", key);
+      if (error) throw error;
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Konnte nicht umbenannt werden.");
+    }
+  }
+
+  async function handleDeletePostType(key, label) {
+    if (!window.confirm(`Rubrik "${label}" wirklich löschen?`)) return;
+    try {
+      const { error } = await supabase.from("post_types").delete().eq("key", key);
+      if (error) throw error;
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Rubrik konnte nicht gelöscht werden - vermutlich gibt es noch Beiträge in dieser Rubrik.");
+    }
+  }
 
   function toggleComments(id) {
     setOpenCommentIds((prev) => {
@@ -256,7 +306,7 @@ function PinnwandApp({ session }) {
   }, [posts, activeFilter, showArchive, q, pinnedIds]);
 
   function resetForm() {
-    setFormType("gesuch");
+    setFormType(postTypes[0]?.key || "gesuch");
     setFormTitle("");
     setFormDescription("");
     setFormPriceNote("");
@@ -445,7 +495,7 @@ function PinnwandApp({ session }) {
             >
               <LayoutGrid size={18} />
             </button>
-            {POST_TYPES.map((t) => (
+            {postTypes.map((t) => (
               <button
                 key={t.key}
                 onClick={() => setActiveFilter(t.key)}
@@ -500,6 +550,7 @@ function PinnwandApp({ session }) {
                 <PostCard
                   key={post.id}
                   post={post}
+                  postTypes={postTypes}
                   isAdmin={isAdmin}
                   ownUserId={user.id}
                   options={optionsFor(post.id)}
@@ -533,6 +584,11 @@ function PinnwandApp({ session }) {
       {showForm && (
         <PostForm
           editingPost={editingPost}
+          postTypes={postTypes}
+          isAdmin={isAdmin}
+          onAddType={handleAddPostType}
+          onRenameType={handleRenamePostType}
+          onDeleteType={handleDeletePostType}
           formType={formType} setFormType={setFormType}
           formTitle={formTitle} setFormTitle={setFormTitle}
           formDescription={formDescription} setFormDescription={setFormDescription}
@@ -574,11 +630,11 @@ function PinnwandApp({ session }) {
 }
 
 function PostCard({
-  post, isAdmin, ownUserId, options, allVotes, myVotes, pinned, onTogglePin,
+  post, postTypes, isAdmin, ownUserId, options, allVotes, myVotes, pinned, onTogglePin,
   postComments, commentsOpen, onToggleComments, onAddComment, onDeleteComment,
   onImageClick, onEdit, onDelete, onVote,
 }) {
-  const info = typeInfo(post.type);
+  const info = typeInfo(postTypes, post.type);
   const canManage = isAdmin || post.created_by === ownUserId;
   const archived = isArchived(post);
   const [commentDraft, setCommentDraft] = useState("");
@@ -733,15 +789,21 @@ function PollWidget({ post, options, allVotes, myVotes, onVote, color }) {
 }
 
 function PostForm({
-  editingPost, formType, setFormType, formTitle, setFormTitle, formDescription, setFormDescription,
+  editingPost, postTypes, isAdmin, onAddType, onRenameType, onDeleteType,
+  formType, setFormType, formTitle, setFormTitle, formDescription, setFormDescription,
   formPriceNote, setFormPriceNote, formIsFree, setFormIsFree, formPollMode, setFormPollMode,
   formPollOptions, updatePollOption, addPollOption, removePollOption,
   formImagePreview, onImageSelected, imageInputRef,
   formAttachmentFile, onAttachmentSelected, attachmentInputRef,
   formError, saving, onSave, onClose,
 }) {
-  const info = typeInfo(formType);
+  const info = typeInfo(postTypes, formType);
   const isEditing = !!editingPost;
+  const [manageTypes, setManageTypes] = useState(false);
+  const [typeRenameKey, setTypeRenameKey] = useState(null);
+  const [typeRenameLabel, setTypeRenameLabel] = useState("");
+  const [newTypeLabel, setNewTypeLabel] = useState("");
+  const [newTypeIcon, setNewTypeIcon] = useState("search");
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={onClose}>
@@ -751,25 +813,77 @@ function PostForm({
           <button onClick={onClose}><X size={20} /></button>
         </div>
 
-        <label className="text-xs font-medium block mb-1.5" style={{ color: INK_SOFT }}>Art des Beitrags</label>
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {POST_TYPES.map((t) => (
-            <button
-              key={t.key}
-              disabled={isEditing}
-              onClick={() => setFormType(t.key)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{
-                backgroundColor: formType === t.key ? t.color : "transparent",
-                color: formType === t.key ? "#fff" : INK,
-                border: `1.5px solid ${formType === t.key ? t.color : BORDER_SOFT}`,
-                opacity: isEditing && formType !== t.key ? 0.4 : 1,
-              }}
-            >
-              <t.Icon size={12} /> {t.label}
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs font-medium block" style={{ color: INK_SOFT }}>Art des Beitrags</label>
+          {isAdmin && !isEditing && (
+            <button type="button" onClick={() => setManageTypes((v) => !v)} className="text-[11px] font-semibold underline" style={{ color: INK_SOFT }}>
+              {manageTypes ? "Fertig" : "Rubriken verwalten"}
             </button>
-          ))}
+          )}
         </div>
+        {manageTypes ? (
+          <div className="mb-4 flex flex-col gap-1.5">
+            {postTypes.map((t) => (
+              <div key={t.key} className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+                {typeRenameKey === t.key ? (
+                  <input
+                    autoFocus
+                    value={typeRenameLabel}
+                    onChange={(e) => setTypeRenameLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (onRenameType(t.key, typeRenameLabel), setTypeRenameKey(null))}
+                    onBlur={() => { onRenameType(t.key, typeRenameLabel); setTypeRenameKey(null); }}
+                    className="flex-1 rounded-lg px-2 py-1 text-xs border"
+                    style={{ borderColor: BORDER_SOFT }}
+                  />
+                ) : (
+                  <button type="button" onClick={() => { setTypeRenameKey(t.key); setTypeRenameLabel(t.label); }} className="flex-1 text-left text-xs font-medium">{t.label}</button>
+                )}
+                <button type="button" onClick={() => onDeleteType(t.key, t.label)}><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 mt-1">
+              <select value={newTypeIcon} onChange={(e) => setNewTypeIcon(e.target.value)} className="rounded-lg px-1.5 py-1.5 text-xs border" style={{ borderColor: BORDER_SOFT }}>
+                {TYPE_ICON_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+              <input
+                value={newTypeLabel}
+                onChange={(e) => setNewTypeLabel(e.target.value)}
+                placeholder="Neue Rubrik…"
+                className="flex-1 rounded-lg px-2 py-1.5 text-xs border"
+                style={{ borderColor: BORDER_SOFT }}
+              />
+              <button
+                type="button"
+                onClick={() => { onAddType(newTypeLabel, newTypeIcon); setNewTypeLabel(""); }}
+                disabled={!newTypeLabel.trim()}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white"
+                style={{ backgroundColor: INK, opacity: !newTypeLabel.trim() ? 0.6 : 1 }}
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {postTypes.map((t) => (
+              <button
+                key={t.key}
+                disabled={isEditing}
+                onClick={() => setFormType(t.key)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{
+                  backgroundColor: formType === t.key ? t.color : "transparent",
+                  color: formType === t.key ? "#fff" : INK,
+                  border: `1.5px solid ${formType === t.key ? t.color : BORDER_SOFT}`,
+                  opacity: isEditing && formType !== t.key ? 0.4 : 1,
+                }}
+              >
+                <t.Icon size={12} /> {t.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <label className="text-xs font-medium block mb-1">Titelbild (optional)</label>
         <div className="mb-3">

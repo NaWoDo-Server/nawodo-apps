@@ -151,6 +151,8 @@ function Fahrtenbuch({ session }) {
   const [showCarForm, setShowCarForm] = useState(false);
   const [newCarName, setNewCarName] = useState("");
   const [savingCar, setSavingCar] = useState(false);
+  const [carRenameId, setCarRenameId] = useState(null);
+  const [carRenameName, setCarRenameName] = useState("");
 
   const [showAccount, setShowAccount] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -232,12 +234,35 @@ function Fahrtenbuch({ session }) {
       if (error) throw error;
       setCars((prev) => [...prev, data]);
       setSelectedCarId(data.id);
-      setShowCarForm(false);
       setNewCarName("");
     } catch (e) {
       // Formular bleibt offen
     } finally {
       setSavingCar(false);
+    }
+  }
+
+  async function handleRenameCar(id) {
+    if (!carRenameName.trim()) return;
+    try {
+      const { error } = await supabase.from("resources").update({ name: carRenameName.trim() }).eq("id", id);
+      if (error) throw error;
+      setCars((prev) => prev.map((c) => (c.id === id ? { ...c, name: carRenameName.trim() } : c)));
+      setCarRenameId(null);
+    } catch (e) {
+      alert(e.message || "Konnte nicht umbenannt werden.");
+    }
+  }
+
+  async function handleDeleteCar(id, name) {
+    if (!window.confirm(`Fahrzeug "${name}" wirklich löschen? Alle Fahrtenbuch-Einträge dazu werden mitgelöscht. Das kann nicht rückgängig gemacht werden.`)) return;
+    try {
+      const { error } = await supabase.from("resources").delete().eq("id", id);
+      if (error) throw error;
+      setCars((prev) => prev.filter((c) => c.id !== id));
+      if (selectedCarId === id) setSelectedCarId(null);
+    } catch (e) {
+      alert(e.message || "Konnte nicht gelöscht werden.");
     }
   }
 
@@ -691,8 +716,33 @@ function Fahrtenbuch({ session }) {
       {showCarForm && (
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowCarForm(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neues Fahrzeug</h2><button onClick={() => setShowCarForm(false)}><X size={20} /></button></div>
-            <label className="text-xs font-medium block mb-1">Name</label>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Fahrzeuge</h2><button onClick={() => setShowCarForm(false)}><X size={20} /></button></div>
+
+            {cars.length > 0 && (
+              <div className="mb-4 flex flex-col gap-1.5">
+                {cars.map((c) => (
+                  <div key={c.id} className="flex items-center gap-2">
+                    {carRenameId === c.id ? (
+                      <input
+                        autoFocus
+                        value={carRenameName}
+                        onChange={(e) => setCarRenameName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleRenameCar(c.id)}
+                        onBlur={() => handleRenameCar(c.id)}
+                        className="flex-1 rounded-lg px-2 py-1.5 text-sm border"
+                        style={{ borderColor: "#D8D5C7" }}
+                      />
+                    ) : (
+                      <span className="flex-1 text-sm font-medium">{c.name}</span>
+                    )}
+                    <button onClick={() => { setCarRenameId(c.id); setCarRenameName(c.name); }}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
+                    <button onClick={() => handleDeleteCar(c.id, c.name)}><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="text-xs font-medium block mb-1">Neues Fahrzeug</label>
             <input value={newCarName} onChange={(e) => setNewCarName(e.target.value)} placeholder="z.B. Zoe 2" className="w-full rounded-lg px-3 py-2.5 mb-4 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
             <button onClick={handleAddCar} disabled={savingCar} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: INK, opacity: savingCar ? 0.7 : 1 }}>
               {savingCar && <Loader2 size={15} className="animate-spin" />} {savingCar ? "Speichern…" : "Hinzufügen"}

@@ -97,38 +97,122 @@
       align-items: center;
       justify-content: center;
     }
-    .account-dropdown {
-      position: absolute;
-      top: 44px;
-      right: 0;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      padding: 10px;
-      min-width: 160px;
+    .avatar-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+    /* --- Konto-Fenster: gleiches Design wie in den Apps --- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
     }
-    .account-name {
-      font-size: 12px;
-      color: #6B6A61;
-      padding: 4px 8px 8px;
-      border-bottom: 1px solid #F1F0EA;
-      margin-bottom: 6px;
-      word-break: break-word;
-    }
-    .logout-item {
-      display: block;
-      text-align: left;
+    .modal-card {
       width: 100%;
+      max-width: 420px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: #F1F0EA;
+      border-radius: 20px;
+      padding: 24px;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .modal-header h2 { font-size: 18px; font-weight: 700; margin: 0; }
+    .modal-close-btn {
       background: none;
       border: none;
-      font-size: 13px;
-      color: #A13D3D;
-      text-decoration: none;
-      padding: 6px 8px;
-      border-radius: 8px;
+      cursor: pointer;
+      color: #2B2B26;
+      font-size: 20px;
+      line-height: 1;
+      padding: 4px;
+    }
+    .profile-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #E4E1D3;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+    }
+    .avatar-wrap { position: relative; flex-shrink: 0; }
+    .avatar-lg {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #2B2B26;
+      color: #fff;
+      font-weight: 600;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-edit-btn {
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #2B2B26;
+      border: 2px solid #E4E1D3;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
       cursor: pointer;
     }
-    .logout-item:hover { background: #F1F0EA; }
+    .hidden-input { display: none; }
+    .account-name { font-size: 13px; font-weight: 600; word-break: break-word; }
+    .account-email { font-size: 12px; color: #6B6A61; word-break: break-word; }
+    .field-label { font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
+    .modal-input {
+      width: 100%;
+      border-radius: 10px;
+      padding: 12px 13px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      border: 1px solid #D8D5C7;
+      background: #fff;
+    }
+    .modal-primary-btn {
+      width: 100%;
+      border-radius: 10px;
+      padding: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #fff;
+      background: #2B2B26;
+      border: none;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+    .modal-primary-btn:disabled { opacity: 0.7; }
+    .modal-danger-btn {
+      width: 100%;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 14px;
+      color: #A13D3D;
+      background: none;
+      border: 1.5px solid #E0B8B8;
+      cursor: pointer;
+    }
+    .msg-error { color: #A13D3D; font-size: 13px; margin: 0 0 8px; }
+    .msg-success { color: #2E7D4F; font-size: 13px; margin: 0 0 8px; }
 
     .today-widget { display: block; cursor: default; }
     .today-widget .widget-label {
@@ -317,9 +401,37 @@
     <div id="appBox" class="hidden">
       <div class="account-menu">
         <button id="avatarBtn" class="avatar-btn">?</button>
-        <div id="accountDropdown" class="account-dropdown hidden">
-          <div class="account-name" id="accountName"></div>
-          <button id="logoutLink" class="logout-item">Abmelden</button>
+      </div>
+
+      <div id="accountModal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>Konto</h2>
+            <button id="closeAccountModal" class="modal-close-btn">&times;</button>
+          </div>
+          <div class="profile-row">
+            <div class="avatar-wrap">
+              <div class="avatar-lg" id="accountAvatarLg">?</div>
+              <label class="avatar-edit-btn" title="Foto ändern">
+                &#9998;
+                <input type="file" id="avatarFileInput" accept="image/*" class="hidden-input" />
+              </label>
+            </div>
+            <div>
+              <div class="account-name" id="accountNameModal"></div>
+              <div class="account-email" id="accountEmailModal"></div>
+              <div class="msg-error hidden" id="avatarError"></div>
+            </div>
+          </div>
+
+          <label class="field-label">Passwort ändern</label>
+          <input type="password" id="newPasswordInput" class="modal-input" placeholder="Neues Passwort" autocomplete="new-password" />
+          <input type="password" id="newPasswordConfirmInput" class="modal-input" placeholder="Neues Passwort wiederholen" autocomplete="new-password" />
+          <div class="msg-error hidden" id="passwordError"></div>
+          <div class="msg-success hidden" id="passwordSuccess">Passwort geändert!</div>
+          <button id="savePasswordBtn" class="modal-primary-btn">Passwort speichern</button>
+
+          <button id="logoutBtn" class="modal-danger-btn">Abmelden</button>
         </div>
       </div>
 
@@ -477,9 +589,23 @@
       var loginError = document.getElementById("loginError");
       var loginBtn = document.getElementById("loginBtn");
       var avatarBtn = document.getElementById("avatarBtn");
-      var accountDropdown = document.getElementById("accountDropdown");
-      var accountName = document.getElementById("accountName");
-      var logoutLink = document.getElementById("logoutLink");
+      var accountModal = document.getElementById("accountModal");
+      var closeAccountModal = document.getElementById("closeAccountModal");
+      var accountAvatarLg = document.getElementById("accountAvatarLg");
+      var accountNameModal = document.getElementById("accountNameModal");
+      var accountEmailModal = document.getElementById("accountEmailModal");
+      var avatarFileInput = document.getElementById("avatarFileInput");
+      var avatarError = document.getElementById("avatarError");
+      var newPasswordInput = document.getElementById("newPasswordInput");
+      var newPasswordConfirmInput = document.getElementById("newPasswordConfirmInput");
+      var passwordError = document.getElementById("passwordError");
+      var passwordSuccess = document.getElementById("passwordSuccess");
+      var savePasswordBtn = document.getElementById("savePasswordBtn");
+      var logoutBtn = document.getElementById("logoutBtn");
+
+      var BUCKET = "public-media";
+      var currentSession = null;
+      var ownMemberId = null;
 
       var url = window.__SUPABASE_URL__;
       var key = window.__SUPABASE_ANON_KEY__;
@@ -498,7 +624,25 @@
         loadingBox.classList.add("hidden");
         appBox.classList.add("hidden");
         loginBox.classList.remove("hidden");
-        accountDropdown.classList.add("hidden");
+        accountModal.classList.add("hidden");
+      }
+
+      function setAvatarDisplay(photoUrl, initial) {
+        if (photoUrl) {
+          avatarBtn.innerHTML = '<img src="' + photoUrl + '" alt="" />';
+          accountAvatarLg.innerHTML = '<img src="' + photoUrl + '" alt="" />';
+        } else {
+          avatarBtn.textContent = initial;
+          accountAvatarLg.textContent = initial;
+        }
+      }
+
+      function loadOwnAvatar(userId, initial) {
+        client.from("members").select("id, foto_url").eq("user_id", userId).maybeSingle().then(function (res) {
+          var data = res.data;
+          ownMemberId = data && data.id ? data.id : null;
+          setAvatarDisplay(data && data.foto_url ? data.foto_url : null, initial);
+        }).catch(function () {});
       }
 
       function applyAppPermissions(client, session) {
@@ -521,10 +665,14 @@
         loadingBox.classList.add("hidden");
         loginBox.classList.add("hidden");
         appBox.classList.remove("hidden");
+        currentSession = session;
         var user = session.user;
         var name = (user.user_metadata && user.user_metadata.name) || user.email;
-        avatarBtn.textContent = name.charAt(0).toUpperCase();
-        accountName.textContent = name;
+        var initial = name.charAt(0).toUpperCase();
+        accountNameModal.textContent = name;
+        accountEmailModal.textContent = user.email;
+        setAvatarDisplay(null, initial);
+        loadOwnAvatar(user.id, initial);
         var settingsTile = document.getElementById("settingsTile");
         if (settingsTile) {
           var isSuperAdmin = user.user_metadata && user.user_metadata.is_superadmin === true;
@@ -564,16 +712,94 @@
       });
 
       avatarBtn.addEventListener("click", function () {
-        accountDropdown.classList.toggle("hidden");
+        newPasswordInput.value = "";
+        newPasswordConfirmInput.value = "";
+        passwordError.classList.add("hidden");
+        passwordSuccess.classList.add("hidden");
+        avatarError.classList.add("hidden");
+        accountModal.classList.remove("hidden");
       });
-      document.addEventListener("click", function (e) {
-        if (!accountDropdown.contains(e.target) && e.target !== avatarBtn) {
-          accountDropdown.classList.add("hidden");
+
+      closeAccountModal.addEventListener("click", function () {
+        accountModal.classList.add("hidden");
+      });
+
+      // Schliesst nur, wenn sowohl Maus-runter als auch der Klick selbst direkt auf dem
+      // dunklen Hintergrund waren - sonst wuerde Text im Fenster markieren und dabei ueber
+      // den Rand hinausziehen das Fenster versehentlich schliessen.
+      var mouseDownOnOverlay = false;
+      accountModal.addEventListener("mousedown", function (e) {
+        mouseDownOnOverlay = e.target === accountModal;
+      });
+      accountModal.addEventListener("click", function (e) {
+        if (e.target === accountModal && mouseDownOnOverlay) {
+          accountModal.classList.add("hidden");
         }
       });
 
-      logoutLink.addEventListener("click", function (e) {
-        e.preventDefault();
+      avatarFileInput.addEventListener("change", function () {
+        var file = avatarFileInput.files && avatarFileInput.files[0];
+        if (!file || !currentSession) return;
+        avatarError.classList.add("hidden");
+        var userId = currentSession.user.id;
+        var ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+        var path = "mitglied-foto/" + userId + "-" + Date.now() + "." + ext;
+        client.storage.from(BUCKET).upload(path, file, { upsert: true }).then(function (upRes) {
+          if (upRes.error) throw upRes.error;
+          var publicUrl = client.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+          if (ownMemberId) {
+            return client.from("members").update({ foto_url: publicUrl }).eq("id", ownMemberId).then(function (res) {
+              if (res.error) throw res.error;
+              setAvatarDisplay(publicUrl, accountNameModal.textContent.charAt(0).toUpperCase());
+            });
+          } else {
+            var name = (currentSession.user.user_metadata && currentSession.user.user_metadata.name) || currentSession.user.email;
+            return client.from("members").insert({
+              user_id: userId, created_by: userId, is_child: false, vorname: name, nachname: "", foto_url: publicUrl,
+            }).select().single().then(function (res) {
+              if (res.error) throw res.error;
+              ownMemberId = res.data.id;
+              setAvatarDisplay(publicUrl, name.charAt(0).toUpperCase());
+            });
+          }
+        }).catch(function (e) {
+          avatarError.textContent = (e && e.message) || "Foto konnte nicht hochgeladen werden.";
+          avatarError.classList.remove("hidden");
+        });
+      });
+
+      savePasswordBtn.addEventListener("click", function () {
+        passwordError.classList.add("hidden");
+        passwordSuccess.classList.add("hidden");
+        var pw = newPasswordInput.value;
+        var pwConfirm = newPasswordConfirmInput.value;
+        if (pw.length < 6) {
+          passwordError.textContent = "Mindestens 6 Zeichen.";
+          passwordError.classList.remove("hidden");
+          return;
+        }
+        if (pw !== pwConfirm) {
+          passwordError.textContent = "Passwörter stimmen nicht überein.";
+          passwordError.classList.remove("hidden");
+          return;
+        }
+        savePasswordBtn.disabled = true;
+        savePasswordBtn.textContent = "Speichern…";
+        client.auth.updateUser({ password: pw }).then(function (res) {
+          savePasswordBtn.disabled = false;
+          savePasswordBtn.textContent = "Passwort speichern";
+          if (res.error) {
+            passwordError.textContent = res.error.message || "Hat nicht geklappt.";
+            passwordError.classList.remove("hidden");
+          } else {
+            newPasswordInput.value = "";
+            newPasswordConfirmInput.value = "";
+            passwordSuccess.classList.remove("hidden");
+          }
+        });
+      });
+
+      logoutBtn.addEventListener("click", function () {
         client.auth.signOut().then(function () { showLogin(); });
       });
     })();

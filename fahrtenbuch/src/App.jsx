@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Car, X, AlertCircle, Loader2, Home, Download, Calendar, BarChart3, Pencil, Trash2 } from "lucide-react";
-import { supabase, configMissing } from "./supabaseClient";
+import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { useIsDesktop } from "./useIsDesktop";
 
 const PAPER = "#F1F0EA";
@@ -112,6 +112,7 @@ function AuthGate() {
 function Fahrtenbuch({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
+  const avatarUrl = user.user_metadata?.avatar_url || null;
   const isAdmin = user.user_metadata?.is_admin === true;
   const isSuperAdmin = user.user_metadata?.is_superadmin === true;
   const [myModApps, setMyModApps] = useState([]);
@@ -168,6 +169,8 @@ function Fahrtenbuch({ session }) {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -229,6 +232,24 @@ function Fahrtenbuch({ session }) {
       setPasswordError(e.message || "Hat nicht geklappt.");
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function handleAvatarUpload(file) {
+    setAvatarError("");
+    setUploadingAvatar(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `avatars/${user.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { error } = await supabase.auth.updateUser({ data: { avatar_url: data.publicUrl } });
+      if (error) throw error;
+    } catch (e) {
+      setAvatarError(e.message || "Foto konnte nicht hochgeladen werden.");
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -472,7 +493,7 @@ function Fahrtenbuch({ session }) {
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0" style={{ backgroundColor: BLUE }}>{initial}</button>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
           </div>
         </div>
 
@@ -824,9 +845,22 @@ function Fahrtenbuch({ session }) {
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAccount(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Konto</h2><button onClick={() => setShowAccount(false)}><X size={20} /></button></div>
-            <div className="mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
-              <div className="text-sm font-semibold">{userName}{isAdmin ? " · Admin" : ""}</div>
-              <div className="text-xs" style={{ color: INK_SOFT }}>{user.email}</div>
+            <div className="flex items-center gap-3 mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
+              <div className="relative flex-shrink-0">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-white overflow-hidden" style={{ backgroundColor: INK }}>
+                  {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}
+                </div>
+                <label className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer" style={{ backgroundColor: INK, border: "2px solid #E4E1D3" }}>
+                  <Pencil size={10} color="#fff" />
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && handleAvatarUpload(e.target.files[0])} />
+                </label>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">{userName}{isAdmin ? " · Admin" : ""}</div>
+                <div className="text-xs truncate" style={{ color: INK_SOFT }}>{user.email}</div>
+                {uploadingAvatar && <div className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Wird hochgeladen…</div>}
+                {avatarError && <div className="text-xs mt-0.5" style={{ color: "#A13D3D" }}>{avatarError}</div>}
+              </div>
             </div>
             <label className="text-xs font-medium block mb-1">Passwort ändern</label>
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Neues Passwort" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />

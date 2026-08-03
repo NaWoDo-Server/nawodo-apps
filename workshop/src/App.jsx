@@ -105,6 +105,7 @@ function WorkshopApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const initial = userName.charAt(0).toUpperCase();
+  const avatarUrl = user.user_metadata?.avatar_url || null;
   const isAdmin = user.user_metadata?.is_admin === true;
   const isSuperAdmin = user.user_metadata?.is_superadmin === true;
 
@@ -124,8 +125,7 @@ function WorkshopApp({ session }) {
   const [editingWorkshop, setEditingWorkshop] = useState(null);
   const [formDate, setFormDate] = useState(todayStr());
   const [formModeratorUserId, setFormModeratorUserId] = useState("");
-  const [formThemen, setFormThemen] = useState("");
-  const [formThemenInfo, setFormThemenInfo] = useState("");
+  const [formThemenList, setFormThemenList] = useState([{ title: "", info: "" }]);
   const [formAgenda, setFormAgenda] = useState("");
   const [formFiles, setFormFiles] = useState([]);
   const [formError, setFormError] = useState("");
@@ -137,6 +137,8 @@ function WorkshopApp({ session }) {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -181,11 +183,33 @@ function WorkshopApp({ session }) {
   function resetForm() {
     setFormDate(todayStr());
     setFormModeratorUserId("");
-    setFormThemen("");
-    setFormThemenInfo("");
+    setFormThemenList([{ title: "", info: "" }]);
     setFormAgenda("");
     setFormFiles([]);
     setFormError("");
+  }
+
+  function parseThemenPairs(themenStr, infoStr) {
+    const titles = (themenStr || "").split("\n").map((s) => s.trim());
+    const infos = (infoStr || "").split("\n").map((s) => s.trim());
+    const len = Math.max(titles.length, infos.length, 1);
+    const pairs = [];
+    for (let i = 0; i < len; i++) {
+      if (titles[i] || infos[i]) pairs.push({ title: titles[i] || "", info: infos[i] || "" });
+    }
+    return pairs.length ? pairs : [{ title: "", info: "" }];
+  }
+
+  function updateThemenField(index, field, value) {
+    setFormThemenList((list) => list.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  }
+
+  function addThemenField() {
+    setFormThemenList((list) => [...list, { title: "", info: "" }]);
+  }
+
+  function removeThemenField(index) {
+    setFormThemenList((list) => (list.length > 1 ? list.filter((_, i) => i !== index) : list));
   }
 
   function openNewForm() {
@@ -198,8 +222,7 @@ function WorkshopApp({ session }) {
     setEditingWorkshop(w);
     setFormDate(w.date);
     setFormModeratorUserId(w.moderator_user_id || "");
-    setFormThemen(w.themen || "");
-    setFormThemenInfo(w.themen_info || "");
+    setFormThemenList(parseThemenPairs(w.themen, w.themen_info));
     setFormAgenda(w.agenda || "");
     setFormFiles([]);
     setFormError("");
@@ -212,12 +235,15 @@ function WorkshopApp({ session }) {
     setSaving(true);
     try {
       const moderator = allUsers.find((u) => u.id === formModeratorUserId);
+      const cleanedThemen = formThemenList
+        .map((t) => ({ title: t.title.trim(), info: t.info.trim() }))
+        .filter((t) => t.title || t.info);
       const payload = {
         date: formDate,
         moderator_user_id: formModeratorUserId || null,
         moderator_name: moderator?.name || null,
-        themen: formThemen.trim() || null,
-        themen_info: formThemenInfo.trim() || null,
+        themen: cleanedThemen.length ? cleanedThemen.map((t) => t.title).join("\n") : null,
+        themen_info: cleanedThemen.length ? cleanedThemen.map((t) => t.info).join("\n") : null,
         agenda: formAgenda.trim() || null,
       };
 
@@ -327,6 +353,24 @@ function WorkshopApp({ session }) {
     window.location.href = "/";
   }
 
+  async function handleAvatarUpload(file) {
+    setAvatarError("");
+    setUploadingAvatar(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `avatars/${user.id}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { error } = await supabase.auth.updateUser({ data: { avatar_url: data.publicUrl } });
+      if (error) throw error;
+    } catch (e) {
+      setAvatarError(e.message || "Foto konnte nicht hochgeladen werden.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}>
@@ -340,12 +384,12 @@ function WorkshopApp({ session }) {
       <div className="max-w-3xl mx-auto lg:max-w-none lg:mx-0 lg:px-8 px-4 sm:px-6 py-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
-            <img src="/workshop/logo-nawodo.png" alt="" className="w-8 h-8 rounded-lg" />
+            <img src="/workshop/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
             <h1 className="font-bold text-lg">Workshop</h1>
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0" style={{ backgroundColor: BLUE }}>{initial}</button>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
           </div>
         </div>
 
@@ -461,10 +505,40 @@ function WorkshopApp({ session }) {
             </select>
 
             <label className="text-xs font-medium block mb-1">Themen</label>
-            <textarea value={formThemen} onChange={(e) => setFormThemen(e.target.value)} rows={3} placeholder="Ein Thema pro Zeile" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
-
-            <label className="text-xs font-medium block mb-1">Infos zu den Themen (eine Info pro Zeile, gleiche Reihenfolge wie oben)</label>
-            <textarea value={formThemenInfo} onChange={(e) => setFormThemenInfo(e.target.value)} rows={3} placeholder="Info zu Thema 1&#10;Info zu Thema 2&#10;..." className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <div className="flex flex-col gap-2 mb-3">
+              {formThemenList.map((t, i) => (
+                <div key={i} className="rounded-lg p-2.5" style={{ border: `1px solid ${BORDER_SOFT}` }}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <input
+                      value={t.title}
+                      onChange={(e) => updateThemenField(i, "title", e.target.value)}
+                      placeholder={`Thema ${i + 1}`}
+                      className="flex-1 rounded-lg px-3 py-2 text-sm border"
+                      style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                    />
+                    {formThemenList.length > 1 && (
+                      <button type="button" onClick={() => removeThemenField(i)}><X size={16} style={{ color: INK_SOFT }} /></button>
+                    )}
+                  </div>
+                  <textarea
+                    value={t.info}
+                    onChange={(e) => updateThemenField(i, "info", e.target.value)}
+                    rows={2}
+                    placeholder="Info dazu (optional)"
+                    className="w-full rounded-lg px-3 py-2 text-sm border"
+                    style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addThemenField}
+                className="flex items-center gap-1.5 self-start px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+              >
+                <Plus size={13} /> Weiteres Thema
+              </button>
+            </div>
 
             <label className="text-xs font-medium block mb-1">Agenda</label>
             <textarea value={formAgenda} onChange={(e) => setFormAgenda(e.target.value)} rows={3} placeholder="z.B. 18:00 Begrüßung, 18:15 Thema 1, ..." className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
@@ -490,9 +564,22 @@ function WorkshopApp({ session }) {
         <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAccount(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Konto</h2><button onClick={() => setShowAccount(false)}><X size={20} /></button></div>
-            <div className="mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
-              <div className="text-sm font-semibold">{userName}{isAdmin ? " · Admin" : ""}</div>
-              <div className="text-xs" style={{ color: INK_SOFT }}>{user.email}</div>
+            <div className="flex items-center gap-3 mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
+              <div className="relative flex-shrink-0">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-white overflow-hidden" style={{ backgroundColor: INK }}>
+                  {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}
+                </div>
+                <label className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer" style={{ backgroundColor: INK, border: "2px solid #E4E1D3" }}>
+                  <Pencil size={10} color="#fff" />
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && handleAvatarUpload(e.target.files[0])} />
+                </label>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">{userName}{isAdmin ? " · Admin" : ""}</div>
+                <div className="text-xs truncate" style={{ color: INK_SOFT }}>{user.email}</div>
+                {uploadingAvatar && <div className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Wird hochgeladen…</div>}
+                {avatarError && <div className="text-xs mt-0.5" style={{ color: "#A13D3D" }}>{avatarError}</div>}
+              </div>
             </div>
             <label className="text-xs font-medium block mb-1">Passwort ändern</label>
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Neues Passwort" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />

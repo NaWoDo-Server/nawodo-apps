@@ -33,9 +33,10 @@ function ModeratorList() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [{ data: mods }, { data: members }] = await Promise.all([
+      const [{ data: mods }, { data: members }, { data: admins }] = await Promise.all([
         supabase.from("app_moderators").select("user_id, app_key"),
         supabase.from("members").select("user_id, vorname, nachname"),
+        supabase.rpc("list_admin_user_ids"),
       ]);
       if (!alive) return;
       const nameFor = (uid) => {
@@ -48,7 +49,11 @@ function ModeratorList() {
         if (!byApp[mo.app_key]) byApp[mo.app_key] = [];
         byApp[mo.app_key].push(nameFor(mo.user_id));
       });
-      setRows(APP_LIST.map((a) => ({ key: a.key, label: a.label, names: byApp[a.key] || [] })));
+      const adminNames = (admins || []).map((a) => nameFor(a.user_id));
+      setRows([
+        { key: "admin", label: "Admin", names: adminNames },
+        ...APP_LIST.map((a) => ({ key: a.key, label: a.label, names: byApp[a.key] || [] })),
+      ]);
     })();
     return () => { alive = false; };
   }, []);
@@ -62,12 +67,12 @@ function ModeratorList() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="grid gap-x-4 gap-y-2 items-start" style={{ gridTemplateColumns: "auto 1fr" }}>
       {rows.map((r) => (
-        <div key={r.key} className="flex flex-col items-start gap-0.5 text-sm">
-          <span className="font-medium">{r.label}</span>
-          <span style={{ color: r.names.length ? INK : INK_SOFT }}>{r.names.length ? r.names.join(", ") : "– kein Moderator"}</span>
-        </div>
+        <React.Fragment key={r.key}>
+          <span className="text-sm font-medium">{r.label}</span>
+          <span className="text-sm" style={{ color: r.names.length ? INK : INK_SOFT }}>{r.names.length ? r.names.join(", ") : "– niemand"}</span>
+        </React.Fragment>
       ))}
     </div>
   );

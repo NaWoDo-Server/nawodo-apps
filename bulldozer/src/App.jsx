@@ -506,7 +506,7 @@ function BulldozerApp({ session }) {
               onClick={() => startLevel(continueIndex)}
               src="/bulldozer/btn-weiter.png"
               alt="Weiterspielen"
-              sub={highestSolved === -1 ? undefined : `Lvl ${continueIndex + 1}`}
+              sub={highestSolved === -1 ? undefined : `${continueIndex + 1}/${LEVELS.length}`}
             />
             <ImgButton onClick={() => setScreen("leaderboard")} src="/bulldozer/btn-highscore.png" alt="Highscore" />
 

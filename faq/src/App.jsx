@@ -62,9 +62,9 @@ function ModeratorList() {
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-3">
       {rows.map((r) => (
-        <div key={r.key} className="flex items-center justify-between gap-3 text-sm">
+        <div key={r.key} className="flex flex-col items-start gap-0.5 text-sm">
           <span className="font-medium">{r.label}</span>
           <span style={{ color: r.names.length ? INK : INK_SOFT }}>{r.names.length ? r.names.join(", ") : "– kein Moderator"}</span>
         </div>

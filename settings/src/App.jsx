@@ -556,14 +556,16 @@ function SettingsApp({ session }) {
                   );
                 })}
               </div>
-              <button
-                onClick={handleApplyRoles}
-                disabled={savingAction}
-                className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
-                style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
-              >
-                <Check size={14} /> Setzen
-              </button>
+              <div className="flex justify-end">
+                <button
+                  onClick={handleApplyRoles}
+                  disabled={savingAction}
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
+                  style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
+                >
+                  <Check size={14} /> Setzen
+                </button>
+              </div>
             </div>
 
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
@@ -584,14 +586,16 @@ function SettingsApp({ session }) {
                   );
                 })}
               </div>
-              <button
-                onClick={handleApplyPermissions}
-                disabled={savingAction}
-                className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
-                style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
-              >
-                <Check size={14} /> Setzen
-              </button>
+              <div className="flex justify-end">
+                <button
+                  onClick={handleApplyPermissions}
+                  disabled={savingAction}
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
+                  style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
+                >
+                  <Check size={14} /> Setzen
+                </button>
+              </div>
             </div>
 
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>

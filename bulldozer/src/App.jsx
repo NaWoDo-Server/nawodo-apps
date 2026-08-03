@@ -399,7 +399,7 @@ function BulldozerApp({ session }) {
     return (
       <button
         onClick={onClick}
-        className="w-full max-w-[260px] mx-auto rounded-xl overflow-hidden mb-3 block"
+        className="w-full max-w-[130px] mx-auto rounded-xl overflow-hidden mb-3 block"
         style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
       >
         <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
@@ -516,7 +516,7 @@ function BulldozerApp({ session }) {
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
                 <button onClick={jumpToCode} className="rounded-lg overflow-hidden flex-shrink-0" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}>
-                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-9 w-auto block" style={{ imageRendering: "pixelated" }} />
+                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-[18px] w-auto block" style={{ imageRendering: "pixelated" }} />
                 </button>
               </div>
               {codeError && <p className="text-xs mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}

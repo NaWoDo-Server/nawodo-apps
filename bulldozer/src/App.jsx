@@ -133,6 +133,7 @@ function BulldozerApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const initial = userName.charAt(0).toUpperCase();
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true;
 
   const [ownMemberId, setOwnMemberId] = useState(null);
   const [ownFotoUrl, setOwnFotoUrl] = useState(null);
@@ -145,6 +146,7 @@ function BulldozerApp({ session }) {
 
   const [showAccount, setShowAccount] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showLevelTable, setShowLevelTable] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -544,6 +546,15 @@ function BulldozerApp({ session }) {
                 </button>
               </div>
               {codeError && <p className="text-xs mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setShowLevelTable(true)}
+                  className="w-full mt-3 rounded-lg py-2 text-xs font-semibold"
+                  style={{ backgroundColor: "transparent", border: `1px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+                >
+                  Levelcode-Tabelle
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -637,6 +648,35 @@ function BulldozerApp({ session }) {
           </div>
         )}
       </div>
+
+      {showLevelTable && isSuperAdmin && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowLevelTable(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">Levelcode-Tabelle</h2>
+              <button onClick={() => setShowLevelTable(false)}><X size={20} /></button>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ color: INK_SOFT }}>
+                  <th className="text-left font-semibold pb-1.5 pr-2">#</th>
+                  <th className="text-left font-semibold pb-1.5 pr-2">Titel</th>
+                  <th className="text-left font-semibold pb-1.5">Code</th>
+                </tr>
+              </thead>
+              <tbody>
+                {LEVELS.map((lvl, i) => (
+                  <tr key={i} style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
+                    <td className="py-1 pr-2" style={{ color: INK_SOFT }}>{i + 1}</td>
+                    <td className="py-1 pr-2">{lvl.title}</td>
+                    <td className="py-1 font-mono">{levelCode(i)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showHelp && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowHelp(false); } }}>

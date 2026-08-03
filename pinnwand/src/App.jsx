@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Search, Gift, Megaphone, Users, Star, BookOpen, BarChart3,
+  Search, Gift, Megaphone, Users, Star, BookOpen, BarChart3, LayoutGrid,
   Plus, X, Pencil, Trash2, Loader2, AlertCircle, Home, Paperclip,
-  Image as ImageIcon, Archive, ChevronDown, ChevronRight,
+  Image as ImageIcon, Archive, Pin, MessageCircle, Send,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
@@ -83,11 +83,14 @@ function PinnwandApp({ session }) {
   const [posts, setPosts] = useState([]);
   const [options, setOptions] = useState([]);
   const [votes, setVotes] = useState([]);
+  const [pins, setPins] = useState([]);
+  const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [activeTypes, setActiveTypes] = useState(() => new Set(POST_TYPES.map((t) => t.key)));
+  const [activeFilter, setActiveFilter] = useState(null); // null = Gesamtübersicht
   const [showArchive, setShowArchive] = useState(false);
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [openCommentIds, setOpenCommentIds] = useState(() => new Set());
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
@@ -117,44 +120,74 @@ function PinnwandApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [p, o, v] = await Promise.all([
+    const [p, o, v, pi, c] = await Promise.all([
       supabase.from("posts").select("*").order("created_at", { ascending: false }),
       supabase.from("poll_options").select("*").order("sort_order"),
       supabase.from("poll_votes").select("*"),
+      supabase.from("post_pins").select("*"),
+      supabase.from("post_comments").select("*").order("created_at"),
     ]);
     setPosts(p.data || []);
     setOptions(o.data || []);
     setVotes(v.data || []);
+    setPins(pi.data || []);
+    setComments(c.data || []);
     setLoading(false);
   }
 
   function optionsFor(postId) { return options.filter((o) => o.post_id === postId); }
   function votesFor(postId) { return votes.filter((v) => v.post_id === postId); }
   function myVotesFor(postId) { return votesFor(postId).filter((v) => v.user_id === user.id).map((v) => v.option_id); }
+  function commentsFor(postId) { return comments.filter((c) => c.post_id === postId); }
+  const pinnedIds = useMemo(() => new Set(pins.filter((p) => p.user_id === user.id).map((p) => p.post_id)), [pins, user.id]);
 
-  function toggleExpanded(id) {
-    setExpandedIds((prev) => {
+  function toggleComments(id) {
+    setOpenCommentIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
-  function toggleType(key) {
-    setActiveTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
+  async function togglePin(post) {
+    const existing = pins.find((p) => p.post_id === post.id && p.user_id === user.id);
+    try {
+      if (existing) {
+        await supabase.from("post_pins").delete().eq("id", existing.id);
+      } else {
+        await supabase.from("post_pins").insert({ post_id: post.id, user_id: user.id });
+      }
+      await loadAll();
+    } catch {}
+  }
+
+  async function addComment(post, body) {
+    if (!body.trim()) return;
+    try {
+      await supabase.from("post_comments").insert({ post_id: post.id, user_id: user.id, user_name: userName, body: body.trim() });
+      await loadAll();
+    } catch {}
+  }
+
+  async function deleteComment(comment) {
+    try {
+      await supabase.from("post_comments").delete().eq("id", comment.id);
+      await loadAll();
+    } catch {}
   }
 
   const q = search.trim().toLowerCase();
   const visiblePosts = useMemo(() => {
-    return posts
-      .filter((p) => activeTypes.has(p.type))
+    const filtered = posts
+      .filter((p) => activeFilter === null || p.type === activeFilter)
       .filter((p) => (showArchive ? isArchived(p) : !isArchived(p)))
       .filter((p) => !q || p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-  }, [posts, activeTypes, showArchive, q]);
+    return filtered.slice().sort((a, b) => {
+      const aPin = pinnedIds.has(a.id), bPin = pinnedIds.has(b.id);
+      if (aPin !== bPin) return aPin ? -1 : 1;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+  }, [posts, activeFilter, showArchive, q, pinnedIds]);
 
   function resetForm() {
     setFormType("gesuch");
@@ -305,97 +338,115 @@ function PinnwandApp({ session }) {
   }
 
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="sm:max-w-2xl mx-auto sm:border-x" style={{ borderColor: "#E4E1D3" }}>
-        <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+    <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <div className="max-w-3xl mx-auto">
+        <div className="px-4 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/pinnwand/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
             <h1 className="font-bold text-lg">Pinnwand</h1>
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
+            <button onClick={openNewForm} className="w-9 h-9 rounded-full flex items-center justify-center text-white flex-shrink-0" style={{ backgroundColor: INK }}><Plus size={18} /></button>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0" style={{ backgroundColor: INK }}>{initial}</button>
           </div>
         </div>
 
-        <div className="px-5 mb-3">
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Beiträge durchsuchen…"
-              className="w-full rounded-full pl-9 pr-3 py-2.5 text-sm border"
-              style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
-            />
-          </div>
-        </div>
-
-        <div className="px-5 mb-3 flex gap-2 flex-wrap">
-          {POST_TYPES.map((t) => {
-            const active = activeTypes.has(t.key);
-            return (
+        <div className="flex items-start gap-3 px-4">
+          {/* Icon-Leiste links: fungiert als Filter, oben die Gesamtübersicht */}
+          <div className="flex flex-col items-center gap-2.5 flex-shrink-0 pt-1">
+            <button
+              onClick={() => setActiveFilter(null)}
+              title="Gesamtübersicht"
+              className="w-11 h-11 rounded-full flex items-center justify-center text-white flex-shrink-0"
+              style={{ backgroundColor: INK, opacity: activeFilter === null ? 1 : 0.55, boxShadow: activeFilter === null ? "0 0 0 3px #fff, 0 0 0 5px " + INK : "none" }}
+            >
+              <LayoutGrid size={18} />
+            </button>
+            {POST_TYPES.map((t) => (
               <button
                 key={t.key}
-                onClick={() => toggleType(t.key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ backgroundColor: active ? t.color : `${t.color}1A`, color: active ? "#fff" : INK, border: `1.5px solid ${active ? t.color : `${t.color}55`}` }}
+                onClick={() => setActiveFilter(t.key)}
+                title={t.label}
+                className="w-11 h-11 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                style={{ backgroundColor: t.color, opacity: activeFilter === t.key ? 1 : 0.55, boxShadow: activeFilter === t.key ? `0 0 0 3px #fff, 0 0 0 5px ${t.color}` : "none" }}
               >
-                <t.Icon size={12} /> {t.label}
+                <t.Icon size={18} />
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
 
-        <div className="px-5 mb-4 flex items-center gap-2">
-          <button
-            onClick={() => setShowArchive(false)}
-            className="px-3 py-1.5 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: !showArchive ? INK : "transparent", color: !showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${!showArchive ? INK : BORDER_SOFT}` }}
-          >
-            Aktuell
-          </button>
-          <button
-            onClick={() => setShowArchive(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: showArchive ? INK : "transparent", color: showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${showArchive ? INK : BORDER_SOFT}` }}
-          >
-            <Archive size={12} /> Archiv
-          </button>
-        </div>
-
-        <div className="px-5 flex flex-col gap-3">
-          {visiblePosts.length === 0 && (
-            <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
-              <p className="text-sm" style={{ color: INK_SOFT }}>{showArchive ? "Keine archivierten Beiträge." : "Noch keine Beiträge."}</p>
+          {/* Beiträge */}
+          <div className="flex-1 min-w-0">
+            <div className="mb-3">
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Beiträge durchsuchen…"
+                  className="w-full rounded-full pl-9 pr-3 py-2.5 text-sm border"
+                  style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
+                />
+              </div>
             </div>
-          )}
-          {visiblePosts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              isAdmin={isAdmin}
-              ownUserId={user.id}
-              options={optionsFor(post.id)}
-              allVotes={votesFor(post.id)}
-              myVotes={myVotesFor(post.id)}
-              expanded={expandedIds.has(post.id)}
-              onToggleExpand={() => toggleExpanded(post.id)}
-              onEdit={() => openEditForm(post)}
-              onDelete={() => handleDelete(post)}
-              onVote={(ids) => handleVote(post, ids)}
-            />
-          ))}
+
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                onClick={() => setShowArchive(false)}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ backgroundColor: !showArchive ? INK : "transparent", color: !showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${!showArchive ? INK : BORDER_SOFT}` }}
+              >
+                Aktuell
+              </button>
+              <button
+                onClick={() => setShowArchive(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ backgroundColor: showArchive ? INK : "transparent", color: showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${showArchive ? INK : BORDER_SOFT}` }}
+              >
+                <Archive size={12} /> Archiv
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {visiblePosts.length === 0 && (
+                <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
+                  <p className="text-sm" style={{ color: INK_SOFT }}>{showArchive ? "Keine archivierten Beiträge." : "Noch keine Beiträge."}</p>
+                </div>
+              )}
+              {visiblePosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  isAdmin={isAdmin}
+                  ownUserId={user.id}
+                  options={optionsFor(post.id)}
+                  allVotes={votesFor(post.id)}
+                  myVotes={myVotesFor(post.id)}
+                  pinned={pinnedIds.has(post.id)}
+                  onTogglePin={() => togglePin(post)}
+                  postComments={commentsFor(post.id)}
+                  commentsOpen={openCommentIds.has(post.id)}
+                  onToggleComments={() => toggleComments(post.id)}
+                  onAddComment={(body) => addComment(post, body)}
+                  onDeleteComment={deleteComment}
+                  onImageClick={() => setLightboxUrl(post.image_url)}
+                  onEdit={() => openEditForm(post)}
+                  onDelete={() => handleDelete(post)}
+                  onVote={(ids) => handleVote(post, ids)}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <button
-        onClick={openNewForm}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg z-40"
-        style={{ backgroundColor: INK }}
-      >
-        <Plus size={26} />
-      </button>
+      {lightboxUrl && (
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4" style={{ backgroundColor: "rgba(0,0,0,0.85)" }} onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="" className="max-w-full max-h-full rounded-lg object-contain" />
+          <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}><X size={20} /></button>
+        </div>
+      )}
 
       {showForm && (
         <PostForm
@@ -440,16 +491,23 @@ function PinnwandApp({ session }) {
   );
 }
 
-function PostCard({ post, isAdmin, ownUserId, options, allVotes, myVotes, expanded, onToggleExpand, onEdit, onDelete, onVote }) {
+function PostCard({
+  post, isAdmin, ownUserId, options, allVotes, myVotes, pinned, onTogglePin,
+  postComments, commentsOpen, onToggleComments, onAddComment, onDeleteComment,
+  onImageClick, onEdit, onDelete, onVote,
+}) {
   const info = typeInfo(post.type);
   const canManage = isAdmin || post.created_by === ownUserId;
   const archived = isArchived(post);
-  const longDescription = post.description.length > 160;
-  const shownDescription = expanded || !longDescription ? post.description : post.description.slice(0, 160) + "…";
+  const [commentDraft, setCommentDraft] = useState("");
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-      {post.image_url && <img src={post.image_url} alt="" className="w-full h-40 object-cover" />}
+      {post.image_url && (
+        <button onClick={onImageClick} className="block w-full">
+          <img src={post.image_url} alt="" className="w-full h-40 object-cover" />
+        </button>
+      )}
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: info.color }}>
@@ -457,6 +515,9 @@ function PostCard({ post, isAdmin, ownUserId, options, allVotes, myVotes, expand
           </span>
           <div className="flex items-center gap-2">
             {archived && <span className="text-xs flex items-center gap-1" style={{ color: INK_SOFT }}><Archive size={11} /> archiviert</span>}
+            <button onClick={onTogglePin} title={pinned ? "Nicht mehr anpinnen" : "Anpinnen"}>
+              <Pin size={14} style={{ color: pinned ? info.color : "#B8B4A2" }} fill={pinned ? info.color : "none"} />
+            </button>
             {canManage && (
               <>
                 <button onClick={onEdit}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
@@ -474,14 +535,7 @@ function PostCard({ post, isAdmin, ownUserId, options, allVotes, myVotes, expand
           </span>
         )}
 
-        <p className="text-sm mb-2 whitespace-pre-wrap" style={{ color: INK_SOFT }}>
-          {shownDescription}
-          {longDescription && (
-            <button onClick={onToggleExpand} className="ml-1 text-xs font-semibold" style={{ color: info.color }}>
-              {expanded ? "weniger" : "mehr"}
-            </button>
-          )}
-        </p>
+        <p className="text-sm mb-2 whitespace-pre-wrap" style={{ color: INK_SOFT }}>{post.description}</p>
 
         {post.type === "umfrage" && (
           <PollWidget post={post} options={options} allVotes={allVotes} myVotes={myVotes} onVote={onVote} color={info.color} />
@@ -497,6 +551,49 @@ function PostCard({ post, isAdmin, ownUserId, options, allVotes, myVotes, expand
           <span className="text-xs font-medium">{post.created_by_name}</span>
           <span className="text-xs" style={{ color: INK_SOFT }}>{fmtRelative(post.created_at)}</span>
         </div>
+
+        <button onClick={onToggleComments} className="flex items-center gap-1.5 mt-2 text-xs font-semibold" style={{ color: INK_SOFT }}>
+          <MessageCircle size={13} /> {postComments.length > 0 ? `${postComments.length} Frage${postComments.length === 1 ? "" : "n"}` : "Frage stellen"}
+        </button>
+
+        {commentsOpen && (
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid #F1F0EA" }}>
+            <div className="flex flex-col gap-2 mb-2">
+              {postComments.map((c) => (
+                <div key={c.id} className="text-xs rounded-lg px-2.5 py-2" style={{ backgroundColor: "#F1F0EA" }}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-semibold">{c.user_name}</span>
+                    <div className="flex items-center gap-2">
+                      <span style={{ color: INK_SOFT }}>{fmtRelative(c.created_at)}</span>
+                      {(isAdmin || c.user_id === ownUserId) && (
+                        <button onClick={() => onDeleteComment(c)}><X size={11} style={{ color: "#B8B4A2" }} /></button>
+                      )}
+                    </div>
+                  </div>
+                  <div>{c.body}</div>
+                </div>
+              ))}
+              {postComments.length === 0 && <p className="text-xs" style={{ color: INK_SOFT }}>Noch keine Fragen.</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={commentDraft}
+                onChange={(e) => setCommentDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && commentDraft.trim()) { onAddComment(commentDraft); setCommentDraft(""); } }}
+                placeholder="Frage stellen…"
+                className="flex-1 rounded-lg px-3 py-2 text-xs border"
+                style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+              />
+              <button
+                onClick={() => { if (commentDraft.trim()) { onAddComment(commentDraft); setCommentDraft(""); } }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+                style={{ backgroundColor: info.color }}
+              >
+                <Send size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

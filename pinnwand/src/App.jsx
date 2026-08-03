@@ -43,6 +43,37 @@ async function uploadFile(file, pathPrefix) {
   return data.publicUrl;
 }
 
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024; // 50 MB pro Beitrag
+const MAX_IMAGE_DIMENSION = 1600; // Titelbilder werden vor dem Hochladen auf max. 1600px verkleinert
+
+// Verkleinert ein hochgeladenes Foto auf dem Geraet des Nutzers (Canvas), bevor es
+// hochgeladen wird - spart Speicherplatz und macht die Seite schneller.
+function resizeImage(file, maxDim = MAX_IMAGE_DIMENSION, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round((height * maxDim) / width); width = maxDim; }
+        else { width = Math.round((width * maxDim) / height); height = maxDim; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error("Bild konnte nicht verarbeitet werden."));
+        resolve(new File([blob], "titelbild.jpg", { type: "image/jpeg" }));
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Bild konnte nicht gelesen werden.")); };
+    img.src = url;
+  });
+}
+
 export default function App() {
   if (configMissing) {
     return (
@@ -231,11 +262,28 @@ function PinnwandApp({ session }) {
   function addPollOption() { setFormPollOptions((prev) => [...prev, ""]); }
   function removePollOption(idx) { setFormPollOptions((prev) => prev.filter((_, i) => i !== idx)); }
 
-  function onImageSelected(e) {
+  async function onImageSelected(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFormImageFile(file);
     setFormImagePreview(URL.createObjectURL(file));
+    try {
+      const resized = await resizeImage(file);
+      setFormImageFile(resized);
+    } catch {
+      setFormImageFile(file); // falls Verkleinern fehlschlaegt: Original hochladen
+    }
+  }
+
+  function onAttachmentSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setFormError("Die Datei ist größer als 50 MB. Bitte eine kleinere Datei anhängen.");
+      e.target.value = "";
+      return;
+    }
+    setFormError("");
+    setFormAttachmentFile(file);
   }
 
   async function handleSave() {
@@ -376,7 +424,7 @@ function PinnwandApp({ session }) {
           </div>
 
           {/* Beiträge */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 max-w-2xl">
             <div className="mb-3">
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
@@ -407,9 +455,9 @@ function PinnwandApp({ session }) {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+            <div className="flex flex-col gap-3">
               {visiblePosts.length === 0 && (
-                <div className="col-span-full text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
+                <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
                   <p className="text-sm" style={{ color: INK_SOFT }}>{showArchive ? "Keine archivierten Beiträge." : "Noch keine Beiträge."}</p>
                 </div>
               )}
@@ -459,7 +507,7 @@ function PinnwandApp({ session }) {
           formPollOptions={formPollOptions}
           updatePollOption={updatePollOption} addPollOption={addPollOption} removePollOption={removePollOption}
           formImagePreview={formImagePreview} onImageSelected={onImageSelected} imageInputRef={imageInputRef}
-          formAttachmentFile={formAttachmentFile} setFormAttachmentFile={setFormAttachmentFile} attachmentInputRef={attachmentInputRef}
+          formAttachmentFile={formAttachmentFile} onAttachmentSelected={onAttachmentSelected} attachmentInputRef={attachmentInputRef}
           formError={formError} saving={saving}
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditingPost(null); }}
@@ -654,7 +702,7 @@ function PostForm({
   formPriceNote, setFormPriceNote, formIsFree, setFormIsFree, formPollMode, setFormPollMode,
   formPollOptions, updatePollOption, addPollOption, removePollOption,
   formImagePreview, onImageSelected, imageInputRef,
-  formAttachmentFile, setFormAttachmentFile, attachmentInputRef,
+  formAttachmentFile, onAttachmentSelected, attachmentInputRef,
   formError, saving, onSave, onClose,
 }) {
   const info = typeInfo(formType);
@@ -757,7 +805,8 @@ function PostForm({
           <button onClick={() => attachmentInputRef.current?.click()} className="w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2" style={{ border: `1.5px dashed ${BORDER_SOFT}`, color: INK_SOFT }}>
             <Paperclip size={13} /> {formAttachmentFile ? formAttachmentFile.name : "Datei anhängen"}
           </button>
-          <input ref={attachmentInputRef} type="file" className="hidden" onChange={(e) => setFormAttachmentFile(e.target.files?.[0] || null)} />
+          <input ref={attachmentInputRef} type="file" className="hidden" onChange={onAttachmentSelected} />
+          <p className="text-xs mt-1" style={{ color: INK_SOFT }}>Maximal 50 MB pro Datei.</p>
         </div>
 
         {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}

@@ -424,7 +424,7 @@ function PinnwandApp({ session }) {
           </div>
 
           {/* Beiträge */}
-          <div className="flex-1 min-w-0 max-w-2xl">
+          <div className="flex-1 min-w-0">
             <div className="mb-3">
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />

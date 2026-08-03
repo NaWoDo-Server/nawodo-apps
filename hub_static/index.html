@@ -353,7 +353,7 @@
           </div>
 
           <div class="widget hidden" id="birthdayWidget">
-            <div class="widget-label">&#127874; Geburtstag heute</div>
+            <div class="widget-label">&#127874; Geburtstage diese Woche</div>
             <div class="today-list" id="birthdayList"></div>
           </div>
         </div>
@@ -552,17 +552,36 @@
       var list = document.getElementById("birthdayList");
       client.from("members").select("vorname,nachname,geburtstag").then(function (res) {
         var members = (res.data) || [];
+
         var today = new Date();
-        var mm = String(today.getMonth() + 1).padStart(2, "0");
-        var dd = String(today.getDate()).padStart(2, "0");
-        var todays = members.filter(function (m) {
-          if (!m.geburtstag) return false;
+        today.setHours(0, 0, 0, 0);
+        var dow = today.getDay(); // 0=So, 1=Mo, ... 6=Sa
+        var diffToMonday = dow === 0 ? -6 : 1 - dow;
+        var monday = new Date(today);
+        monday.setDate(today.getDate() + diffToMonday);
+        var sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+
+        function birthdayThisYear(month, day) {
+          return new Date(today.getFullYear(), month - 1, day);
+        }
+
+        var thisWeek = members
+          .filter(function (m) {
+            if (!m.geburtstag) return false;
+            var parts = m.geburtstag.split("-");
+            var candidate = birthdayThisYear(parseInt(parts[1], 10), parseInt(parts[2], 10));
+            return candidate >= monday && candidate <= sunday;
+          })
+          .sort(function (a, b) {
+            return a.geburtstag.slice(5).localeCompare(b.geburtstag.slice(5));
+          });
+
+        if (thisWeek.length === 0) return;
+        list.innerHTML = thisWeek.map(function (m) {
           var parts = m.geburtstag.split("-");
-          return parts[1] === mm && parts[2] === dd;
-        });
-        if (todays.length === 0) return;
-        list.innerHTML = todays.map(function (m) {
-          return '<div class="today-row"><div class="today-dot" style="background:#C9A227"></div><div><div class="t-title">' + m.vorname + " " + m.nachname + "</div></div></div>";
+          var dateLabel = parts[2] + "." + parts[1] + ".";
+          return '<div class="today-row"><div class="today-dot" style="background:#C9A227"></div><div><div class="t-title">' + m.vorname + " " + m.nachname + '</div><div class="t-time">' + dateLabel + "</div></div></div>";
         }).join("");
         widget.classList.remove("hidden");
       }).catch(function () {});

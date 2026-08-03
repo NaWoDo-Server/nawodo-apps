@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  User, Users, Phone, Smartphone, Mail, MapPin, Building2, Calendar,
+  User, Users, UserX, Phone, Smartphone, Mail, MapPin, Building2, Calendar,
   Download, Search, Plus, X, Pencil, Trash2, Loader2, AlertCircle, Home,
   LayoutGrid, Image as ImageIcon, Camera, ChevronDown, ChevronLeft, ChevronRight,
 } from "lucide-react";
@@ -308,6 +308,27 @@ function MitgliederApp({ session }) {
       setCreateAccountError(e.message || "Account konnte nicht angelegt werden.");
     } finally {
       setSavingAccount(false);
+    }
+  }
+
+  async function handleDeleteAccount(m) {
+    const displayName = m.vorname && m.nachname ? `${m.vorname} ${m.nachname}` : m.vorname || m.email;
+    if (!window.confirm(`Account von ${displayName} wirklich vollständig löschen? Die Person kann sich danach nicht mehr einloggen. Das kann nicht rückgängig gemacht werden.`)) return;
+    try {
+      const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: window.__SUPABASE_ANON_KEY__,
+        },
+        body: JSON.stringify({ user_id: m.user_id }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || "Account konnte nicht gelöscht werden.");
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Account konnte nicht gelöscht werden.");
     }
   }
 
@@ -686,6 +707,9 @@ function MitgliederApp({ session }) {
                           <button onClick={() => openFillPlaceholder(m)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#C9752F1A", color: "#C9752F" }}>
                             Ausfüllen
                           </button>
+                        )}
+                        {isAdmin && !m.is_child && m.user_id && (
+                          <button onClick={() => handleDeleteAccount(m)} title="Account vollständig löschen"><UserX size={14} style={{ color: "#A13D3D" }} /></button>
                         )}
                       </div>
                     </div>

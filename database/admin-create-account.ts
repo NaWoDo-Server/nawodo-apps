@@ -45,10 +45,21 @@ Deno.serve(async (req) => {
     const callerToken = authHeader.replace(/^Bearer\s+/i, "");
     if (!callerToken) return { error: jsonResponse({ error: "Nicht angemeldet." }, 401) };
 
-    const meResp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${callerToken}` },
-    });
-    if (!meResp.ok) return { error: jsonResponse({ error: "Anmeldung ungültig." }, 401) };
+    console.log("verifySuperAdmin: SUPABASE_URL=", SUPABASE_URL, "hasServiceKey=", !!SERVICE_ROLE_KEY, "tokenLen=", callerToken.length);
+    let meResp: Response;
+    try {
+      meResp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${callerToken}` },
+      });
+    } catch (e) {
+      console.error("verifySuperAdmin: fetch threw", String(e));
+      return { error: jsonResponse({ error: "Anmeldung ungültig (Netzwerkfehler beim Auth-Check)." }, 401) };
+    }
+    if (!meResp.ok) {
+      const errText = await meResp.text().catch(() => "");
+      console.error("verifySuperAdmin: /auth/v1/user not ok", meResp.status, errText);
+      return { error: jsonResponse({ error: "Anmeldung ungültig." }, 401) };
+    }
     const me = await meResp.json();
     const isSuperAdmin = me?.user_metadata?.is_superadmin === true;
     if (!isSuperAdmin) return { error: jsonResponse({ error: "Dafür fehlt die Berechtigung." }, 403) };

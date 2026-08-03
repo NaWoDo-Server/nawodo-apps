@@ -343,13 +343,18 @@
             <div class="diary-date">31. Juli 2026</div>
           </a>
 
-          <div class="widget today-widget collapsed" id="todayWidget">
+          <div class="widget today-widget" id="todayWidget">
             <div class="widget-label" id="todayLabel"><span>Heute im Terminkalender</span><span class="today-chevron">&#9660;</span></div>
             <div class="today-list" id="todayList"></div>
             <div class="today-toggles">
               <button class="today-toggle" id="toggleTermine" data-cat="termine">Termine</button>
               <button class="today-toggle" id="toggleRaum" data-cat="raum">Raumplanung</button>
             </div>
+          </div>
+
+          <div class="widget hidden" id="birthdayWidget">
+            <div class="widget-label">&#127874; Geburtstag heute</div>
+            <div class="today-list" id="birthdayList"></div>
           </div>
         </div>
 
@@ -491,6 +496,7 @@
         avatarBtn.textContent = name.charAt(0).toUpperCase();
         accountName.textContent = name;
         loadTodayWidget(client);
+        loadBirthdayWidget(client);
       }
 
       client.auth.getSession().then(function (res) {
@@ -541,6 +547,27 @@
       return y + "-" + m + "-" + day;
     }
 
+    function loadBirthdayWidget(client) {
+      var widget = document.getElementById("birthdayWidget");
+      var list = document.getElementById("birthdayList");
+      client.from("members").select("vorname,nachname,geburtstag").then(function (res) {
+        var members = (res.data) || [];
+        var today = new Date();
+        var mm = String(today.getMonth() + 1).padStart(2, "0");
+        var dd = String(today.getDate()).padStart(2, "0");
+        var todays = members.filter(function (m) {
+          if (!m.geburtstag) return false;
+          var parts = m.geburtstag.split("-");
+          return parts[1] === mm && parts[2] === dd;
+        });
+        if (todays.length === 0) return;
+        list.innerHTML = todays.map(function (m) {
+          return '<div class="today-row"><div class="today-dot" style="background:#C9A227"></div><div><div class="t-title">' + m.vorname + " " + m.nachname + "</div></div></div>";
+        }).join("");
+        widget.classList.remove("hidden");
+      }).catch(function () {});
+    }
+
     function loadTodayWidget(client) {
       var todayList = document.getElementById("todayList");
       var toggleTermine = document.getElementById("toggleTermine");
@@ -550,6 +577,9 @@
       todayLabelEl.addEventListener("click", function () {
         todayWidgetEl.classList.toggle("collapsed");
       });
+      if (window.innerWidth < 860) {
+        todayWidgetEl.classList.add("collapsed"); // Mobil: standardmäßig eingeklappt, Desktop: ausgeklappt
+      }
       var active = { termine: true, raum: false }; // Terminplanung ist als Einziges standardmäßig an
 
       Promise.all([

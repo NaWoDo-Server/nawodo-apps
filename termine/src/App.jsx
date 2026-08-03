@@ -571,11 +571,13 @@ function Hofteiler({ session }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex gap-1 p-1 rounded-full" style={{ backgroundColor: "#E4E1D3" }}>
+            <div className="mb-3">
+              <div className="flex gap-1 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
                 <button onClick={() => setDesktopViewMode("month")} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold" style={{ backgroundColor: desktopViewMode === "month" ? "#fff" : "transparent", color: desktopViewMode === "month" ? INK : INK_SOFT }}><CalendarDays size={13} /> Monat</button>
                 <button onClick={() => { setDesktopViewMode("week"); setCalendarWeekStart(startOfWeek(selectedDate)); }} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold" style={{ backgroundColor: desktopViewMode === "week" ? "#fff" : "transparent", color: desktopViewMode === "week" ? INK : INK_SOFT }}><CalendarDays size={13} /> Woche</button>
               </div>
+            </div>
+            <div className="mb-3">
               <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: INK }}><Plus size={14} /> Buchen</button>
             </div>
             {desktopViewMode === "month" ? (

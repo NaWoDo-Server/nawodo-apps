@@ -435,9 +435,8 @@ function Fahrtenbuch({ session }) {
               </div>
 
               {activeCar && (
-                <div className="px-5 mt-4 mb-2 flex items-center justify-between">
+                <div className="px-5 mt-4 mb-2">
                   <div className="text-xs" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
-                  <button onClick={openForm} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
                 </div>
               )}
 
@@ -446,6 +445,12 @@ function Fahrtenbuch({ session }) {
                   <Calendar size={12} /> {rangeLabel}
                 </button>
               </div>
+
+              {activeCar && (
+                <div className="px-5 mb-3">
+                  <button onClick={openForm} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
+                </div>
+              )}
 
               {pendingBookings.length > 0 && (
                 <div className="px-5 mb-4">
@@ -528,7 +533,6 @@ function Fahrtenbuch({ session }) {
                 {activeCar && (
                   <div className="flex flex-col gap-2">
                     <div className="text-xs" style={{ color: INK_SOFT }}>Letzter Stand: <span className="font-semibold" style={{ color: INK }}>{lastKm !== "" ? `${lastKm} km` : "noch kein Eintrag"}</span></div>
-                    <button onClick={openForm} className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
                   </div>
                 )}
 
@@ -545,11 +549,16 @@ function Fahrtenbuch({ session }) {
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="mb-4">
+                <div className="mb-3">
                   <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
                     <Calendar size={12} /> {rangeLabel}
                   </button>
                 </div>
+                {activeCar && (
+                  <div className="mb-4">
+                    <button onClick={openForm} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
+                  </div>
+                )}
 
                 {pendingBookings.length > 0 && (
                   <div className="mb-5">

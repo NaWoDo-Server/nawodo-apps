@@ -483,6 +483,12 @@ function BulldozerApp({ session }) {
 
         {screen === "select" && (
           <div className="flex flex-col items-center py-6">
+            <img
+              src="/bulldozer/bulldozer-logo.png"
+              alt="Bulldozer"
+              className="w-full max-w-[320px] mb-6 px-4"
+              style={{ imageRendering: "pixelated" }}
+            />
             <StoneButton onClick={() => startLevel(0)}>SPIELEN</StoneButton>
             <StoneButton onClick={() => startLevel(continueIndex)} sub={highestSolved === -1 ? undefined : `Level ${continueIndex + 1}`}>
               WEITERSPIELEN

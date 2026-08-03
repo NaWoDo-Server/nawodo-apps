@@ -414,8 +414,8 @@ function WorkshopApp({ session }) {
         <div className="mb-4">
           <button
             onClick={openNewForm}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold"
-            style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white"
+            style={{ backgroundColor: "#6C63A6" }}
           >
             <Plus size={14} /> Neuer Workshop
           </button>

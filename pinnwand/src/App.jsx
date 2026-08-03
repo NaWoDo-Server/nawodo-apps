@@ -574,7 +574,7 @@ function PinnwandApp({ session }) {
               <button
                 onClick={openNewForm}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white"
-                style={{ backgroundColor: INK }}
+                style={{ backgroundColor: "#C9752F" }}
               >
                 <Plus size={14} /> Neuer Beitrag
               </button>

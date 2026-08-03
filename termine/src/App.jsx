@@ -704,7 +704,7 @@ function Hofteiler({ session }) {
               </div>
             </div>
             <div className="mb-3">
-              <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: INK }}><Plus size={14} /> Buchen</button>
+              <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#C0392B" }}><Plus size={14} /> Buchen</button>
             </div>
             {desktopViewMode === "month" ? (
               <DesktopMonthGrid

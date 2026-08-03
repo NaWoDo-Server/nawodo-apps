@@ -522,12 +522,12 @@ function PinnwandApp({ session }) {
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto">
         <div className="px-4 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src="/pinnwand/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
-            <h1 className="font-bold text-lg">Pinnwand</h1>
+            <img src="/pinnwand/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
+            <h1 className="font-bold text-lg lg:text-2xl">Pinnwand</h1>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
           </div>
         </div>
 

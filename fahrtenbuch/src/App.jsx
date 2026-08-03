@@ -506,12 +506,12 @@ function Fahrtenbuch({ session }) {
       <div className={isDesktop ? "lg:w-2/3 mx-auto" : "sm:max-w-2xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
         <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6 flex items-center justify-between" : "px-5 pt-6 pb-3 flex items-center justify-between"}>
           <div className="flex items-center gap-2.5">
-            <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-11 object-contain" : "h-8 object-contain"} />
+            <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-12 object-contain" : "h-8 object-contain"} />
             <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+            <a href="/" className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"} style={{ backgroundColor: "#E4E1D3" }}><Home size={isDesktop ? 24 : 16} style={{ color: INK_SOFT }} /></a>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg text-white flex-shrink-0 overflow-hidden" : "w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden"} style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
           </div>
         </div>
 

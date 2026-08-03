@@ -240,7 +240,6 @@ function MitgliederApp({ session }) {
   const [formTelefon, setFormTelefon] = useState("");
   const [formHandy, setFormHandy] = useState("");
   const [formGeburtstag, setFormGeburtstag] = useState("");
-  const [formParent2, setFormParent2] = useState("");
   const [formFotoFile, setFormFotoFile] = useState(null);
   const [formFotoPreview, setFormFotoPreview] = useState(null);
   const [showAddGroup, setShowAddGroup] = useState(false);
@@ -409,7 +408,6 @@ function MitgliederApp({ session }) {
     }
   }
 
-  const adultMembers = useMemo(() => members.filter((m) => !m.is_child && m.user_id), [members]);
 
   const q = search.trim().toLowerCase();
   const visibleMembers = useMemo(() => {
@@ -467,8 +465,6 @@ function MitgliederApp({ session }) {
     setFormGeburtstag(m.geburtstag || "");
     setFormFotoFile(null);
     setFormFotoPreview(m.foto_url || null);
-    const otherParent = [m.parent1_user_id, m.parent2_user_id].find((id) => id && id !== user.id);
-    setFormParent2(otherParent || "");
     setFormError("");
     setShowForm(true);
   }
@@ -512,10 +508,6 @@ function MitgliederApp({ session }) {
       let savedId = editingMember?.id || null;
 
       if (editingMember) {
-        if (formIsChild) {
-          payload.parent1_user_id = editingMember.parent1_user_id === user.id || !editingMember.parent1_user_id ? user.id : editingMember.parent1_user_id;
-          payload.parent2_user_id = formParent2 || null;
-        }
         const { error } = await supabase.from("members").update(payload).eq("id", editingMember.id);
         if (error) throw error;
       } else {
@@ -1053,19 +1045,6 @@ function MitgliederApp({ session }) {
 
                 <label className="text-xs font-medium block mb-1">Handy</label>
                 <input value={formHandy} onChange={(e) => setFormHandy(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
-              </>
-            )}
-
-            {formIsChild && (
-              <>
-                <label className="text-xs font-medium block mb-1">Zweiter Elternteil (optional)</label>
-                <select value={formParent2} onChange={(e) => setFormParent2(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
-                  <option value="">Keine Angabe</option>
-                  {adultMembers.filter((m) => m.user_id !== user.id).map((m) => (
-                    <option key={m.user_id} value={m.user_id}>{m.vorname} {m.nachname}</option>
-                  ))}
-                </select>
-                <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Du bist automatisch als Elternteil verknüpft.</p>
               </>
             )}
 

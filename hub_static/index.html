@@ -130,7 +130,19 @@
     }
     .logout-item:hover { background: #F1F0EA; }
 
-    .today-widget { display: none; }
+    .today-widget { display: block; cursor: default; }
+    .today-widget .widget-label {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0;
+    }
+    .today-chevron { font-size: 10px; color: #9B9A90; transition: transform 0.15s; flex-shrink: 0; }
+    .today-widget.collapsed .today-list,
+    .today-widget.collapsed .today-toggles { display: none; }
+    .today-widget:not(.collapsed) .widget-label { margin-bottom: 6px; }
+    .today-widget.collapsed .today-chevron { transform: rotate(-90deg); }
     .today-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
     .today-empty { font-size: 12px; color: #9B9A90; margin-top: 4px; }
     .today-row { font-size: 13px; }
@@ -273,7 +285,12 @@
       .widget { padding: 18px 18px; border-radius: 22px; }
       .weather-icon { font-size: 38px; }
       .weather-temp { font-size: 28px; }
-      .today-widget { display: block; }
+      .today-widget.collapsed .today-list,
+      .today-widget.collapsed .today-toggles { display: flex; }
+      .today-widget .today-list { display: flex; }
+      .today-widget .today-toggles { display: flex; }
+      .today-widget .widget-label { cursor: default; margin-bottom: 6px; }
+      .today-chevron { display: none; }
 
       .main { flex: 1; }
       .grid {
@@ -331,8 +348,8 @@
             <div class="diary-date">31. Juli 2026</div>
           </a>
 
-          <div class="widget today-widget" id="todayWidget">
-            <div class="widget-label" id="todayLabel">Heute im Terminkalender</div>
+          <div class="widget today-widget collapsed" id="todayWidget">
+            <div class="widget-label" id="todayLabel"><span>Heute im Terminkalender</span><span class="today-chevron">&#9660;</span></div>
             <div class="today-list" id="todayList"></div>
             <div class="today-toggles">
               <button class="today-toggle" id="toggleTermine" data-cat="termine">Termine</button>
@@ -535,6 +552,11 @@
       var todayList = document.getElementById("todayList");
       var toggleTermine = document.getElementById("toggleTermine");
       var toggleRaum = document.getElementById("toggleRaum");
+      var todayWidgetEl = document.getElementById("todayWidget");
+      var todayLabelEl = document.getElementById("todayLabel");
+      todayLabelEl.addEventListener("click", function () {
+        todayWidgetEl.classList.toggle("collapsed");
+      });
       var active = { termine: true, raum: false }; // Terminplanung ist als Einziges standardmäßig an
 
       Promise.all([

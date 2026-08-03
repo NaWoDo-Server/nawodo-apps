@@ -81,6 +81,18 @@ function Hofteiler({ session }) {
   const userName = user.user_metadata?.name || user.email;
   const isAdmin = user.user_metadata?.is_admin === true;
 
+  // Admins koennen eine Buchung fuer ein anderes Mitglied anlegen/umtragen.
+  // Liste wird nur fuer Admins geladen (RPC prueft das serverseitig zusaetzlich ab).
+  const [members, setMembers] = useState([{ id: user.id, name: userName }]);
+  const [bookingUserId, setBookingUserId] = useState(user.id);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase.rpc("list_members").then(({ data, error }) => {
+      if (!error && data) setMembers(data);
+    });
+  }, [isAdmin]);
+
   const [categories, setCategories] = useState([]);
   const [resources, setResources] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -256,12 +268,15 @@ function Hofteiler({ session }) {
 
   // bookingId gesetzt = bestehende Buchung aktualisieren (eigene Buchung wird bei der
   // Konfliktprüfung ignoriert), sonst neue Buchung anlegen.
-  function checkConflictAndSave({ bookingId, resourceId, startDate, endDate, allDay, startTime, endTime, name, note, title }) {
+  // skipConflict: NaWoDo-Termine duerfen sich zeitlich ueberschneiden (mehrere Termine
+  // gleichzeitig sind erlaubt) - Sharing-Ressourcen und Raumbuchung pruefen weiterhin
+  // wie bisher auf Ueberschneidung.
+  function checkConflictAndSave({ bookingId, resourceId, startDate, endDate, allDay, startTime, endTime, name, note, title, userId, skipConflict }) {
     return (async () => {
       const latest = await refreshBookings();
       const newBooking = { date: startDate, end_date: endDate, all_day: allDay, start_time: allDay ? "00:00" : startTime, end_time: allDay ? "23:59" : endTime };
       const [newStart, newEnd] = bookingRangeMs(newBooking);
-      const conflict = latest.find((b) => {
+      const conflict = skipConflict ? null : latest.find((b) => {
         if (bookingId && b.id === bookingId) return false;
         if (b.resource_id !== resourceId) return false;
         const [bStart, bEnd] = bookingRangeMs(b);
@@ -281,7 +296,7 @@ function Hofteiler({ session }) {
         name: name.trim(),
         note: note.trim() || null,
         title: title ? title.trim() : null,
-        ...(bookingId ? {} : { user_id: user.id }),
+        user_id: userId || user.id,
       };
       const { error } = bookingId
         ? await supabase.from("bookings").update(payload).eq("id", bookingId)
@@ -313,6 +328,7 @@ function Hofteiler({ session }) {
     setDialogResourceId(null);
     setDialogCategoryId(dialogEventCategory?.id || pickableCategories[0]?.id || null);
     setSelectedDate(dateStr);
+    setBookingUserId(user.id);
     setDesktopDialogOpen(true);
   }
 
@@ -336,6 +352,7 @@ function Hofteiler({ session }) {
     setFormNote(booking.note || "");
     setFormRoomId(null);
     setFormBlockZoe(false);
+    setBookingUserId(booking.user_id || user.id);
     setDesktopDialogOpen(true);
   }
 
@@ -351,13 +368,17 @@ function Hofteiler({ session }) {
     if (!formAllDay && formEndDate === formStartDate && toMinutes(formEnd) <= toMinutes(formStart)) {
       return setFormError("Ende muss nach dem Start liegen.");
     }
+    // Admins koennen eine Buchung fuer ein anderes Mitglied anlegen - Name/ID des
+    // ausgewaehlten Mitglieds werden dann statt der eigenen verwendet.
+    const bookingAsName = isAdmin ? (members.find((m) => m.id === bookingUserId)?.name || userName) : userName;
+    const bookingAsUserId = isAdmin ? bookingUserId : user.id;
     setSaving(true);
     try {
       if (isEventMode) {
-        await checkConflictAndSave({ bookingId: editingBookingId, resourceId: eventResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
+        await checkConflictAndSave({ bookingId: editingBookingId, resourceId: eventResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: bookingAsName, note: formNote, title: formTitle, userId: bookingAsUserId, skipConflict: true });
         if (formRoomId) {
           try {
-            await checkConflictAndSave({ resourceId: formRoomId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote, title: formTitle });
+            await checkConflictAndSave({ resourceId: formRoomId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: bookingAsName, note: formNote, title: formTitle, userId: bookingAsUserId });
           } catch (roomErr) {
             setFormError(`Termin gespeichert, aber der Raum konnte nicht mitgebucht werden: ${roomErr.message}`);
             setSaving(false);
@@ -365,11 +386,11 @@ function Hofteiler({ session }) {
           }
         }
       } else {
-        await checkConflictAndSave({ bookingId: editingBookingId, resourceId: dialogResourceId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
+        await checkConflictAndSave({ bookingId: editingBookingId, resourceId: dialogResourceId, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: bookingAsName, note: formNote, userId: bookingAsUserId });
         const dialogResource = resources.find((r) => r.id === dialogResourceId);
         if (formBlockZoe && zoeResource && isWallboxResource(dialogResource)) {
           try {
-            await checkConflictAndSave({ resourceId: zoeResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: userName, note: formNote });
+            await checkConflictAndSave({ resourceId: zoeResource.id, startDate: formStartDate, endDate: formEndDate, allDay: formAllDay, startTime: formStart, endTime: formEnd, name: bookingAsName, note: formNote, userId: bookingAsUserId });
           } catch (zoeErr) {
             setFormError(`Gebucht, aber Zoe konnte nicht mitgeblockt werden: ${zoeErr.message}`);
             setSaving(false);
@@ -749,6 +770,11 @@ function Hofteiler({ session }) {
         onClose={() => { setDesktopDialogOpen(false); setEditingBookingId(null); }}
         isEditing={!!editingBookingId}
         userName={userName}
+        isAdmin={isAdmin}
+        members={members}
+        ownUserId={user.id}
+        bookingUserId={bookingUserId}
+        onBookingUserChange={setBookingUserId}
         pickableCategories={pickableCategories}
         eventCategory={dialogEventCategory}
         resources={resources}

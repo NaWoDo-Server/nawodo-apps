@@ -8,6 +8,7 @@ import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
 // übersichtlicher (Anforderung aus dem Layout-Redesign).
 export default function BookingDialog({
   open, onClose, userName,
+  isAdmin, members, ownUserId, bookingUserId, onBookingUserChange,
   pickableCategories, eventCategory, resources, roomResources, zoeResource, isWallboxResource, colorFor,
   categoryId, onCategoryChange, resourceId, onResourceChange,
   formTitle, setFormTitle,
@@ -91,10 +92,26 @@ export default function BookingDialog({
 
         {(isEventMode || resourceId) && (
           <>
-            <div className="flex items-center gap-2 mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: BORDER }}>
-              <span className="text-xs" style={{ color: INK_SOFT }}>{isEventMode ? "Eingetragen von" : "Gebucht als"}</span>
-              <span className="text-sm font-semibold">{userName}</span>
-            </div>
+            {isAdmin ? (
+              <div className="mb-3">
+                <label className="text-xs font-medium block mb-1" style={{ color: INK_SOFT }}>{isEventMode ? "Eingetragen von" : "Gebucht als"}</label>
+                <select
+                  value={bookingUserId}
+                  onChange={(e) => onBookingUserChange(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2.5 text-sm border"
+                  style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                >
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}{m.id === ownUserId ? " (ich)" : ""}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: BORDER }}>
+                <span className="text-xs" style={{ color: INK_SOFT }}>{isEventMode ? "Eingetragen von" : "Gebucht als"}</span>
+                <span className="text-sm font-semibold">{userName}</span>
+              </div>
+            )}
 
             <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
               <input type="checkbox" checked={formAllDay} onChange={(e) => setFormAllDay(e.target.checked)} className="w-4 h-4" />

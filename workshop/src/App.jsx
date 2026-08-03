@@ -337,7 +337,7 @@ function WorkshopApp({ session }) {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5">
+      <div className="max-w-3xl mx-auto lg:max-w-none lg:mx-0 lg:px-8 px-4 sm:px-6 py-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <img src="/workshop/logo-nawodo.png" alt="" className="w-8 h-8 rounded-lg" />
@@ -463,8 +463,8 @@ function WorkshopApp({ session }) {
             <label className="text-xs font-medium block mb-1">Themen</label>
             <textarea value={formThemen} onChange={(e) => setFormThemen(e.target.value)} rows={3} placeholder="Ein Thema pro Zeile" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
-            <label className="text-xs font-medium block mb-1">Infos zu den Themen</label>
-            <textarea value={formThemenInfo} onChange={(e) => setFormThemenInfo(e.target.value)} rows={3} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <label className="text-xs font-medium block mb-1">Infos zu den Themen (eine Info pro Zeile, gleiche Reihenfolge wie oben)</label>
+            <textarea value={formThemenInfo} onChange={(e) => setFormThemenInfo(e.target.value)} rows={3} placeholder="Info zu Thema 1&#10;Info zu Thema 2&#10;..." className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
             <label className="text-xs font-medium block mb-1">Agenda</label>
             <textarea value={formAgenda} onChange={(e) => setFormAgenda(e.target.value)} rows={3} placeholder="z.B. 18:00 Begrüßung, 18:15 Thema 1, ..." className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
@@ -510,6 +510,48 @@ function WorkshopApp({ session }) {
   );
 }
 
+function ThemenList({ themen, themenInfo }) {
+  const items = useMemo(() => {
+    const titles = (themen || "").split("\n").map((s) => s.trim()).filter(Boolean);
+    const infos = (themenInfo || "").split("\n").map((s) => s.trim());
+    return titles.map((title, i) => ({ title, info: infos[i] || "" }));
+  }, [themen, themenInfo]);
+
+  const [openIndex, setOpenIndex] = useState(null);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mb-3">
+      <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Themen</div>
+      <div className="flex flex-col gap-1.5">
+        {items.map((item, i) => {
+          const isOpen = openIndex === i;
+          return (
+            <div key={i} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${BORDER_SOFT}` }}>
+              <button
+                onClick={() => item.info && setOpenIndex(isOpen ? null : i)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+                style={{ cursor: item.info ? "pointer" : "default" }}
+              >
+                <span className="text-sm font-medium">{item.title}</span>
+                {item.info && (
+                  isOpen
+                    ? <ChevronDown size={14} className="flex-shrink-0" style={{ color: INK_SOFT }} />
+                    : <ChevronRight size={14} className="flex-shrink-0" style={{ color: INK_SOFT }} />
+                )}
+              </button>
+              {isOpen && item.info && (
+                <p className="text-sm whitespace-pre-wrap px-3 pb-2.5" style={{ color: INK_SOFT }}>{item.info}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WorkshopCard({
   w, highlighted, attachmentsList, foodList, attendanceList, myAttendanceRow, canManage, userId,
   onCollapse, onEdit, onDelete, onDeleteAttachment, onAddFood, onDeleteFood, onSetAttendance,
@@ -538,18 +580,7 @@ function WorkshopCard({
         </div>
       </div>
 
-      {w.themen && (
-        <div className="mb-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Themen</div>
-          <p className="text-sm whitespace-pre-wrap">{w.themen}</p>
-        </div>
-      )}
-      {w.themen_info && (
-        <div className="mb-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Infos zu den Themen</div>
-          <p className="text-sm whitespace-pre-wrap" style={{ color: INK_SOFT }}>{w.themen_info}</p>
-        </div>
-      )}
+      <ThemenList themen={w.themen} themenInfo={w.themen_info} />
       {w.agenda && (
         <div className="mb-3">
           <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Agenda</div>

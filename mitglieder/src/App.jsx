@@ -170,6 +170,12 @@ function MitgliederApp({ session }) {
   const [formFotoPreview, setFormFotoPreview] = useState(null);
   const [formBereiche, setFormBereiche] = useState([]);
   const [showAddGroup, setShowAddGroup] = useState(false);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
+  const [newAccountEmail, setNewAccountEmail] = useState("");
+  const [newAccountPassword, setNewAccountPassword] = useState("");
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [createAccountError, setCreateAccountError] = useState("");
   const [newGroupLabel, setNewGroupLabel] = useState("");
   const [newGroupEmail, setNewGroupEmail] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
@@ -272,6 +278,36 @@ function MitgliederApp({ session }) {
       alert(e.message || "Gruppe konnte nicht angelegt werden.");
     } finally {
       setSavingGroup(false);
+    }
+  }
+
+  async function handleCreateAccount() {
+    setCreateAccountError("");
+    const email = newAccountEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) return setCreateAccountError("Bitte eine gültige Email-Adresse angeben.");
+    if (!newAccountPassword || newAccountPassword.length < 6) return setCreateAccountError("Passwort muss mindestens 6 Zeichen haben.");
+    setSavingAccount(true);
+    try {
+      const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: window.__SUPABASE_ANON_KEY__,
+        },
+        body: JSON.stringify({ email, password: newAccountPassword, name: newAccountName.trim() }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.error || "Account konnte nicht angelegt werden.");
+      setNewAccountName("");
+      setNewAccountEmail("");
+      setNewAccountPassword("");
+      setShowCreateAccount(false);
+      await loadAll();
+    } catch (e) {
+      setCreateAccountError(e.message || "Account konnte nicht angelegt werden.");
+    } finally {
+      setSavingAccount(false);
     }
   }
 
@@ -588,10 +624,19 @@ function MitgliederApp({ session }) {
               ))}
             </div>
 
-            <div className="mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <button onClick={openNewFlow} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: INK }}>
                 <Plus size={14} /> Neuer Eintrag
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { setShowCreateAccount(true); setCreateAccountError(""); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+                >
+                  <Plus size={12} /> Account anlegen
+                </button>
+              )}
             </div>
 
             {activeBereich && (
@@ -719,6 +764,30 @@ function MitgliederApp({ session }) {
               style={{ backgroundColor: BLUE, opacity: savingGroup || !newGroupLabel.trim() ? 0.6 : 1 }}
             >
               {savingGroup && <Loader2 size={15} className="animate-spin" />} {savingGroup ? "Anlegen…" : "Gruppe anlegen"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showCreateAccount && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowCreateAccount(false)}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neuen Account anlegen</h2><button onClick={() => setShowCreateAccount(false)}><X size={20} /></button></div>
+            <label className="text-xs font-medium block mb-1">Name (optional)</label>
+            <input value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <label className="text-xs font-medium block mb-1">Email</label>
+            <input type="email" value={newAccountEmail} onChange={(e) => setNewAccountEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <label className="text-xs font-medium block mb-1">Startpasswort</label>
+            <input type="text" value={newAccountPassword} onChange={(e) => setNewAccountPassword(e.target.value)} placeholder="mind. 6 Zeichen" className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Bitte dem Mitglied mitteilen, damit es sich einloggen und das Passwort selbst ändern kann.</p>
+            {createAccountError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {createAccountError}</div>}
+            <button
+              onClick={handleCreateAccount}
+              disabled={savingAccount}
+              className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2"
+              style={{ backgroundColor: BLUE, opacity: savingAccount ? 0.7 : 1 }}
+            >
+              {savingAccount && <Loader2 size={15} className="animate-spin" />} {savingAccount ? "Anlegen…" : "Account anlegen"}
             </button>
           </div>
         </div>

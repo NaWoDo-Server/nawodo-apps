@@ -5,6 +5,8 @@
 // POST { type: "account", email, password, vorname, nachname, mitgliedstyp, app_permissions } -> Login-Account anlegen
 // POST { type: "child", vorname, nachname, parent_user_id, mitgliedstyp } -> Kind-Profil anlegen (kein Login)
 // POST { type: "toggle_admin", target_user_id, is_admin } -> globalen Admin-Status setzen/entfernen
+// POST { type: "set_password", target_user_id, password } -> neues Passwort fuer bestehenden Account setzen
+// POST { type: "set_permission", target_user_id, app_key, allowed } -> App-Zugriff einzeln erlauben/sperren
 // DELETE { user_id } -> Account (+ Profil) löschen
 // Alle Aufrufe erwarten den Access-Token des aufrufenden Superadmins im Authorization-Header.
 
@@ -65,7 +67,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Ungültige Anfrage." }, 400);
     }
 
-    const type = body.type === "child" ? "child" : body.type === "toggle_admin" ? "toggle_admin" : "account";
+    const type = ["child", "toggle_admin", "set_password", "set_permission"].includes(body.type)
+      ? body.type
+      : "account";
 
     // --- Globalen Admin-Status setzen/entfernen (nur Superadmin, siehe verifySuperAdmin oben). ---
     if (type === "toggle_admin") {
@@ -105,6 +109,62 @@ Deno.serve(async (req) => {
         );
       }
       return jsonResponse({ ok: true, is_admin: nextIsAdmin }, 200);
+    }
+
+    // --- Neues Passwort fuer einen bestehenden Account setzen (z.B. wenn jemand es
+    // vergessen hat). Nur Superadmin, siehe verifySuperAdmin oben. ---
+    if (type === "set_password") {
+      const targetUserId = body.target_user_id;
+      const newPassword = body.password || "";
+      if (!targetUserId) {
+        return jsonResponse({ error: "Keine target_user_id angegeben." }, 400);
+      }
+      if (!newPassword || newPassword.length < 6) {
+        return jsonResponse({ error: "Passwort muss mindestens 6 Zeichen haben." }, 400);
+      }
+      const putResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
+        method: "PUT",
+        headers: restHeaders,
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const updated = await putResp.json();
+      if (!putResp.ok) {
+        return jsonResponse(
+          { error: updated?.msg || updated?.message || "Passwort konnte nicht gesetzt werden." },
+          putResp.status
+        );
+      }
+      return jsonResponse({ ok: true }, 200);
+    }
+
+    // --- App-Zugriff einzeln erlauben/sperren (member_permissions). Fehlende Zeile heisst
+    // erlaubt (Standard); zum Sperren wird eine Zeile mit allowed=false angelegt. ---
+    if (type === "set_permission") {
+      const targetUserId = body.target_user_id;
+      const appKey = body.app_key;
+      const allowed = body.allowed !== false;
+      if (!targetUserId || !APP_KEYS.includes(appKey)) {
+        return jsonResponse({ error: "Ungültige Angabe." }, 400);
+      }
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/member_permissions?user_id=eq.${targetUserId}&app_key=eq.${appKey}`,
+        { method: "DELETE", headers: restHeaders }
+      );
+      if (!allowed) {
+        const insResp = await fetch(`${SUPABASE_URL}/rest/v1/member_permissions`, {
+          method: "POST",
+          headers: restHeaders,
+          body: JSON.stringify({ user_id: targetUserId, app_key: appKey, allowed: false }),
+        });
+        if (!insResp.ok) {
+          const errBody = await insResp.json().catch(() => ({}));
+          return jsonResponse(
+            { error: errBody?.message || "Recht konnte nicht geändert werden." },
+            insResp.status
+          );
+        }
+      }
+      return jsonResponse({ ok: true, allowed }, 200);
     }
 
     const vorname = (body.vorname || "").trim();

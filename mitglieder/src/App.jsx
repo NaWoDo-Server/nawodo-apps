@@ -183,7 +183,14 @@ function AuthGate() {
 function MitgliederApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
-  const avatarUrl = user.user_metadata?.avatar_url || null;
+  const [ownMemberId, setOwnMemberId] = useState(null);
+  const [ownFotoUrl, setOwnFotoUrl] = useState(null);
+  useEffect(() => {
+    supabase.from("members").select("id, foto_url").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+      setOwnMemberId(data?.id || null);
+      setOwnFotoUrl(data?.foto_url || null);
+    });
+  }, [user.id]);
   const isAdmin = user.user_metadata?.is_admin === true;
   const isSuperAdmin = user.user_metadata?.is_superadmin === true; // darf zusaetzlich Accounts anlegen/loeschen
   const initial = userName.charAt(0).toUpperCase();
@@ -647,7 +654,7 @@ function MitgliederApp({ session }) {
         savedId = data.id;
       }
 
-      if (isSuperAdmin && !formIsChild && savedId) {
+      if (isElevatedForMitglieder && !formIsChild && savedId) {
         await saveBereicheFor(savedId);
       }
 
@@ -694,12 +701,23 @@ function MitgliederApp({ session }) {
     setUploadingAvatar(true);
     try {
       const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `avatars/${user.id}-${Date.now()}.${ext}`;
+      const path = `mitglied-foto/${user.id}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
       if (upErr) throw upErr;
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const { error } = await supabase.auth.updateUser({ data: { avatar_url: data.publicUrl } });
-      if (error) throw error;
+      if (ownMemberId) {
+        const { error } = await supabase.from("members").update({ foto_url: data.publicUrl }).eq("id", ownMemberId);
+        if (error) throw error;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("members")
+          .insert({ user_id: user.id, created_by: user.id, is_child: false, vorname: userName, nachname: "", foto_url: data.publicUrl })
+          .select()
+          .single();
+        if (error) throw error;
+        setOwnMemberId(inserted.id);
+      }
+      setOwnFotoUrl(data.publicUrl);
     } catch (e) {
       setAvatarError(e.message || "Foto konnte nicht hochgeladen werden.");
     } finally {
@@ -740,7 +758,7 @@ function MitgliederApp({ session }) {
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
           </div>
         </div>
 
@@ -1295,9 +1313,9 @@ function MitgliederApp({ session }) {
               </div>
             )}
 
-            {isSuperAdmin && !formIsChild && (
+            {isElevatedForMitglieder && !formIsChild && (
               <div className="mb-3">
-                <label className="text-xs font-medium block mb-1.5">Gruppen (nur für Superadmin sichtbar/änderbar)</label>
+                <label className="text-xs font-medium block mb-1.5">Gruppen</label>
                 <div className="flex flex-wrap gap-1.5">
                   {sortedBereiche.map((b) => {
                     const active = formBereiche.includes(b.key);
@@ -1338,7 +1356,7 @@ function MitgliederApp({ session }) {
             <div className="flex items-center gap-3 mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
               <div className="relative flex-shrink-0">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-white overflow-hidden" style={{ backgroundColor: INK }}>
-                  {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}
+                  {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
                 </div>
                 <label className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer" style={{ backgroundColor: INK, border: "2px solid #E4E1D3" }}>
                   <Pencil size={10} color="#fff" />

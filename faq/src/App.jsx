@@ -259,7 +259,7 @@ function FaqApp({ session }) {
 
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="sm:max-w-2xl mx-auto sm:border-x" style={{ borderColor: "#E4E1D3" }}>
+      <div className="sm:max-w-2xl mx-auto sm:border-x lg:max-w-none lg:w-2/3" style={{ borderColor: "#E4E1D3" }}>
         <div className="px-5 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/faq/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />

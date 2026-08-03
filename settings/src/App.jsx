@@ -404,7 +404,7 @@ function SettingsApp({ session }) {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
-      <div className="max-w-3xl mx-auto lg:max-w-none lg:mx-0 lg:px-8 px-4 sm:px-6 py-5">
+      <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <img src="/settings/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />

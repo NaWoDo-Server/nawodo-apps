@@ -621,7 +621,7 @@ function MitgliederApp({ session }) {
 
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="max-w-3xl mx-auto lg:max-w-none lg:mx-0 lg:px-8">
+      <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto">
         <div className="px-5 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/mitglieder/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />

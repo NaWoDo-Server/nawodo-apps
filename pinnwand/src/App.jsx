@@ -347,7 +347,6 @@ function PinnwandApp({ session }) {
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
-            <button onClick={openNewForm} className="w-9 h-9 rounded-full flex items-center justify-center text-white flex-shrink-0" style={{ backgroundColor: INK }}><Plus size={18} /></button>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0" style={{ backgroundColor: INK }}>{initial}</button>
           </div>
         </div>
@@ -391,16 +390,16 @@ function PinnwandApp({ session }) {
               </div>
             </div>
 
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-4 flex items-center justify-between">
               <button
-                onClick={() => setShowArchive(false)}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ backgroundColor: !showArchive ? INK : "transparent", color: !showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${!showArchive ? INK : BORDER_SOFT}` }}
+                onClick={openNewForm}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white"
+                style={{ backgroundColor: INK }}
               >
-                Aktuell
+                <Plus size={14} /> Neuer Beitrag
               </button>
               <button
-                onClick={() => setShowArchive(true)}
+                onClick={() => setShowArchive((v) => !v)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
                 style={{ backgroundColor: showArchive ? INK : "transparent", color: showArchive ? "#fff" : INK_SOFT, border: `1.5px solid ${showArchive ? INK : BORDER_SOFT}` }}
               >

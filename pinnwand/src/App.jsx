@@ -339,7 +339,7 @@ function PinnwandApp({ session }) {
 
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto lg:max-w-none lg:mx-0 lg:px-8">
         <div className="px-4 pt-6 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/pinnwand/logo-nawodo.png" alt="NaWoDo" className="h-8 object-contain" />
@@ -407,9 +407,9 @@ function PinnwandApp({ session }) {
               </button>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
               {visiblePosts.length === 0 && (
-                <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
+                <div className="col-span-full text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
                   <p className="text-sm" style={{ color: INK_SOFT }}>{showArchive ? "Keine archivierten Beiträge." : "Noch keine Beiträge."}</p>
                 </div>
               )}

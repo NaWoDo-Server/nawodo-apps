@@ -397,21 +397,20 @@ function BulldozerApp({ session }) {
 
   function ImgButton({ onClick, src, alt, sub }) {
     return (
-      <button
-        onClick={onClick}
-        className="w-full max-w-[130px] mx-auto rounded-xl overflow-hidden mb-3 block"
-        style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
-      >
-        <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <button
+          onClick={onClick}
+          className="w-full max-w-[130px] rounded-xl overflow-hidden block"
+          style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
+        >
+          <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
+        </button>
         {sub && (
-          <span
-            className="block text-xs font-semibold text-white py-1"
-            style={{ backgroundColor: ORANGE }}
-          >
+          <span className="text-xs font-semibold" style={{ color: INK }}>
             {sub}
           </span>
         )}
-      </button>
+      </div>
     );
   }
 
@@ -501,7 +500,7 @@ function BulldozerApp({ session }) {
               onClick={() => startLevel(continueIndex)}
               src="/bulldozer/btn-weiter.png"
               alt="Weiterspielen"
-              sub={highestSolved === -1 ? undefined : `Level ${continueIndex + 1}`}
+              sub={highestSolved === -1 ? undefined : `Lvl ${continueIndex + 1}`}
             />
             <ImgButton onClick={() => setScreen("leaderboard")} src="/bulldozer/btn-highscore.png" alt="Highscore" />
 

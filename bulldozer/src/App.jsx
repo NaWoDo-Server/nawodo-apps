@@ -611,10 +611,10 @@ function BulldozerApp({ session }) {
                   onChange={(e) => setCodeInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && jumpToCode()}
                   placeholder="Code…"
-                  className="flex-1 min-w-0 rounded-lg px-1.5 py-1 lg:py-1.5 text-[10px] lg:text-xs border uppercase"
+                  className="flex-1 min-w-0 h-7 lg:h-9 rounded-lg px-1.5 text-[10px] lg:text-xs border uppercase"
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
-                <button onClick={jumpToCode} className="flex-shrink-0">
+                <button onClick={jumpToCode} className="flex-shrink-0 h-7 lg:h-9">
                   <img src="/bulldozer/btn-los.png" alt="Los" className="h-full w-auto block" style={{ imageRendering: "pixelated" }} />
                 </button>
               </div>
@@ -622,7 +622,7 @@ function BulldozerApp({ session }) {
               {isSuperAdmin && (
                 <button
                   onClick={() => setShowLevelTable(true)}
-                  className="block mx-auto mt-3 rounded-lg px-4 py-1.5 lg:px-6 lg:py-2.5 text-xs lg:text-sm font-semibold"
+                  className="flex items-center justify-center mx-auto mt-3 h-7 lg:h-9 rounded-lg px-4 lg:px-6 text-xs lg:text-sm font-semibold"
                   style={{ backgroundColor: "transparent", border: `1px solid ${BORDER_SOFT}`, color: INK_SOFT }}
                 >
                   Levelcode-Tabelle

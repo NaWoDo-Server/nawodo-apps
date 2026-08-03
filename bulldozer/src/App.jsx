@@ -604,14 +604,14 @@ function BulldozerApp({ session }) {
             />
             <ImgButton onClick={() => setScreen("leaderboard")} src="/bulldozer/btn-highscore.png" alt="Highscore" />
 
-            <div className="w-full max-w-[260px] lg:max-w-[420px] mt-2">
-              <div className="flex gap-2 lg:gap-3">
+            <div className="w-full max-w-[130px] lg:max-w-[210px] mt-2">
+              <div className="flex gap-1 lg:gap-1.5">
                 <input
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && jumpToCode()}
-                  placeholder="Level-Code…"
-                  className="flex-1 rounded-lg px-3 py-2 lg:py-3 text-xs lg:text-base border uppercase"
+                  placeholder="Code…"
+                  className="flex-1 min-w-0 rounded-lg px-1.5 py-1 lg:py-1.5 text-[10px] lg:text-xs border uppercase"
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
                 <button onClick={jumpToCode} className="flex-shrink-0">

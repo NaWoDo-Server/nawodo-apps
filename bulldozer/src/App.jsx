@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import {
-  Loader2, AlertCircle, X, Pencil, RotateCcw, Undo2, Trophy,
+  Home, Loader2, AlertCircle, X, Pencil, RotateCcw, Undo2, Trophy,
   ChevronLeft, ChevronUp, ChevronDown, ChevronRight, KeyRound,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
@@ -578,6 +578,7 @@ function BulldozerApp({ session }) {
             <h1 className="font-bold text-lg">Bulldozer</h1>
           </div>
           <div className="flex items-center gap-2">
+            <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
               {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
             </button>

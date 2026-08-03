@@ -581,14 +581,14 @@ function MitgliederApp({ session }) {
                   key={key}
                   onClick={() => setTypeFilter(key)}
                   className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: typeFilter === key ? INK : "transparent", color: typeFilter === key ? "#fff" : INK_SOFT }}
+                  style={{ backgroundColor: typeFilter === key ? "#fff" : "transparent", color: typeFilter === key ? INK : INK_SOFT }}
                 >
                   {label}
                 </button>
               ))}
             </div>
 
-            <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="mb-4 flex items-center gap-2">
               <button onClick={openNewFlow} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: INK }}>
                 <Plus size={14} /> Neuer Eintrag
               </button>

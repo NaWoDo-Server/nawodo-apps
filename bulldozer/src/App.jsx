@@ -214,6 +214,7 @@ function BulldozerApp({ session }) {
   const [startedAt, setStartedAt] = useState(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [won, setWon] = useState(false);
+  const [facing, setFacing] = useState("right");
   const [saveError, setSaveError] = useState("");
 
   const [codeInput, setCodeInput] = useState("");
@@ -244,6 +245,11 @@ function BulldozerApp({ session }) {
     return [m.vorname, m.nachname].filter(Boolean).join(" ").trim() || "Unbekannt";
   }
 
+  const ownSolvedIndices = useMemo(() => scores.filter((s) => s.user_id === user.id).map((s) => s.level_index), [scores, user.id]);
+  const highestSolved = ownSolvedIndices.length ? Math.max(...ownSolvedIndices) : -1;
+  const allSolved = highestSolved >= LEVELS.length - 1;
+  const continueIndex = Math.min(highestSolved + 1, LEVELS.length - 1);
+
   const level = LEVELS[levelIndex];
   const parsed = useMemo(() => parseLevel(level), [levelIndex]);
 
@@ -260,6 +266,7 @@ function BulldozerApp({ session }) {
     setStartedAt(Date.now());
     setElapsedMs(0);
     setWon(false);
+    setFacing("right");
     setSaveError("");
     setScreen("game");
   }
@@ -299,6 +306,7 @@ function BulldozerApp({ session }) {
     setHistory((h) => [...h, gameState]);
     setMoves(newMoves);
     setGameState(next);
+    setFacing(dir);
     if (isWin(parsed, next.boxes)) {
       const finalTime = startedAt ? Date.now() - startedAt : elapsedMs;
       setElapsedMs(finalTime);
@@ -358,6 +366,33 @@ function BulldozerApp({ session }) {
 
   const cellPx = "clamp(28px, 10vw, 46px)";
 
+  // Fantasievolle, komplett selbst gestaltete Optik (kein Original-Artwork):
+  // unregelmaessige "Felsbrocken" als Kisten, ein kleines eigenes Bulldozer-Symbol
+  // als Spielfigur, das sich in Bewegungsrichtung dreht.
+  const ROCK_SHAPES = [
+    "42% 58% 60% 40% / 45% 45% 55% 55%",
+    "55% 45% 45% 55% / 55% 40% 60% 45%",
+    "48% 52% 40% 60% / 40% 55% 45% 60%",
+  ];
+
+  function rockShapeFor(x, y) {
+    return ROCK_SHAPES[(x * 31 + y * 17) % ROCK_SHAPES.length];
+  }
+
+  const FACING_DEG = { right: 0, down: 90, left: 180, up: 270 };
+
+  function BulldozerIcon({ deg }) {
+    return (
+      <svg viewBox="0 0 24 24" width="72%" height="72%" style={{ transform: `rotate(${deg}deg)` }}>
+        <g fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 16h1M3 16V9h9l3 4h4a2 2 0 0 1 2 2v1" />
+          <path d="M13 9V6h3" />
+          <path d="M4 16a2.5 2.5 0 0 0 5 0M15 16a2.5 2.5 0 0 0 5 0" />
+        </g>
+      </svg>
+    );
+  }
+
   function renderGrid() {
     if (!gameState) return null;
     const cells = [];
@@ -368,21 +403,37 @@ function BulldozerApp({ session }) {
         const isTarget = parsed.targets.has(key);
         const isBox = gameState.boxes.has(key);
         const isPlayer = gameState.player[0] === x && gameState.player[1] === y;
-        let bg = "#fff";
+        let bg = "#F1EFE6";
         let content = null;
         if (isWall) {
           bg = "#8B7355";
         } else {
-          bg = "#F1EFE6";
+          if (isTarget && !isBox) {
+            content = <div className="rounded-full" style={{ width: "38%", height: "38%", border: `2.5px solid ${TEAL}`, backgroundColor: `${TEAL}1A` }} />;
+          }
           if (isBox) {
-            bg = isTarget ? GREEN : "#A9764C";
-            content = <div className="w-full h-full rounded-md" style={{ backgroundColor: bg, border: `2px solid ${isTarget ? "#1F5E3A" : "#7A5334"}` }} />;
-            bg = "#F1EFE6";
-          } else if (isTarget) {
-            content = <div className="rounded-full" style={{ width: "35%", height: "35%", border: `2.5px solid ${TEAL}` }} />;
+            const onTarget = isTarget;
+            content = (
+              <div
+                style={{
+                  width: "78%",
+                  height: "78%",
+                  borderRadius: rockShapeFor(x, y),
+                  background: onTarget
+                    ? "linear-gradient(155deg, #4FA06A, #1F5E3A)"
+                    : "linear-gradient(155deg, #B78A5E, #7A5334)",
+                  border: `2px solid ${onTarget ? "#164A2C" : "#5C3D24"}`,
+                  boxShadow: "inset -3px -3px 0 rgba(0,0,0,0.15), inset 2px 2px 0 rgba(255,255,255,0.15)",
+                }}
+              />
+            );
           }
           if (isPlayer) {
-            content = <div className="rounded-full" style={{ width: "60%", height: "60%", backgroundColor: ORANGE, border: "2px solid #8C4E1E" }} />;
+            content = (
+              <div className="rounded-full flex items-center justify-center" style={{ width: "82%", height: "82%", backgroundColor: ORANGE, border: "2px solid #8C4E1E" }}>
+                <BulldozerIcon deg={FACING_DEG[facing] ?? 0} />
+              </div>
+            );
           }
         }
         cells.push(
@@ -438,6 +489,19 @@ function BulldozerApp({ session }) {
 
         {screen === "select" && (
           <>
+            <div className="mb-4 rounded-xl p-4 text-center" style={{ backgroundColor: ORANGE }}>
+              <p className="text-xs font-semibold text-white/80 mb-1">
+                {highestSolved === -1 ? "Noch nicht gestartet" : allSolved ? "Alles geschafft!" : `Fortschritt: ${highestSolved + 1} / ${LEVELS.length} Level`}
+              </p>
+              <button onClick={() => startLevel(continueIndex)} className="w-full rounded-lg py-3 font-semibold text-sm" style={{ backgroundColor: "#fff", color: ORANGE }}>
+                {highestSolved === -1 ? "Los geht's – Level 1" : allSolved ? `Nochmal spielen – Level ${continueIndex + 1}` : `Weiterspielen – Level ${continueIndex + 1}`}
+              </button>
+            </div>
+
+            <button onClick={() => setScreen("leaderboard")} className="w-full mb-4 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK }}>
+              <Trophy size={15} style={{ color: ORANGE }} /> Rangliste ansehen
+            </button>
+
             <div className="mb-4 p-3 rounded-lg flex gap-2" style={{ backgroundColor: "#E9E6D9" }}>
               <input
                 value={codeInput}

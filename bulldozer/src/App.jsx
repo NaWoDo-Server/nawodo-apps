@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Home, Loader2, AlertCircle, X, Pencil, RotateCcw, Undo2, Trophy,
-  ChevronLeft, ChevronUp, ChevronDown, ChevronRight, KeyRound,
+  ChevronLeft, ChevronUp, ChevronDown, ChevronRight, KeyRound, HelpCircle,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { LEVELS, levelCode, findLevelIndexByCode } from "./levels.js";
@@ -11,6 +11,7 @@ const INK = "#2B2B26";
 const INK_SOFT = "#6B6A61";
 const BORDER_SOFT = "#D8D5C7";
 const ORANGE = "#C9752F";
+const LIGHT_GRAY = "#B7B4A5";
 const GREEN = "#2E7D4F";
 const TEAL = "#3E8E7E";
 
@@ -143,6 +144,7 @@ function BulldozerApp({ session }) {
   }, [user.id]);
 
   const [showAccount, setShowAccount] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -482,6 +484,7 @@ function BulldozerApp({ session }) {
             <h1 className="font-bold text-lg">Bulldozer</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowHelp(true)} className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><HelpCircle size={16} style={{ color: INK_SOFT }} /></button>
             <button onClick={() => setScreen("leaderboard")} className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Trophy size={16} style={{ color: INK_SOFT }} /></button>
             <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
@@ -566,13 +569,13 @@ function BulldozerApp({ session }) {
             {won && (
               <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
                 <div className="w-full max-w-sm rounded-2xl p-6 text-center" style={{ backgroundColor: PAPER }}>
-                  <Trophy className="mx-auto mb-2" size={28} style={{ color: ORANGE }} />
+                  <Trophy className="mx-auto mb-2" size={28} style={{ color: LIGHT_GRAY }} />
                   <h2 className="font-bold text-lg mb-1">Level geschafft!</h2>
                   <p className="text-sm mb-4" style={{ color: INK_SOFT }}>{moves} Züge · {formatTime(elapsedMs)} · Code: {levelCode(levelIndex)}</p>
                   {saveError && <p className="text-xs mb-3" style={{ color: "#A13D3D" }}>{saveError}</p>}
                   <div className="flex flex-col gap-2">
                     {levelIndex < LEVELS.length - 1 && (
-                      <button onClick={() => startLevel(levelIndex + 1)} className="w-full rounded-lg py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: ORANGE }}>
+                      <button onClick={() => startLevel(levelIndex + 1)} className="w-full rounded-lg py-2.5 text-sm font-semibold" style={{ backgroundColor: LIGHT_GRAY, color: INK }}>
                         Nächstes Level
                       </button>
                     )}
@@ -658,6 +661,47 @@ function BulldozerApp({ session }) {
           </div>
         )}
       </div>
+
+      {showHelp && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowHelp(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">So wird gespielt</h2>
+              <button onClick={() => setShowHelp(false)}><X size={20} /></button>
+            </div>
+            <div className="text-sm space-y-3" style={{ color: INK }}>
+              <p>
+                <strong>Ziel:</strong> Schiebe mit deinem Bulldozer alle Steine auf die markierten
+                Zielfelder (rote Ringe). Sobald jeder Stein auf einem Zielfeld steht, ist das Level
+                geschafft.
+              </p>
+              <p>
+                <strong>Steuerung:</strong> Am Computer mit den Pfeiltasten, am Handy oder Tablet
+                mit den Pfeil-Buttons unter dem Spielfeld. Du kannst Steine nur schieben, nicht
+                ziehen – achte also darauf, dich nicht selbst einzusperren.
+              </p>
+              <p>
+                <strong>Rückgängig &amp; Neustart:</strong> Mit dem Rückgängig-Button machst du
+                deinen letzten Zug rückgängig, mit Neustart beginnst du das Level von vorne.
+              </p>
+              <p>
+                <strong>Level-Codes:</strong> Jedes Level hat einen kurzen Code (z. B. bei
+                „Level geschafft“ oder oben im Spiel zu sehen). Damit kannst du direkt zu einem
+                Level springen oder es mit anderen teilen.
+              </p>
+              <p>
+                <strong>Weiterspielen:</strong> Der Button „Weiter“ bringt dich immer zu deinem
+                zuletzt noch nicht gelösten Level – die Zahl daneben zeigt, welches Level das ist.
+              </p>
+              <p>
+                <strong>Highscore:</strong> In der Rangliste siehst du zwei Ansichten: „Gesamt“
+                zeigt, wer die meisten Level gelöst hat (bei Gleichstand zählt die schnellere
+                Gesamtzeit), „Pro Level“ zeigt die schnellste Zeit je Level.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAccount && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAccount(false); } }}>

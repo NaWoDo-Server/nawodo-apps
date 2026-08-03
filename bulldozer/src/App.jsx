@@ -366,31 +366,33 @@ function BulldozerApp({ session }) {
 
   const cellPx = "clamp(28px, 10vw, 46px)";
 
-  // Fantasievolle, komplett selbst gestaltete Optik (kein Original-Artwork):
-  // unregelmaessige "Felsbrocken" als Kisten, ein kleines eigenes Bulldozer-Symbol
-  // als Spielfigur, das sich in Bewegungsrichtung dreht.
-  const ROCK_SHAPES = [
-    "42% 58% 60% 40% / 45% 45% 55% 55%",
-    "55% 45% 45% 55% / 55% 40% 60% 45%",
-    "48% 52% 40% 60% / 40% 55% 45% 60%",
-  ];
+  // Eigenes Sprite-Sheet (von Lars beigesteuert, Weston Campbells eigenes
+  // "Bulldozer Monochrome"-Theme, mit seiner Erlaubnis) - 15 Kacheln a 32x32px,
+  // als ein Bild unter /bulldozer/theme.png ausgeliefert.
+  const THEME_TILE_COUNT = 15;
+  const THEME = {
+    wallBorder: 1,
+    wallObstacle: 3,
+    box: 8,
+    boxOnTarget: 9,
+    target: 10,
+    playerRight: 11,
+    playerUp: 12,
+    playerDown: 13,
+    playerLeft: 14,
+  };
+  const FLOOR_COLOR = "#808000";
+  const PLAYER_SPRITE = { right: THEME.playerRight, up: THEME.playerUp, down: THEME.playerDown, left: THEME.playerLeft };
 
-  function rockShapeFor(x, y) {
-    return ROCK_SHAPES[(x * 31 + y * 17) % ROCK_SHAPES.length];
-  }
-
-  const FACING_DEG = { right: 0, down: 90, left: 180, up: 270 };
-
-  function BulldozerIcon({ deg }) {
-    return (
-      <svg viewBox="0 0 24 24" width="72%" height="72%" style={{ transform: `rotate(${deg}deg)` }}>
-        <g fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 16h1M3 16V9h9l3 4h4a2 2 0 0 1 2 2v1" />
-          <path d="M13 9V6h3" />
-          <path d="M4 16a2.5 2.5 0 0 0 5 0M15 16a2.5 2.5 0 0 0 5 0" />
-        </g>
-      </svg>
-    );
+  function spriteStyle(index, extra) {
+    return {
+      backgroundImage: "url(/bulldozer/theme.png)",
+      backgroundSize: `${THEME_TILE_COUNT * 100}% 100%`,
+      backgroundPosition: `${(index / (THEME_TILE_COUNT - 1)) * 100}% 0`,
+      backgroundRepeat: "no-repeat",
+      imageRendering: "pixelated",
+      ...extra,
+    };
   }
 
   function renderGrid() {
@@ -403,41 +405,20 @@ function BulldozerApp({ session }) {
         const isTarget = parsed.targets.has(key);
         const isBox = gameState.boxes.has(key);
         const isPlayer = gameState.player[0] === x && gameState.player[1] === y;
-        let bg = "#F1EFE6";
+        let cellStyle = { width: cellPx, height: cellPx, backgroundColor: FLOOR_COLOR };
         let content = null;
         if (isWall) {
-          bg = "#8B7355";
-        } else {
-          if (isTarget && !isBox) {
-            content = <div className="rounded-full" style={{ width: "38%", height: "38%", border: `2.5px solid ${TEAL}`, backgroundColor: `${TEAL}1A` }} />;
-          }
-          if (isBox) {
-            const onTarget = isTarget;
-            content = (
-              <div
-                style={{
-                  width: "78%",
-                  height: "78%",
-                  borderRadius: rockShapeFor(x, y),
-                  background: onTarget
-                    ? "linear-gradient(155deg, #4FA06A, #1F5E3A)"
-                    : "linear-gradient(155deg, #B78A5E, #7A5334)",
-                  border: `2px solid ${onTarget ? "#164A2C" : "#5C3D24"}`,
-                  boxShadow: "inset -3px -3px 0 rgba(0,0,0,0.15), inset 2px 2px 0 rgba(255,255,255,0.15)",
-                }}
-              />
-            );
-          }
-          if (isPlayer) {
-            content = (
-              <div className="rounded-full flex items-center justify-center" style={{ width: "82%", height: "82%", backgroundColor: ORANGE, border: "2px solid #8C4E1E" }}>
-                <BulldozerIcon deg={FACING_DEG[facing] ?? 0} />
-              </div>
-            );
-          }
+          const isBorder = x === 0 || y === 0 || x === parsed.width - 1 || y === parsed.height - 1;
+          cellStyle = { width: cellPx, height: cellPx, ...spriteStyle(isBorder ? THEME.wallBorder : THEME.wallObstacle) };
+        } else if (isPlayer) {
+          content = <div style={{ width: "88%", height: "88%", ...spriteStyle(PLAYER_SPRITE[facing] ?? THEME.playerRight) }} />;
+        } else if (isBox) {
+          content = <div style={{ width: "86%", height: "86%", ...spriteStyle(isTarget ? THEME.boxOnTarget : THEME.box) }} />;
+        } else if (isTarget) {
+          content = <div style={{ width: "58%", height: "58%", ...spriteStyle(THEME.target) }} />;
         }
         cells.push(
-          <div key={key} className="flex items-center justify-center" style={{ width: cellPx, height: cellPx, backgroundColor: bg }}>
+          <div key={key} className="flex items-center justify-center" style={cellStyle}>
             {content}
           </div>
         );

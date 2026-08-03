@@ -297,7 +297,7 @@ function MitgliederApp({ session }) {
           id: null, user_id: u.id, created_by: null, is_child: false, isPlaceholder: true,
           vorname: u.name, nachname: "", anschrift: null, strasse: null, hausnummer: null, plz: null, wohnort: null, wohneinheit: null,
           email: u.email, telefon: null, handy: null, geburtstag: null, foto_url: null,
-          parent1_user_id: null, parent2_user_id: null,
+          parent1_user_id: null, parent2_user_id: null, related_user_id: null,
         };
       });
     const children = members.filter((m) => m.is_child);
@@ -329,6 +329,10 @@ function MitgliederApp({ session }) {
   function childrenOf(m) {
     if (!m.user_id) return [];
     return members.filter((c) => c.is_child && (c.parent1_user_id === m.user_id || c.parent2_user_id === m.user_id));
+  }
+  function relatedMemberOf(m) {
+    if (!m.related_user_id) return null;
+    return memberByUserId(m.related_user_id) || null;
   }
   function bereicheForMember(memberId) {
     if (!memberId) return [];
@@ -771,6 +775,11 @@ function MitgliederApp({ session }) {
 
                     <div className={`${isExpanded ? "block" : "hidden"} sm:block`}>
                       {m.is_child && <div className="text-xs mb-1" style={{ color: INK_SOFT }}>Kind{parents.length > 0 ? ` von ${parents.join(" & ")}` : ""}</div>}
+                      {!m.is_child && (m.mitgliedstyp === "gast" || m.mitgliedstyp === "bewohner") && relatedMemberOf(m) && (
+                        <div className="text-xs mb-1" style={{ color: INK_SOFT }}>
+                          {m.mitgliedstyp === "gast" ? "Gast von" : "Bewohner von"} {relatedMemberOf(m).vorname} {relatedMemberOf(m).nachname}
+                        </div>
+                      )}
                       {m.isPlaceholder && <div className="text-xs mb-1" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}
 
                       <div className="flex flex-col gap-1 mt-1 text-xs" style={{ color: INK_SOFT }}>
@@ -919,6 +928,14 @@ function MitgliederApp({ session }) {
                       ))}
                     </>
                   ) : "Kind"}
+                </div>
+              )}
+              {!profileMember.is_child && (profileMember.mitgliedstyp === "gast" || profileMember.mitgliedstyp === "bewohner") && relatedMemberOf(profileMember) && (
+                <div className="text-xs mt-1 flex flex-wrap items-center justify-center gap-1" style={{ color: INK_SOFT }}>
+                  {profileMember.mitgliedstyp === "gast" ? "Gast von" : "Bewohner von"}{" "}
+                  <button onClick={() => setProfileMember(relatedMemberOf(profileMember))} className="font-semibold underline" style={{ color: BLUE }}>
+                    {relatedMemberOf(profileMember).vorname} {relatedMemberOf(profileMember).nachname}
+                  </button>
                 </div>
               )}
               {profileMember.isPlaceholder && <div className="text-xs mt-1" style={{ color: "#C9752F" }}>Profil noch nicht ausgefüllt</div>}

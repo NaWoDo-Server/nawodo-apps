@@ -117,6 +117,7 @@ function SettingsApp({ session }) {
   const [newParent2UserId, setNewParent2UserId] = useState("");
   const [newChildLogin, setNewChildLogin] = useState(false);
   const [newMitgliedstyp, setNewMitgliedstyp] = useState("mitglied");
+  const [newRelatedUserId, setNewRelatedUserId] = useState("");
   const [newPerms, setNewPerms] = useState(() => Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
   const [savingCreate, setSavingCreate] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -364,6 +365,7 @@ function SettingsApp({ session }) {
     setNewParent2UserId("");
     setNewChildLogin(false);
     setNewMitgliedstyp("mitglied");
+    setNewRelatedUserId("");
     setNewPerms(Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
     setCreateError("");
   }
@@ -393,9 +395,13 @@ function SettingsApp({ session }) {
       const email = newEmail.trim().toLowerCase();
       if (!email || !email.includes("@")) return setCreateError("Bitte eine gültige Email-Adresse angeben.");
       if (!newPasswordCreate || newPasswordCreate.length < 6) return setCreateError("Passwort muss mindestens 6 Zeichen haben.");
+      if ((newMitgliedstyp === "gast" || newMitgliedstyp === "bewohner") && !newRelatedUserId) {
+        return setCreateError("Bitte angeben, zu welchem Mitglied diese Person gehört.");
+      }
       body.email = email;
       body.password = newPasswordCreate;
       body.app_permissions = newPerms;
+      body.related_user_id = newRelatedUserId || null;
     }
     setSavingCreate(true);
     try {
@@ -787,6 +793,18 @@ function SettingsApp({ session }) {
               </>
             ) : (
               <>
+                {(newMitgliedstyp === "gast" || newMitgliedstyp === "bewohner") && (
+                  <>
+                    <label className="text-xs font-medium block mb-1">Zugehöriges Mitglied</label>
+                    <select value={newRelatedUserId} onChange={(e) => setNewRelatedUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+                      <option value="">Bitte auswählen</option>
+                      {adultsForParent.map((m) => (
+                        <option key={m.user_id} value={m.user_id}>{m.vorname} {m.nachname}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs mb-3" style={{ color: INK_SOFT }}>* Zu welchem Mitglied gehört {newMitgliedstyp === "gast" ? "der Gast" : "der/die Bewohner:in"}?</p>
+                  </>
+                )}
                 <label className="text-xs font-medium block mb-1">Email</label>
                 <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
                 <label className="text-xs font-medium block mb-1">Startpasswort</label>

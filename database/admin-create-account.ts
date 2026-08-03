@@ -2,7 +2,8 @@
 // Nur für den Superadmin: legt einen neuen Login-Account (auth.users) über die offizielle
 // GoTrue-Admin-API an, oder ein Kind-Profil ohne Login (nur members-Tabelle), oder löscht
 // einen bestehenden Account inkl. seines Mitglieder-Profils vollständig (unwiderruflich).
-// POST { type: "account", email, password, vorname, nachname, mitgliedstyp, app_permissions } -> Login-Account anlegen
+// POST { type: "account", email, password, vorname, nachname, mitgliedstyp, related_user_id, app_permissions } -> Login-Account anlegen
+//   (related_user_id ist Pflicht, wenn mitgliedstyp "gast" oder "bewohner" ist - zu welchem Mitglied gehoert die Person)
 // POST { type: "child", vorname, nachname, parent1_user_id, parent2_user_id, mitgliedstyp } -> Kind-Profil anlegen (kein Login), mind. ein Elternteil noetig
 // POST { type: "toggle_admin", target_user_id, is_admin } -> globalen Admin-Status setzen/entfernen
 // POST { type: "set_password", target_user_id, password } -> neues Passwort fuer bestehenden Account setzen
@@ -270,12 +271,16 @@ Deno.serve(async (req) => {
     // --- Login-Account anlegen (offizielle GoTrue-Admin-API). ---
     const email = (body.email || "").trim().toLowerCase();
     const password = body.password || "";
+    const relatedUserId = body.related_user_id || null;
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "Bitte eine gültige Email-Adresse angeben." }, 400);
     }
     if (!password || password.length < 6) {
       return jsonResponse({ error: "Passwort muss mindestens 6 Zeichen haben." }, 400);
+    }
+    if ((mitgliedstyp === "gast" || mitgliedstyp === "bewohner") && !relatedUserId) {
+      return jsonResponse({ error: "Bitte angeben, zu welchem Mitglied diese Person gehört." }, 400);
     }
 
     const fullName = [vorname, nachname].filter(Boolean).join(" ");
@@ -310,6 +315,7 @@ Deno.serve(async (req) => {
         vorname,
         nachname,
         mitgliedstyp,
+        related_user_id: relatedUserId,
       }),
     });
 

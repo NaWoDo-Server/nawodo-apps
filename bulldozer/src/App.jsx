@@ -395,15 +395,22 @@ function BulldozerApp({ session }) {
     };
   }
 
-  function StoneButton({ onClick, children, sub }) {
+  function ImgButton({ onClick, src, alt, sub }) {
     return (
       <button
         onClick={onClick}
-        className="w-full max-w-[260px] mx-auto rounded-xl py-4 px-6 flex flex-col items-center justify-center gap-0.5 mb-3"
-        style={{ backgroundColor: ORANGE, boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
+        className="w-full max-w-[260px] mx-auto rounded-xl overflow-hidden mb-3 block"
+        style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
       >
-        <span className="font-bold text-base tracking-wide text-white">{children}</span>
-        {sub && <span className="text-xs font-semibold text-white">{sub}</span>}
+        <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
+        {sub && (
+          <span
+            className="block text-xs font-semibold text-white py-1"
+            style={{ backgroundColor: ORANGE }}
+          >
+            {sub}
+          </span>
+        )}
       </button>
     );
   }
@@ -489,11 +496,14 @@ function BulldozerApp({ session }) {
               className="w-full max-w-[320px] mb-6 px-4"
               style={{ imageRendering: "pixelated" }}
             />
-            <StoneButton onClick={() => startLevel(0)}>SPIELEN</StoneButton>
-            <StoneButton onClick={() => startLevel(continueIndex)} sub={highestSolved === -1 ? undefined : `Level ${continueIndex + 1}`}>
-              WEITERSPIELEN
-            </StoneButton>
-            <StoneButton onClick={() => setScreen("leaderboard")}>HIGHSCORE</StoneButton>
+            <ImgButton onClick={() => startLevel(0)} src="/bulldozer/btn-start.png" alt="Spielen" />
+            <ImgButton
+              onClick={() => startLevel(continueIndex)}
+              src="/bulldozer/btn-weiter.png"
+              alt="Weiterspielen"
+              sub={highestSolved === -1 ? undefined : `Level ${continueIndex + 1}`}
+            />
+            <ImgButton onClick={() => setScreen("leaderboard")} src="/bulldozer/btn-highscore.png" alt="Highscore" />
 
             <div className="w-full max-w-[260px] mt-2">
               <div className="flex gap-2">
@@ -505,8 +515,8 @@ function BulldozerApp({ session }) {
                   className="flex-1 rounded-lg px-3 py-2 text-xs border uppercase"
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
-                <button onClick={jumpToCode} className="px-3 py-2 rounded-lg text-xs font-semibold text-white flex items-center gap-1" style={{ backgroundColor: ORANGE }}>
-                  <KeyRound size={12} /> Los
+                <button onClick={jumpToCode} className="rounded-lg overflow-hidden flex-shrink-0" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}>
+                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-9 w-auto block" style={{ imageRendering: "pixelated" }} />
                 </button>
               </div>
               {codeError && <p className="text-xs mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}

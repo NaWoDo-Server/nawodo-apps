@@ -12,6 +12,67 @@ const SECTIONS = [
   { key: "app", label: "Rund um diese Seite", color: "#3E8E7E" },
 ];
 
+// Sentinel-Wert: Wenn eine FAQ-Antwort genau diesem Text entspricht, wird statt
+// des gespeicherten Texts eine live aus der Datenbank abgefragte Moderatoren-Liste
+// angezeigt (siehe <ModeratorList /> weiter unten).
+const DYNAMIC_MODERATORS_KEY = "__DYNAMIC_MODERATORS__";
+
+const APP_LIST = [
+  { key: "sharing", label: "Sharing" },
+  { key: "termine", label: "Termine" },
+  { key: "fahrtenbuch", label: "Fahrtenbuch" },
+  { key: "faq", label: "FAQ" },
+  { key: "pinnwand", label: "Pinnwand" },
+  { key: "mitglieder", label: "Mitglieder" },
+  { key: "workshop", label: "Workshop" },
+];
+
+function ModeratorList() {
+  const [rows, setRows] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [{ data: mods }, { data: members }] = await Promise.all([
+        supabase.from("app_moderators").select("user_id, app_key"),
+        supabase.from("members").select("user_id, vorname, nachname"),
+      ]);
+      if (!alive) return;
+      const nameFor = (uid) => {
+        const m = (members || []).find((mm) => mm.user_id === uid);
+        if (!m) return "Unbekannt";
+        return [m.vorname, m.nachname].filter(Boolean).join(" ").trim() || "Unbekannt";
+      };
+      const byApp = {};
+      (mods || []).forEach((mo) => {
+        if (!byApp[mo.app_key]) byApp[mo.app_key] = [];
+        byApp[mo.app_key].push(nameFor(mo.user_id));
+      });
+      setRows(APP_LIST.map((a) => ({ key: a.key, label: a.label, names: byApp[a.key] || [] })));
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (rows === null) {
+    return (
+      <div className="flex items-center gap-2 text-sm" style={{ color: INK_SOFT }}>
+        <Loader2 size={14} className="animate-spin" /> Wird geladen…
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {rows.map((r) => (
+        <div key={r.key} className="flex items-center justify-between gap-3 text-sm">
+          <span className="font-medium">{r.label}</span>
+          <span style={{ color: r.names.length ? INK : INK_SOFT }}>{r.names.length ? r.names.join(", ") : "– kein Moderator"}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   if (configMissing) {
     return (
@@ -329,7 +390,7 @@ function FaqApp({ session }) {
                         </button>
                         {open && (
                           <div className="px-3.5 pb-3.5 pt-0.5 text-sm whitespace-pre-wrap" style={{ color: INK_SOFT, borderTop: "1px solid #F1F0EA", marginTop: 0 }}>
-                            {e.answer}
+                            {e.answer === DYNAMIC_MODERATORS_KEY ? <ModeratorList /> : e.answer}
                           </div>
                         )}
                       </div>
@@ -374,7 +435,13 @@ function FaqApp({ session }) {
             <input value={formQuestion} onChange={(e) => setFormQuestion(e.target.value)} placeholder="z.B. Wie lautet das WLAN-Passwort?" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
 
             <label className="text-xs font-medium block mb-1">Antwort</label>
-            <textarea value={formAnswer} onChange={(e) => setFormAnswer(e.target.value)} placeholder="Antwort…" rows={4} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
+            {editingEntry && editingEntry.answer === DYNAMIC_MODERATORS_KEY ? (
+              <div className="w-full rounded-lg px-3 py-2.5 mb-3 text-xs" style={{ backgroundColor: "#E9E6D9", color: INK_SOFT }}>
+                Diese Antwort wird automatisch aus der aktuellen Moderatoren-Liste erzeugt und kann hier nicht als Text bearbeitet werden. Die Frage selbst kannst du oben trotzdem umbenennen.
+              </div>
+            ) : (
+              <textarea value={formAnswer} onChange={(e) => setFormAnswer(e.target.value)} placeholder="Antwort…" rows={4} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
+            )}
 
             {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
 

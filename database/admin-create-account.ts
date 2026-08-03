@@ -3,7 +3,7 @@
 // GoTrue-Admin-API an, oder ein Kind-Profil ohne Login (nur members-Tabelle), oder löscht
 // einen bestehenden Account inkl. seines Mitglieder-Profils vollständig (unwiderruflich).
 // POST { type: "account", email, password, vorname, nachname, mitgliedstyp, app_permissions } -> Login-Account anlegen
-// POST { type: "child", vorname, nachname, parent_user_id, mitgliedstyp } -> Kind-Profil anlegen (kein Login)
+// POST { type: "child", vorname, nachname, parent1_user_id, parent2_user_id, mitgliedstyp } -> Kind-Profil anlegen (kein Login), mind. ein Elternteil noetig
 // POST { type: "toggle_admin", target_user_id, is_admin } -> globalen Admin-Status setzen/entfernen
 // POST { type: "set_password", target_user_id, password } -> neues Passwort fuer bestehenden Account setzen
 // POST { type: "set_permission", target_user_id, app_key, allowed } -> App-Zugriff einzeln erlauben/sperren
@@ -190,9 +190,10 @@ Deno.serve(async (req) => {
     // --- Kind anlegen: nur ein Profil in der members-Tabelle - optional (individuell,
     // nicht jedes Kind braucht das) zusaetzlich mit eigenem Login. ---
     if (type === "child") {
-      const parentUserId = body.parent_user_id || null;
-      if (!parentUserId) {
-        return jsonResponse({ error: "Bitte einen Elternteil auswählen." }, 400);
+      const parent1UserId = body.parent1_user_id || body.parent_user_id || null;
+      const parent2UserId = body.parent2_user_id || null;
+      if (!parent1UserId && !parent2UserId) {
+        return jsonResponse({ error: "Bitte mindestens einen Elternteil (Vater oder Mutter) auswählen." }, 400);
       }
 
       let childUserId: string | null = null;
@@ -235,7 +236,8 @@ Deno.serve(async (req) => {
           nachname,
           is_child: true,
           created_by: callerId,
-          parent1_user_id: parentUserId,
+          parent1_user_id: parent1UserId,
+          parent2_user_id: parent2UserId,
           mitgliedstyp,
           ...(childUserId ? { user_id: childUserId } : {}),
         }),

@@ -113,6 +113,7 @@ function SettingsApp({ session }) {
   const [newEmail, setNewEmail] = useState("");
   const [newPasswordCreate, setNewPasswordCreate] = useState("");
   const [newParentUserId, setNewParentUserId] = useState("");
+  const [newParent2UserId, setNewParent2UserId] = useState("");
   const [newChildLogin, setNewChildLogin] = useState(false);
   const [newMitgliedstyp, setNewMitgliedstyp] = useState("mitglied");
   const [newPerms, setNewPerms] = useState(() => Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
@@ -318,6 +319,7 @@ function SettingsApp({ session }) {
     setNewEmail("");
     setNewPasswordCreate("");
     setNewParentUserId("");
+    setNewParent2UserId("");
     setNewChildLogin(false);
     setNewMitgliedstyp("mitglied");
     setNewPerms(Object.fromEntries(APP_LIST.map((a) => [a.key, true])));
@@ -334,8 +336,9 @@ function SettingsApp({ session }) {
       mitgliedstyp: newMitgliedstyp,
     };
     if (newType === "child") {
-      if (!newParentUserId) return setCreateError("Bitte einen Elternteil auswählen.");
-      body.parent_user_id = newParentUserId;
+      if (!newParentUserId && !newParent2UserId) return setCreateError("Bitte mindestens einen Elternteil (Vater oder Mutter) auswählen.");
+      body.parent1_user_id = newParentUserId || null;
+      body.parent2_user_id = newParent2UserId || null;
       if (newChildLogin) {
         const email = newEmail.trim().toLowerCase();
         if (!email || !email.includes("@")) return setCreateError("Bitte eine gültige Email-Adresse angeben.");
@@ -673,13 +676,22 @@ function SettingsApp({ session }) {
 
             {newType === "child" ? (
               <>
-                <label className="text-xs font-medium block mb-1">Elternteil</label>
-                <select value={newParentUserId} onChange={(e) => setNewParentUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
-                  <option value="">Bitte auswählen…</option>
+                <label className="text-xs font-medium block mb-1">Vater</label>
+                <select value={newParentUserId} onChange={(e) => setNewParentUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+                  <option value="">Keine Angabe</option>
                   {adultsForParent.map((m) => (
                     <option key={m.user_id} value={m.user_id}>{m.vorname} {m.nachname}</option>
                   ))}
                 </select>
+
+                <label className="text-xs font-medium block mb-1">Mutter</label>
+                <select value={newParent2UserId} onChange={(e) => setNewParent2UserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+                  <option value="">Keine Angabe</option>
+                  {adultsForParent.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>{m.vorname} {m.nachname}</option>
+                  ))}
+                </select>
+                <p className="text-xs mb-3" style={{ color: INK_SOFT }}>* Mindestens Vater oder Mutter muss ausgewählt sein.</p>
 
                 <label className="flex items-center gap-2 text-sm mb-3">
                   <input type="checkbox" checked={newChildLogin} onChange={(e) => setNewChildLogin(e.target.checked)} />

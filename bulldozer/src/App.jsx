@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import {
-  Home, Loader2, AlertCircle, X, Pencil, RotateCcw, Undo2, Trophy,
-  ChevronLeft, ChevronUp, ChevronDown, ChevronRight, KeyRound, HelpCircle,
+  Loader2, AlertCircle, X, Pencil, RotateCcw, Undo2, Trophy,
+  ChevronLeft, ChevronUp, ChevronDown, ChevronRight, KeyRound,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 import { LEVELS, levelCode, findLevelIndexByCode } from "./levels.js";
@@ -225,8 +225,6 @@ function BulldozerApp({ session }) {
   const [scores, setScores] = useState([]);
   const [members, setMembers] = useState([]);
   const [loadingScores, setLoadingScores] = useState(true);
-  const [leaderboardTab, setLeaderboardTab] = useState("overall"); // "overall" | "perlevel"
-  const [perLevelIndex, setPerLevelIndex] = useState(0);
 
   useEffect(() => { loadScores(); }, []);
 
@@ -387,10 +385,6 @@ function BulldozerApp({ session }) {
     return Object.values(byUser).sort((a, b) => b.levelsSolved - a.levelsSolved || a.totalTimeMs - b.totalTimeMs);
   }, [scores]);
 
-  const perLevelRanking = useMemo(() => {
-    return scores.filter((s) => s.level_index === perLevelIndex).sort((a, b) => a.best_time_ms - b.best_time_ms);
-  }, [scores, perLevelIndex]);
-
   // --- Rendering ---
 
   const cellPx = `${cellSize}px`;
@@ -511,9 +505,6 @@ function BulldozerApp({ session }) {
             <h1 className="font-bold text-lg">Bulldozer</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowHelp(true)} className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><HelpCircle size={16} style={{ color: INK_SOFT }} /></button>
-            <button onClick={() => setScreen("leaderboard")} className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Trophy size={16} style={{ color: INK_SOFT }} /></button>
-            <a href="/" className="p-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} style={{ color: INK_SOFT }} /></a>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
               {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
             </button>
@@ -528,6 +519,7 @@ function BulldozerApp({ session }) {
               className="w-full max-w-[320px] mb-6 px-4"
               style={{ imageRendering: "pixelated" }}
             />
+            <ImgButton onClick={() => setShowHelp(true)} src="/bulldozer/btn-anleitung.png" alt="Spielanleitung" />
             <ImgButton onClick={() => startLevel(0)} src="/bulldozer/btn-start.png" alt="Spielen" />
             <ImgButton
               onClick={() => startLevel(continueIndex)}
@@ -623,69 +615,24 @@ function BulldozerApp({ session }) {
 
         {screen === "leaderboard" && (
           <div>
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setLeaderboardTab("overall")}
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold"
-                style={{ backgroundColor: leaderboardTab === "overall" ? ORANGE : "transparent", color: leaderboardTab === "overall" ? "#fff" : INK, border: `1.5px solid ${leaderboardTab === "overall" ? ORANGE : BORDER_SOFT}` }}
-              >
-                Gesamt
-              </button>
-              <button
-                onClick={() => setLeaderboardTab("perlevel")}
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold"
-                style={{ backgroundColor: leaderboardTab === "perlevel" ? ORANGE : "transparent", color: leaderboardTab === "perlevel" ? "#fff" : INK, border: `1.5px solid ${leaderboardTab === "perlevel" ? ORANGE : BORDER_SOFT}` }}
-              >
-                Pro Level
-              </button>
-            </div>
-
             {loadingScores ? (
               <div className="flex items-center justify-center py-10"><Loader2 className="animate-spin" size={22} style={{ color: INK_SOFT }} /></div>
-            ) : leaderboardTab === "overall" ? (
-              overallRanking.length === 0 ? (
-                <p className="text-sm text-center py-8" style={{ color: INK_SOFT }}>Noch keine Ergebnisse – sei der/die Erste!</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {overallRanking.map((r, i) => (
-                    <div key={r.user_id} className="rounded-xl p-3.5 flex items-center justify-between" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ backgroundColor: i === 0 ? "#C9752F1A" : "#E4E1D3", color: i === 0 ? ORANGE : INK_SOFT }}>{i + 1}</div>
-                        <div className="font-semibold text-sm truncate">{nameFor(r.user_id)}</div>
-                      </div>
-                      <div className="text-xs text-right flex-shrink-0" style={{ color: INK_SOFT }}>
-                        {r.levelsSolved} / {LEVELS.length} Level<br />Gesamtzeit {formatTime(r.totalTimeMs)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
+            ) : overallRanking.length === 0 ? (
+              <p className="text-sm text-center py-8" style={{ color: INK_SOFT }}>Noch keine Ergebnisse – sei der/die Erste!</p>
             ) : (
-              <>
-                <select
-                  value={perLevelIndex}
-                  onChange={(e) => setPerLevelIndex(Number(e.target.value))}
-                  className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border"
-                  style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
-                >
-                  {LEVELS.map((lvl, i) => <option key={i} value={i}>{i + 1}. {lvl.title}</option>)}
-                </select>
-                {perLevelRanking.length === 0 ? (
-                  <p className="text-sm text-center py-8" style={{ color: INK_SOFT }}>Für dieses Level gibt's noch keine Bestzeit.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {perLevelRanking.map((r, i) => (
-                      <div key={r.user_id} className="rounded-xl p-3.5 flex items-center justify-between" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ backgroundColor: i === 0 ? "#C9752F1A" : "#E4E1D3", color: i === 0 ? ORANGE : INK_SOFT }}>{i + 1}</div>
-                          <div className="font-semibold text-sm truncate">{nameFor(r.user_id)}</div>
-                        </div>
-                        <div className="text-xs text-right flex-shrink-0" style={{ color: INK_SOFT }}>{formatTime(r.best_time_ms)} · {r.best_moves} Züge</div>
-                      </div>
-                    ))}
+              <div className="flex flex-col gap-2 mx-auto" style={{ maxWidth: "50%" }}>
+                {overallRanking.map((r, i) => (
+                  <div key={r.user_id} className="rounded-xl p-3.5 flex items-center justify-between" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold" style={{ backgroundColor: i === 0 ? "#C9752F1A" : "#E4E1D3", color: i === 0 ? ORANGE : INK_SOFT }}>{i + 1}</div>
+                      <div className="font-semibold text-sm truncate">{nameFor(r.user_id)}</div>
+                    </div>
+                    <div className="text-xs text-right flex-shrink-0" style={{ color: INK_SOFT }}>
+                      {r.levelsSolved} / {LEVELS.length} Level<br />Gesamtzeit {formatTime(r.totalTimeMs)}
+                    </div>
                   </div>
-                )}
-              </>
+                ))}
+              </div>
             )}
           </div>
         )}

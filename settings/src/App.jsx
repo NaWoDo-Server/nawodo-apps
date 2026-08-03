@@ -101,6 +101,9 @@ function SettingsApp({ session }) {
   const [savingAction, setSavingAction] = useState(false);
 
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [pendingIsAdmin, setPendingIsAdmin] = useState(false);
+  const [pendingMods, setPendingMods] = useState([]);
+  const [pendingDenied, setPendingDenied] = useState([]);
   const [newPassword, setNewPassword] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -166,6 +169,13 @@ function SettingsApp({ session }) {
   const selectedUser = allUsers.find((u) => u.id === selectedUserId) || null;
   const selectedMember = selectedUserId ? memberFor(selectedUserId) : null;
 
+  useEffect(() => {
+    if (selectedUserId) {
+      const u = allUsers.find((x) => x.id === selectedUserId);
+      if (u) loadPendingFor(u);
+    }
+  }, [selectedUserId]);
+
   async function callAdminFn(body, method = "POST") {
     const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
       method,
@@ -181,46 +191,54 @@ function SettingsApp({ session }) {
     return data;
   }
 
-  async function handleToggleAdmin(targetUserId, nextIsAdmin) {
-    setActionError("");
-    setSavingAction(true);
-    try {
-      await callAdminFn({ type: "toggle_admin", target_user_id: targetUserId, is_admin: nextIsAdmin });
-      await loadAll();
-    } catch (e) {
-      setActionError(e.message || "Admin-Status konnte nicht geändert werden.");
-    } finally {
-      setSavingAction(false);
-    }
+  function loadPendingFor(u) {
+    if (!u) return;
+    setPendingIsAdmin(u.is_admin === true);
+    setPendingMods(modAppsFor(u.id));
+    setPendingDenied(deniedAppsFor(u.id));
   }
 
-  async function handleToggleModerator(targetUserId, appKey, nextValue) {
+  async function handleApplyRoles() {
+    if (!selectedUser) return;
     setActionError("");
     setSavingAction(true);
     try {
-      if (nextValue) {
-        const { error } = await supabase.from("app_moderators").insert({ user_id: targetUserId, app_key: appKey });
+      const currentIsAdmin = selectedUser.is_admin === true;
+      if (pendingIsAdmin !== currentIsAdmin) {
+        await callAdminFn({ type: "toggle_admin", target_user_id: selectedUser.id, is_admin: pendingIsAdmin });
+      }
+      const currentMods = modAppsFor(selectedUser.id);
+      const toAdd = pendingMods.filter((k) => !currentMods.includes(k));
+      const toRemove = currentMods.filter((k) => !pendingMods.includes(k));
+      for (const k of toAdd) {
+        const { error } = await supabase.from("app_moderators").insert({ user_id: selectedUser.id, app_key: k });
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from("app_moderators").delete().eq("user_id", targetUserId).eq("app_key", appKey);
+      }
+      for (const k of toRemove) {
+        const { error } = await supabase.from("app_moderators").delete().eq("user_id", selectedUser.id).eq("app_key", k);
         if (error) throw error;
       }
       await loadAll();
     } catch (e) {
-      setActionError(e.message || "Moderator-Status konnte nicht geändert werden.");
+      setActionError(e.message || "Rollen konnten nicht gespeichert werden.");
     } finally {
       setSavingAction(false);
     }
   }
 
-  async function handleSetPermission(targetUserId, appKey, allowed) {
+  async function handleApplyPermissions() {
+    if (!selectedUser) return;
     setActionError("");
     setSavingAction(true);
     try {
-      await callAdminFn({ type: "set_permission", target_user_id: targetUserId, app_key: appKey, allowed });
+      const currentDenied = deniedAppsFor(selectedUser.id);
+      const changed = APP_LIST.filter((a) => currentDenied.includes(a.key) !== pendingDenied.includes(a.key));
+      for (const a of changed) {
+        await callAdminFn({ type: "set_permission", target_user_id: selectedUser.id, app_key: a.key, allowed: !pendingDenied.includes(a.key) });
+      }
       await loadAll();
     } catch (e) {
-      setActionError(e.message || "App-Zugriff konnte nicht geändert werden.");
+      setActionError(e.message || "App-Zugriff konnte nicht gespeichert werden.");
     } finally {
       setSavingAction(false);
     }
@@ -456,7 +474,7 @@ function SettingsApp({ session }) {
       </div>
 
       {selectedUser && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setSelectedUserId(null)}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setSelectedUserId(null); } }}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">{selectedUser.name || selectedUser.email}</h2>
@@ -516,48 +534,64 @@ function SettingsApp({ session }) {
                 <input
                   type="checkbox"
                   disabled={savingAction}
-                  checked={selectedUser.is_admin === true}
-                  onChange={(e) => handleToggleAdmin(selectedUser.id, e.target.checked)}
+                  checked={pendingIsAdmin}
+                  onChange={(e) => setPendingIsAdmin(e.target.checked)}
                 />
                 Admin (global, in jeder App)
               </label>
               <div className="text-xs mb-1.5" style={{ color: INK_SOFT }}>Moderator für einzelne Apps:</div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 mb-3">
                 {APP_LIST.map((a) => {
-                  const isMod = modAppsFor(selectedUser.id).includes(a.key);
+                  const isMod = pendingMods.includes(a.key);
                   return (
                     <label key={a.key} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         disabled={savingAction}
                         checked={isMod}
-                        onChange={(e) => handleToggleModerator(selectedUser.id, a.key, e.target.checked)}
+                        onChange={(e) => setPendingMods((list) => (e.target.checked ? [...list, a.key] : list.filter((k) => k !== a.key)))}
                       />
                       {a.label}
                     </label>
                   );
                 })}
               </div>
+              <button
+                onClick={handleApplyRoles}
+                disabled={savingAction}
+                className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
+                style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
+              >
+                <Check size={14} /> Setzen
+              </button>
             </div>
 
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
               <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>App-Zugriff</div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 mb-3">
                 {APP_LIST.map((a) => {
-                  const denied = deniedAppsFor(selectedUser.id).includes(a.key);
+                  const denied = pendingDenied.includes(a.key);
                   return (
                     <label key={a.key} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         disabled={savingAction}
                         checked={!denied}
-                        onChange={(e) => handleSetPermission(selectedUser.id, a.key, e.target.checked)}
+                        onChange={(e) => setPendingDenied((list) => (e.target.checked ? list.filter((k) => k !== a.key) : [...list, a.key]))}
                       />
                       {a.label}
                     </label>
                   );
                 })}
               </div>
+              <button
+                onClick={handleApplyPermissions}
+                disabled={savingAction}
+                className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
+                style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
+              >
+                <Check size={14} /> Setzen
+              </button>
             </div>
 
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
@@ -598,7 +632,7 @@ function SettingsApp({ session }) {
       )}
 
       {showCreate && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowCreate(false)}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowCreate(false); } }}>
           <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Neuer Benutzer</h2><button onClick={() => setShowCreate(false)}><X size={20} /></button></div>
 
@@ -708,7 +742,7 @@ function SettingsApp({ session }) {
       )}
 
       {showAccount && (
-        <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onClick={() => setShowAccount(false)}>
+        <div className="fixed inset-0 flex items-end justify-center z-50" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAccount(false); } }}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Konto</h2><button onClick={() => setShowAccount(false)}><X size={20} /></button></div>
             <div className="mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>

@@ -395,6 +395,26 @@ function BulldozerApp({ session }) {
     };
   }
 
+  // Buttons im "Steinelook": mit der Fels-Kachel aus dem Theme texturiert.
+  function StoneButton({ onClick, children, sub }) {
+    return (
+      <button
+        onClick={onClick}
+        className="w-full max-w-[260px] mx-auto rounded-xl py-4 px-6 flex flex-col items-center justify-center gap-0.5 mb-3"
+        style={{
+          backgroundImage: "url(/bulldozer/rock-tile.png)",
+          backgroundSize: "56px 56px",
+          backgroundRepeat: "repeat",
+          imageRendering: "pixelated",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.3), inset 0 0 0 2px rgba(0,0,0,0.15)",
+        }}
+      >
+        <span className="font-bold text-base tracking-wide" style={{ color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}>{children}</span>
+        {sub && <span className="text-xs font-semibold" style={{ color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.85)" }}>{sub}</span>}
+      </button>
+    );
+  }
+
   function renderGrid() {
     if (!gameState) return null;
     const cells = [];
@@ -415,7 +435,7 @@ function BulldozerApp({ session }) {
         } else if (isBox) {
           content = <div style={{ width: "86%", height: "86%", ...spriteStyle(isTarget ? THEME.boxOnTarget : THEME.box) }} />;
         } else if (isTarget) {
-          content = <div style={{ width: "58%", height: "58%", ...spriteStyle(THEME.target) }} />;
+          content = <div style={{ width: "86%", height: "86%", ...spriteStyle(THEME.target) }} />;
         }
         cells.push(
           <div key={key} className="flex items-center justify-center" style={cellStyle}>
@@ -469,62 +489,30 @@ function BulldozerApp({ session }) {
         </div>
 
         {screen === "select" && (
-          <>
-            <div className="mb-4 rounded-xl p-4 text-center" style={{ backgroundColor: ORANGE }}>
-              <p className="text-xs font-semibold text-white/80 mb-1">
-                {highestSolved === -1 ? "Noch nicht gestartet" : allSolved ? "Alles geschafft!" : `Fortschritt: ${highestSolved + 1} / ${LEVELS.length} Level`}
-              </p>
-              <button onClick={() => startLevel(continueIndex)} className="w-full rounded-lg py-3 font-semibold text-sm" style={{ backgroundColor: "#fff", color: ORANGE }}>
-                {highestSolved === -1 ? "Los geht's – Level 1" : allSolved ? `Nochmal spielen – Level ${continueIndex + 1}` : `Weiterspielen – Level ${continueIndex + 1}`}
-              </button>
-            </div>
+          <div className="flex flex-col items-center py-6">
+            <StoneButton onClick={() => startLevel(0)}>SPIELEN</StoneButton>
+            <StoneButton onClick={() => startLevel(continueIndex)} sub={highestSolved === -1 ? undefined : `Level ${continueIndex + 1}`}>
+              WEITERSPIELEN
+            </StoneButton>
+            <StoneButton onClick={() => setScreen("leaderboard")}>HIGHSCORE</StoneButton>
 
-            <button onClick={() => setScreen("leaderboard")} className="w-full mb-4 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK }}>
-              <Trophy size={15} style={{ color: ORANGE }} /> Rangliste ansehen
-            </button>
-
-            <div className="mb-4 p-3 rounded-lg flex gap-2" style={{ backgroundColor: "#E9E6D9" }}>
-              <input
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && jumpToCode()}
-                placeholder="Level-Code eingeben…"
-                className="flex-1 rounded-lg px-3 py-2 text-sm border uppercase"
-                style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
-              />
-              <button onClick={jumpToCode} className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ backgroundColor: ORANGE }}>
-                <KeyRound size={14} /> Los
-              </button>
+            <div className="w-full max-w-[260px] mt-2">
+              <div className="flex gap-2">
+                <input
+                  value={codeInput}
+                  onChange={(e) => setCodeInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && jumpToCode()}
+                  placeholder="Level-Code…"
+                  className="flex-1 rounded-lg px-3 py-2 text-xs border uppercase"
+                  style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                />
+                <button onClick={jumpToCode} className="px-3 py-2 rounded-lg text-xs font-semibold text-white flex items-center gap-1" style={{ backgroundColor: ORANGE }}>
+                  <KeyRound size={12} /> Los
+                </button>
+              </div>
+              {codeError && <p className="text-xs mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}
             </div>
-            {codeError && <p className="text-xs mb-3 px-1" style={{ color: "#A13D3D" }}>{codeError}</p>}
-
-            <div className="flex flex-col gap-2">
-              {LEVELS.map((lvl, i) => {
-                const own = ownScoreFor(i);
-                return (
-                  <button
-                    key={i}
-                    onClick={() => startLevel(i)}
-                    className="w-full text-left rounded-xl p-3.5 flex items-center justify-between"
-                    style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-semibold text-sm" style={{ backgroundColor: own ? "#2E7D4F1A" : "#C9752F1A", color: own ? GREEN : ORANGE }}>
-                        {i + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-sm truncate">{lvl.title}</div>
-                        <div className="text-xs truncate" style={{ color: INK_SOFT }}>
-                          {own ? `Gelöst · Bestzeit ${formatTime(own.best_time_ms)}` : "Noch nicht gelöst"}
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} style={{ color: INK_SOFT }} className="flex-shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          </>
+          </div>
         )}
 
         {screen === "game" && gameState && (

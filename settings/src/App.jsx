@@ -445,7 +445,7 @@ function SettingsApp({ session }) {
                       {u.is_admin && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#B54A451A", color: "#B54A45" }}>Admin</span>}
                       {mods.length > 0 && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#C9A2271A", color: "#C9A227" }}>Mod · {mods.length}</span>}
                     </div>
-                    <div className="text-xs truncate" style={{ color: INK_SOFT }}>{u.email}{m?.mitgliedstyp === "freund" ? " · Freund" : ""}</div>
+                    <div className="text-xs truncate" style={{ color: INK_SOFT }}>{u.email}{m?.mitgliedstyp === "gast" ? " · Gast" : m?.mitgliedstyp === "bewohner" ? " · Bewohner" : ""}</div>
                   </div>
                 </div>
                 <ChevronRight size={16} style={{ color: INK_SOFT }} className="flex-shrink-0" />
@@ -478,7 +478,8 @@ function SettingsApp({ session }) {
                     style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                   >
                     <option value="mitglied">Genossenschaftsmitglied</option>
-                    <option value="freund">Freund</option>
+                    <option value="bewohner">Bewohner</option>
+                    <option value="gast">Gast</option>
                   </select>
                 </div>
 
@@ -628,7 +629,8 @@ function SettingsApp({ session }) {
             <label className="text-xs font-medium block mb-1">Typ</label>
             <select value={newMitgliedstyp} onChange={(e) => setNewMitgliedstyp(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
               <option value="mitglied">Genossenschaftsmitglied</option>
-              <option value="freund">Freund</option>
+              <option value="bewohner">Bewohner</option>
+              <option value="gast">Gast</option>
             </select>
 
             {newType === "child" ? (

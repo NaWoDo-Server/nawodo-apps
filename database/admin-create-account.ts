@@ -11,6 +11,7 @@
 // Alle Aufrufe erwarten den Access-Token des aufrufenden Superadmins im Authorization-Header.
 
 const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop"];
+const MITGLIEDSTYP_VALUES = ["mitglied", "gast", "bewohner"];
 
 Deno.serve(async (req) => {
   const cors = {
@@ -180,7 +181,7 @@ Deno.serve(async (req) => {
 
     const vorname = (body.vorname || "").trim();
     const nachname = (body.nachname || "").trim();
-    const mitgliedstyp = body.mitgliedstyp === "freund" ? "freund" : "mitglied";
+    const mitgliedstyp = MITGLIEDSTYP_VALUES.includes(body.mitgliedstyp) ? body.mitgliedstyp : "mitglied";
 
     if (!vorname) {
       return jsonResponse({ error: "Bitte einen Vornamen angeben." }, 400);

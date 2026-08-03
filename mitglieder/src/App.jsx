@@ -9,6 +9,22 @@ import { PAPER, INK, INK_SOFT, BORDER, BORDER_SOFT } from "./theme";
 
 const BLUE = "#2E86AB";
 
+function mitgliedstypInfo(typ) {
+  if (typ === "gast") return { label: "Gast", color: "#C9752F" };
+  if (typ === "bewohner") return { label: "Bewohner", color: "#6C63A6" };
+  return { label: "Genossenschaftsmitglied", shortLabel: "Mitglied", color: BLUE };
+}
+
+// Zeigt die neuen, getrennten Adressfelder formatiert an; faellt auf die alte
+// "anschrift"-Spalte zurueck, solange ein Mitglied seine Adresse noch nicht neu
+// eingetragen hat (die alten Daten gehen dabei nicht verloren).
+function formatAddress(m) {
+  const line1 = [m.strasse, m.hausnummer].filter(Boolean).join(" ");
+  const line2 = [m.plz, m.wohnort].filter(Boolean).join(" ");
+  const combined = [line1, line2].filter(Boolean).join(", ");
+  return combined || m.anschrift || "";
+}
+
 // Gruppen (frueher "Bereiche") kommen jetzt aus der Datenbank (Tabelle "bereiche"),
 // damit Admins jederzeit neue Gruppen anlegen koennen. Farben werden beim Anlegen
 // rotierend aus dieser Palette vergeben.
@@ -45,7 +61,10 @@ function buildVCard(m) {
   const lines = ["BEGIN:VCARD", "VERSION:3.0"];
   lines.push(`N:${m.nachname};${m.vorname};;;`);
   lines.push(`FN:${m.vorname} ${m.nachname}`);
-  if (m.anschrift) lines.push(`ADR;TYPE=HOME:;;${m.anschrift.replace(/\n/g, ", ")};;;;`);
+  if (m.strasse || m.hausnummer || m.plz || m.wohnort || m.anschrift) {
+    const street = [m.strasse, m.hausnummer].filter(Boolean).join(" ") || (m.anschrift ? m.anschrift.replace(/\n/g, ", ") : "");
+    lines.push(`ADR;TYPE=HOME:;;${street};${m.wohnort || ""};;${m.plz || ""};`);
+  }
   if (m.telefon) lines.push(`TEL;TYPE=HOME,VOICE:${m.telefon}`);
   if (m.handy) lines.push(`TEL;TYPE=CELL:${m.handy}`);
   if (m.email) lines.push(`EMAIL;TYPE=INTERNET:${m.email}`);
@@ -212,7 +231,10 @@ function MitgliederApp({ session }) {
   const [formNachname, setFormNachname] = useState("");
   const [formVorname, setFormVorname] = useState("");
   const [formSpitzname, setFormSpitzname] = useState("");
-  const [formAnschrift, setFormAnschrift] = useState("");
+  const [formStrasse, setFormStrasse] = useState("");
+  const [formHausnummer, setFormHausnummer] = useState("");
+  const [formPlz, setFormPlz] = useState("");
+  const [formWohnort, setFormWohnort] = useState("");
   const [formWohneinheit, setFormWohneinheit] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formTelefon, setFormTelefon] = useState("");
@@ -274,7 +296,7 @@ function MitgliederApp({ session }) {
         if (existing) return { ...existing, isPlaceholder: false };
         return {
           id: null, user_id: u.id, created_by: null, is_child: false, isPlaceholder: true,
-          vorname: u.name, nachname: "", anschrift: null, wohneinheit: null,
+          vorname: u.name, nachname: "", anschrift: null, strasse: null, hausnummer: null, plz: null, wohnort: null, wohneinheit: null,
           email: u.email, telefon: null, handy: null, geburtstag: null, foto_url: null,
           parent1_user_id: null, parent2_user_id: null,
         };
@@ -394,7 +416,7 @@ function MitgliederApp({ session }) {
     return roster
       .filter((m) => typeFilter === "alle" || (typeFilter === "mitglieder" ? !m.is_child : m.is_child))
       .filter((m) => !activeBereich || (m.id && bereicheForMember(m.id).includes(activeBereich)))
-      .filter((m) => !q || `${m.vorname} ${m.nachname} ${m.anschrift || ""} ${m.wohneinheit || ""} ${m.email || ""}`.toLowerCase().includes(q));
+      .filter((m) => !q || `${m.vorname} ${m.nachname} ${formatAddress(m)} ${m.wohneinheit || ""} ${m.email || ""}`.toLowerCase().includes(q));
   }, [roster, activeBereich, q, bereicheAssign, typeFilter]);
 
   function resetForm() {
@@ -402,7 +424,10 @@ function MitgliederApp({ session }) {
     setFormNachname("");
     setFormVorname("");
     setFormSpitzname("");
-    setFormAnschrift("");
+    setFormStrasse("");
+    setFormHausnummer("");
+    setFormPlz("");
+    setFormWohnort("");
     setFormWohneinheit("");
     setFormEmail("");
     setFormTelefon("");
@@ -431,7 +456,10 @@ function MitgliederApp({ session }) {
     setFormNachname(m.nachname);
     setFormVorname(m.vorname);
     setFormSpitzname(m.spitzname || "");
-    setFormAnschrift(m.anschrift || "");
+    setFormStrasse(m.strasse || "");
+    setFormHausnummer(m.hausnummer || "");
+    setFormPlz(m.plz || "");
+    setFormWohnort(m.wohnort || "");
     setFormWohneinheit(m.wohneinheit || "");
     setFormEmail(m.email || "");
     setFormTelefon(m.telefon || "");
@@ -471,7 +499,10 @@ function MitgliederApp({ session }) {
         nachname: formNachname.trim(),
         vorname: formVorname.trim(),
         spitzname: formSpitzname.trim() || null,
-        anschrift: formAnschrift.trim() || null,
+        strasse: formStrasse.trim() || null,
+        hausnummer: formHausnummer.trim() || null,
+        plz: formPlz.trim() || null,
+        wohnort: formWohnort.trim() || null,
         wohneinheit: formWohneinheit.trim() || null,
         email: formEmail.trim() || null,
         telefon: formTelefon.trim() || null,
@@ -521,10 +552,10 @@ function MitgliederApp({ session }) {
   }
 
   function exportAllCSV() {
-    const header = ["Nachname", "Vorname", "Spitzname", "Anschrift", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Mitgliedstyp", "Eltern", "Gruppen"];
+    const header = ["Nachname", "Vorname", "Spitzname", "Straße", "Hausnummer", "PLZ", "Wohnort", "Wohneinheit", "Email", "Telefon", "Handy", "Geburtstag", "Typ", "Mitgliedstyp", "Eltern", "Gruppen"];
     const rows = roster.map((m) => [
-      m.nachname, m.vorname, m.spitzname || "", m.anschrift || "", m.wohneinheit || "", m.email || "", m.telefon || "", m.handy || "",
-      m.geburtstag || "", m.is_child ? "Kind" : "Erwachsen", m.mitgliedstyp === "freund" ? "Freund" : "Mitglied", parentNames(m).join(" / "),
+      m.nachname, m.vorname, m.spitzname || "", m.strasse || "", m.hausnummer || "", m.plz || "", m.wohnort || "", m.wohneinheit || "", m.email || "", m.telefon || "", m.handy || "",
+      m.geburtstag || "", m.is_child ? "Kind" : "Erwachsen", mitgliedstypInfo(m.mitgliedstyp).label, parentNames(m).join(" / "),
       m.id ? bereicheForMember(m.id).map((k) => bereichInfo(k)?.label || k).join(" / ") : "",
     ]);
     const csv = [header, ...rows].map((r) => r.map(csvEscape).join(";")).join("\r\n");
@@ -721,8 +752,8 @@ function MitgliederApp({ session }) {
                         <div className="min-w-0">
                           <div className="font-bold text-sm truncate flex items-center gap-1.5">
                             {m.vorname}{m.spitzname ? ` „${m.spitzname}“` : ""} {m.nachname}
-                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: m.mitgliedstyp === "freund" ? "#C9752F1A" : "#2E86AB1A", color: m.mitgliedstyp === "freund" ? "#C9752F" : BLUE }}>
-                              {m.mitgliedstyp === "freund" ? "Freund" : "Mitglied"}
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: `${mitgliedstypInfo(m.mitgliedstyp).color}1A`, color: mitgliedstypInfo(m.mitgliedstyp).color }}>
+                              {mitgliedstypInfo(m.mitgliedstyp).shortLabel || mitgliedstypInfo(m.mitgliedstyp).label}
                             </span>
                           </div>
                         </div>
@@ -753,7 +784,7 @@ function MitgliederApp({ session }) {
 
                       <div className="flex flex-col gap-1 mt-1 text-xs" style={{ color: INK_SOFT }}>
                         {m.wohneinheit && <div className="flex items-center gap-1.5"><Building2 size={12} /> WE {m.wohneinheit}</div>}
-                        {m.anschrift && <div className="flex items-center gap-1.5"><MapPin size={12} /> {m.anschrift}</div>}
+                        {formatAddress(m) && <div className="flex items-center gap-1.5"><MapPin size={12} /> {formatAddress(m)}</div>}
                         {m.email && <div className="flex items-center gap-1.5"><Mail size={12} /> {m.email}</div>}
                         {m.telefon && <div className="flex items-center gap-1.5"><Phone size={12} /> {m.telefon}</div>}
                         {m.handy && <div className="flex items-center gap-1.5"><Smartphone size={12} /> {m.handy}</div>}
@@ -881,8 +912,8 @@ function MitgliederApp({ session }) {
                 </div>
               )}
               <div className="font-bold text-base">{profileMember.vorname}{profileMember.spitzname ? ` „${profileMember.spitzname}“` : ""} {profileMember.nachname}</div>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: profileMember.mitgliedstyp === "freund" ? "#C9752F1A" : "#2E86AB1A", color: profileMember.mitgliedstyp === "freund" ? "#C9752F" : BLUE }}>
-                {profileMember.mitgliedstyp === "freund" ? "Freund" : "Genossenschaftsmitglied"}
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: `${mitgliedstypInfo(profileMember.mitgliedstyp).color}1A`, color: mitgliedstypInfo(profileMember.mitgliedstyp).color }}>
+                {mitgliedstypInfo(profileMember.mitgliedstyp).label}
               </span>
               {profileMember.is_child && (
                 <div className="text-xs mt-1 flex flex-wrap items-center justify-center gap-1" style={{ color: INK_SOFT }}>
@@ -903,7 +934,7 @@ function MitgliederApp({ session }) {
             </div>
             <div className="flex flex-col gap-2 text-sm mb-4" style={{ color: INK_SOFT }}>
               {profileMember.wohneinheit && <div className="flex items-center gap-2"><Building2 size={14} /> WE {profileMember.wohneinheit}</div>}
-              {profileMember.anschrift && <div className="flex items-center gap-2"><MapPin size={14} /> {profileMember.anschrift}</div>}
+              {formatAddress(profileMember) && <div className="flex items-center gap-2"><MapPin size={14} /> {formatAddress(profileMember)}</div>}
               {profileMember.email && <div className="flex items-center gap-2"><Mail size={14} /> {profileMember.email}</div>}
               {profileMember.telefon && <div className="flex items-center gap-2"><Phone size={14} /> {profileMember.telefon}</div>}
               {profileMember.handy && <div className="flex items-center gap-2"><Smartphone size={14} /> {profileMember.handy}</div>}
@@ -983,8 +1014,29 @@ function MitgliederApp({ session }) {
             <label className="text-xs font-medium block mb-1">Spitzname (optional)</label>
             <input value={formSpitzname} onChange={(e) => setFormSpitzname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
-            <label className="text-xs font-medium block mb-1">Anschrift</label>
-            <input value={formAnschrift} onChange={(e) => setFormAnschrift(e.target.value)} placeholder="Straße, PLZ Ort" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <div className="flex gap-3 mb-3">
+              <div className="flex-1">
+                <label className="text-xs font-medium block mb-1">Straße</label>
+                <input value={formStrasse} onChange={(e) => setFormStrasse(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+              <div className="w-24">
+                <label className="text-xs font-medium block mb-1">Hausnr.</label>
+                <input value={formHausnummer} onChange={(e) => setFormHausnummer(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+            </div>
+            <div className="flex gap-3 mb-3">
+              <div className="w-28">
+                <label className="text-xs font-medium block mb-1">PLZ</label>
+                <input value={formPlz} onChange={(e) => setFormPlz(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-medium block mb-1">Wohnort</label>
+                <input value={formWohnort} onChange={(e) => setFormWohnort(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+            </div>
+            {!formStrasse && !formHausnummer && !formPlz && !formWohnort && editingMember?.anschrift && (
+              <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Bisherige Angabe (noch nicht ins neue Format übertragen): {editingMember.anschrift}</p>
+            )}
 
             <label className="text-xs font-medium block mb-1">Wohneinheit (WE)</label>
             <input value={formWohneinheit} onChange={(e) => setFormWohneinheit(e.target.value)} placeholder="z.B. WE 12" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />

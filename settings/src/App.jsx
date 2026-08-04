@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Search, Trash2, UserX, KeyRound,
-  ChevronRight, Check, Users,
+  Check, Users,
 } from "lucide-react";
 import { supabase, configMissing } from "./supabaseClient";
 
@@ -33,6 +33,19 @@ const BULK_RIGHT_OPTIONS = [
   { key: "mitglieder_bewohner", label: "Mitglieder-Filter: Bewohner" },
   { key: "mitglieder_kinder", label: "Mitglieder-Filter: Kinder" },
 ];
+
+const OPT_IN_KEYS = ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"];
+
+const SHORT_RIGHT_LABELS = {
+  faq_projekt: "FAQ Projekt",
+  mitglieder_genossenschaft: "Genossen.",
+  mitglieder_gaeste: "Gäste",
+  mitglieder_bewohner: "Bewohner",
+  mitglieder_kinder: "Kinder",
+};
+function shortRightLabel(opt) {
+  return SHORT_RIGHT_LABELS[opt.key] || opt.label.replace("App: ", "");
+}
 
 const BULK_CATEGORY_OPTIONS = [
   { key: "mitglied", label: "Genossenschaftsmitglieder" },
@@ -131,16 +144,11 @@ function SettingsApp({ session }) {
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState("");
   const [savingAction, setSavingAction] = useState(false);
+  const [togglingCell, setTogglingCell] = useState(null); // `${userId}:${appKey}` waehrend des Speicherns
 
   const [selectedRowKey, setSelectedRowKey] = useState(null);
   const [pendingIsAdmin, setPendingIsAdmin] = useState(false);
   const [pendingMods, setPendingMods] = useState([]);
-  const [pendingDenied, setPendingDenied] = useState([]);
-  const [pendingFaqProjekt, setPendingFaqProjekt] = useState(false);
-  const [pendingMitgliederGenossenschaft, setPendingMitgliederGenossenschaft] = useState(false);
-  const [pendingMitgliederGaeste, setPendingMitgliederGaeste] = useState(false);
-  const [pendingMitgliederBewohner, setPendingMitgliederBewohner] = useState(false);
-  const [pendingMitgliederKinder, setPendingMitgliederKinder] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
   const [activeTab, setActiveTab] = useState("benutzer"); // "benutzer" | "apps"
@@ -326,6 +334,28 @@ function SettingsApp({ session }) {
   function mitgliederKinderAllowedFor(userId) {
     return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_kinder" && r.allowed === true);
   }
+
+  // Fuer die Rechte-Matrix in der Benutzerliste: einheitliche Pruefung ueber alle
+  // Rechte (Standard-Apps UND Opt-in-Unterfilter) in einer Funktion.
+  function isRightAllowed(userId, appKey) {
+    const row = memberPermissions.find((r) => r.user_id === userId && r.app_key === appKey);
+    if (OPT_IN_KEYS.includes(appKey)) return row?.allowed === true;
+    return !(row && row.allowed === false);
+  }
+
+  async function handleToggleMatrixCell(userId, appKey) {
+    const cellKey = `${userId}:${appKey}`;
+    setTogglingCell(cellKey);
+    setActionError("");
+    try {
+      await callAdminFn({ type: "set_permission", target_user_id: userId, app_key: appKey, allowed: !isRightAllowed(userId, appKey) });
+      await loadAll();
+    } catch (e) {
+      setActionError(e.message || "Konnte nicht geändert werden.");
+    } finally {
+      setTogglingCell(null);
+    }
+  }
   function groupsForMember(memberId) {
     return memberBereiche.filter((r) => r.member_id === memberId).map((r) => r.bereich_key);
   }
@@ -391,12 +421,6 @@ function SettingsApp({ session }) {
     if (!u) return;
     setPendingIsAdmin(u.is_admin === true);
     setPendingMods(modAppsFor(u.id));
-    setPendingDenied(deniedAppsFor(u.id));
-    setPendingFaqProjekt(faqProjektAllowedFor(u.id));
-    setPendingMitgliederGenossenschaft(mitgliederGenossenschaftAllowedFor(u.id));
-    setPendingMitgliederGaeste(mitgliederGaesteAllowedFor(u.id));
-    setPendingMitgliederBewohner(mitgliederBewohnerAllowedFor(u.id));
-    setPendingMitgliederKinder(mitgliederKinderAllowedFor(u.id));
   }
 
   async function handleApplyRoles() {
@@ -422,44 +446,6 @@ function SettingsApp({ session }) {
       await loadAll();
     } catch (e) {
       setActionError(e.message || "Rollen konnten nicht gespeichert werden.");
-    } finally {
-      setSavingAction(false);
-    }
-  }
-
-  async function handleApplyPermissions() {
-    if (!selectedAuthUser) return;
-    setActionError("");
-    setSavingAction(true);
-    try {
-      const currentDenied = deniedAppsFor(selectedAuthUser.id);
-      const changed = APP_LIST.filter((a) => currentDenied.includes(a.key) !== pendingDenied.includes(a.key));
-      for (const a of changed) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: a.key, allowed: !pendingDenied.includes(a.key) });
-      }
-      const currentFaqProjekt = faqProjektAllowedFor(selectedAuthUser.id);
-      if (currentFaqProjekt !== pendingFaqProjekt) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "faq_projekt", allowed: pendingFaqProjekt });
-      }
-      const currentMitgliederGaeste = mitgliederGaesteAllowedFor(selectedAuthUser.id);
-      if (currentMitgliederGaeste !== pendingMitgliederGaeste) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_gaeste", allowed: pendingMitgliederGaeste });
-      }
-      const currentMitgliederBewohner = mitgliederBewohnerAllowedFor(selectedAuthUser.id);
-      if (currentMitgliederBewohner !== pendingMitgliederBewohner) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_bewohner", allowed: pendingMitgliederBewohner });
-      }
-      const currentMitgliederGenossenschaft = mitgliederGenossenschaftAllowedFor(selectedAuthUser.id);
-      if (currentMitgliederGenossenschaft !== pendingMitgliederGenossenschaft) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_genossenschaft", allowed: pendingMitgliederGenossenschaft });
-      }
-      const currentMitgliederKinder = mitgliederKinderAllowedFor(selectedAuthUser.id);
-      if (currentMitgliederKinder !== pendingMitgliederKinder) {
-        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_kinder", allowed: pendingMitgliederKinder });
-      }
-      await loadAll();
-    } catch (e) {
-      setActionError(e.message || "App-Zugriff konnte nicht gespeichert werden.");
     } finally {
       setSavingAction(false);
     }
@@ -753,43 +739,59 @@ function SettingsApp({ session }) {
           </button>
         </div>
 
-        <div className="flex flex-col gap-2">
-          {rows.map((r) => {
-            const m = r.member;
-            const u = r.authUser;
-            const mods = u ? modAppsFor(u.id) : [];
-            return (
-              <button
-                key={rowKey(r)}
-                onClick={() => setSelectedRowKey(rowKey(r))}
-                className="w-full text-left rounded-xl p-3.5 flex items-center justify-between"
-                style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {m?.foto_url ? (
-                    <img src={m.foto_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#2E86AB1A", color: BLUE }}>
-                      <Users size={16} />
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="font-semibold text-sm truncate flex items-center gap-1.5">
-                      {r.displayName}
-                      {u?.is_admin && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#B54A451A", color: "#B54A45" }}>Admin</span>}
-                      {mods.length > 0 && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#C9A2271A", color: "#C9A227" }}>Mod · {mods.length}</span>}
-                      {m?.is_child && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#3E8E7E1A", color: "#3E8E7E" }}>Kind</span>}
-                    </div>
-                    <div className="text-xs truncate" style={{ color: INK_SOFT }}>
-                      {u?.email || "Kein eigener Login"}
-                      {m?.mitgliedstyp === "gast" ? " · Gast" : m?.mitgliedstyp === "bewohner" ? " · Bewohner" : ""}
-                    </div>
-                  </div>
-                </div>
-                <ChevronRight size={16} style={{ color: INK_SOFT }} className="flex-shrink-0" />
-              </button>
-            );
-          })}
+        <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Name antippen öffnet das Profil (Adresse, Rolle, Passwort). Häkchen wirken sofort.</p>
+        <div className="overflow-x-auto rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+          <table className="text-xs border-collapse" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th className="text-left px-3 py-2.5 sticky left-0" style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Mitglied</th>
+                {BULK_RIGHT_OPTIONS.map((opt) => (
+                  <th key={opt.key} title={opt.label} className="px-1.5 py-2.5 text-center font-semibold whitespace-nowrap" style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}` }}>
+                    {shortRightLabel(opt)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const m = r.member;
+                const u = r.authUser;
+                const mods = u ? modAppsFor(u.id) : [];
+                return (
+                  <tr key={rowKey(r)} style={{ borderBottom: `1px solid ${BORDER_SOFT}` }}>
+                    <td className="px-3 py-2 sticky left-0" style={{ backgroundColor: "#fff" }}>
+                      <button onClick={() => setSelectedRowKey(rowKey(r))} className="text-left">
+                        <div className="font-semibold text-sm truncate flex items-center gap-1.5">
+                          {r.displayName}
+                          {u?.is_admin && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#B54A451A", color: "#B54A45" }}>Admin</span>}
+                          {mods.length > 0 && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#C9A2271A", color: "#C9A227" }}>Mod · {mods.length}</span>}
+                          {m?.is_child && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#3E8E7E1A", color: "#3E8E7E" }}>Kind</span>}
+                        </div>
+                        <div className="text-xs truncate" style={{ color: INK_SOFT }}>
+                          {u?.email || "Kein eigener Login"}
+                          {m?.mitgliedstyp === "gast" ? " · Gast" : m?.mitgliedstyp === "bewohner" ? " · Bewohner" : ""}
+                        </div>
+                      </button>
+                    </td>
+                    {BULK_RIGHT_OPTIONS.map((opt) => (
+                      <td key={opt.key} className="text-center px-1.5 py-2">
+                        {u ? (
+                          <input
+                            type="checkbox"
+                            checked={isRightAllowed(u.id, opt.key)}
+                            disabled={togglingCell === `${u.id}:${opt.key}`}
+                            onChange={() => handleToggleMatrixCell(u.id, opt.key)}
+                          />
+                        ) : (
+                          <span style={{ color: BORDER_SOFT }}>–</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
         </>
         )}
@@ -955,88 +957,6 @@ function SettingsApp({ session }) {
               </div>
             </div>
 
-            <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
-              <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>App-Zugriff</div>
-              <div className="flex flex-col gap-1.5 mb-3">
-                {APP_LIST.map((a) => {
-                  const denied = pendingDenied.includes(a.key);
-                  return (
-                    <React.Fragment key={a.key}>
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          disabled={savingAction}
-                          checked={!denied}
-                          onChange={(e) => setPendingDenied((list) => (e.target.checked ? list.filter((k) => k !== a.key) : [...list, a.key]))}
-                        />
-                        {a.label}
-                      </label>
-                      {a.key === "faq" && (
-                        <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
-                          <input
-                            type="checkbox"
-                            disabled={savingAction || denied}
-                            checked={pendingFaqProjekt}
-                            onChange={(e) => setPendingFaqProjekt(e.target.checked)}
-                          />
-                          ↳ Rund um das Projekt
-                        </label>
-                      )}
-                      {a.key === "mitglieder" && (
-                        <>
-                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
-                            <input
-                              type="checkbox"
-                              disabled={savingAction || denied}
-                              checked={pendingMitgliederGenossenschaft}
-                              onChange={(e) => setPendingMitgliederGenossenschaft(e.target.checked)}
-                            />
-                            ↳ Filter: Genossenschaftsmitglieder
-                          </label>
-                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
-                            <input
-                              type="checkbox"
-                              disabled={savingAction || denied}
-                              checked={pendingMitgliederGaeste}
-                              onChange={(e) => setPendingMitgliederGaeste(e.target.checked)}
-                            />
-                            ↳ Filter: Gäste
-                          </label>
-                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
-                            <input
-                              type="checkbox"
-                              disabled={savingAction || denied}
-                              checked={pendingMitgliederBewohner}
-                              onChange={(e) => setPendingMitgliederBewohner(e.target.checked)}
-                            />
-                            ↳ Filter: Bewohner
-                          </label>
-                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
-                            <input
-                              type="checkbox"
-                              disabled={savingAction || denied}
-                              checked={pendingMitgliederKinder}
-                              onChange={(e) => setPendingMitgliederKinder(e.target.checked)}
-                            />
-                            ↳ Filter: Kinder
-                          </label>
-                        </>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={handleApplyPermissions}
-                  disabled={savingAction}
-                  className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
-                  style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
-                >
-                  <Check size={14} /> Setzen
-                </button>
-              </div>
-            </div>
 
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
               <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Neues Passwort setzen</div>

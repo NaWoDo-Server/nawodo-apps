@@ -594,6 +594,11 @@ function MitgliederApp({ session }) {
     setFormError("");
     if (!formVorname.trim()) return setFormError("Bitte einen Vornamen eintragen.");
     if (!formIsChild && !formEmail.trim()) return setFormError("Bitte eine E-Mail-Adresse eintragen.");
+    const newEmailCheck = formEmail.trim().toLowerCase() || null;
+    if (newEmailCheck && (!editingMember || (editingMember.email || "").toLowerCase() !== newEmailCheck)) {
+      const { data: dupe } = await supabase.from("members").select("id").ilike("email", newEmailCheck).neq("id", editingMember?.id || "00000000-0000-0000-0000-000000000000").maybeSingle();
+      if (dupe) return setFormError("Diese E-Mail-Adresse wird bereits von einem anderen Mitglied verwendet.");
+    }
     setSaving(true);
     try {
       let fotoUrl = editingMember ? editingMember.foto_url : null;
@@ -743,7 +748,7 @@ function MitgliederApp({ session }) {
             <h1 className="font-bold text-lg lg:text-2xl">Mitglieder</h1>
           </a>
           <div className="flex items-center gap-2">
-            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
+            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {(members.find((m) => m.user_id === user.id && !m.is_child)?.spitzname) || (members.find((m) => m.user_id === user.id && !m.is_child)?.vorname) || userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
             <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
           </div>

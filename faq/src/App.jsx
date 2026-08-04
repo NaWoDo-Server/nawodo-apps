@@ -227,6 +227,11 @@ function FaqApp({ session }) {
     setEpError("");
     if (!epVorname.trim()) return setEpError("Bitte einen Vornamen eintragen.");
     if (!epEmail.trim()) return setEpError("Bitte eine E-Mail-Adresse eintragen.");
+    const newEmailCheck = epEmail.trim().toLowerCase();
+    if ((ownMember?.email || "").toLowerCase() !== newEmailCheck) {
+      const { data: dupe } = await supabase.from("members").select("id").ilike("email", newEmailCheck).neq("id", ownMemberId || "00000000-0000-0000-0000-000000000000").maybeSingle();
+      if (dupe) return setEpError("Diese E-Mail-Adresse wird bereits von einem anderen Mitglied verwendet.");
+    }
     setEpSaving(true);
     try {
       const newEmail = epEmail.trim().toLowerCase();
@@ -474,7 +479,7 @@ function FaqApp({ session }) {
             <h1 className="font-bold text-lg lg:text-2xl">FAQ</h1>
           </a>
           <div className="flex items-center gap-2">
-            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
+            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
             <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
           </div>

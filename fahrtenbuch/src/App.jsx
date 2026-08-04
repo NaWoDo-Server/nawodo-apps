@@ -191,6 +191,11 @@ function Fahrtenbuch({ session }) {
     setEpError("");
     if (!epVorname.trim()) return setEpError("Bitte einen Vornamen eintragen.");
     if (!epEmail.trim()) return setEpError("Bitte eine E-Mail-Adresse eintragen.");
+    const newEmailCheck = epEmail.trim().toLowerCase();
+    if ((ownMember?.email || "").toLowerCase() !== newEmailCheck) {
+      const { data: dupe } = await supabase.from("members").select("id").ilike("email", newEmailCheck).neq("id", ownMemberId || "00000000-0000-0000-0000-000000000000").maybeSingle();
+      if (dupe) return setEpError("Diese E-Mail-Adresse wird bereits von einem anderen Mitglied verwendet.");
+    }
     setEpSaving(true);
     try {
       const newEmail = epEmail.trim().toLowerCase();
@@ -634,7 +639,7 @@ function Fahrtenbuch({ session }) {
             <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>
           </a>
           <div className="flex items-center gap-2">
-            <span className={isDesktop ? "text-sm font-bold truncate max-w-[180px]" : "text-xs font-bold truncate max-w-[110px]"} style={{ color: INK_SOFT }}>Hallo {userName}</span>
+            <span className={isDesktop ? "text-sm font-bold truncate max-w-[180px]" : "text-xs font-bold truncate max-w-[110px]"} style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg text-white flex-shrink-0 overflow-hidden" : "w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden"} style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
             <a href="/" className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"} style={{ backgroundColor: "#E4E1D3" }}><Home size={isDesktop ? 24 : 16} style={{ color: INK_SOFT }} /></a>
           </div>

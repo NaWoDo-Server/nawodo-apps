@@ -809,6 +809,13 @@
         return parts;
       }
 
+      // Fuer "Hallo X" im Header: nur Vorname, oder Spitzname falls vorhanden - kein
+      // Nachname, damit es kurz bleibt (anders als der volle Name im Konto-Popup).
+      function headerDisplayName(fallbackName) {
+        if (!ownMember) return fallbackName;
+        return ownMember.spitzname || ownMember.vorname || fallbackName;
+      }
+
       function loadOwnAvatar(userId, initial, fallbackName) {
         client.from("members").select("*").eq("user_id", userId).maybeSingle().then(function (res) {
           var data = res.data;
@@ -816,6 +823,7 @@
           ownMember = data || null;
           setAvatarDisplay(data && data.foto_url ? data.foto_url : null, initial);
           accountNameModal.textContent = fullDisplayName(fallbackName);
+          accountNameHeader.textContent = "Hallo " + headerDisplayName(fallbackName);
         }).catch(function () {});
       }
 
@@ -1114,16 +1122,23 @@
         saveEditProfileBtn.disabled = true;
         saveEditProfileBtn.textContent = "Speichern…";
         var userId = currentSession.user.id;
-        var savePromise = ownMemberId
-          ? client.from("members").update(payload).eq("id", ownMemberId).then(function (res) {
-              if (res.error) throw res.error;
-            })
-          : client.from("members").insert(Object.assign({ user_id: userId, created_by: userId, is_child: false }, payload)).select().single().then(function (res) {
-              if (res.error) throw res.error;
-              ownMemberId = res.data.id;
-            });
+        var emailChanged = (ownMember && (ownMember.email || "").toLowerCase()) !== newEmail;
 
-        var emailChanged = (ownMember && ownMember.email) !== newEmail;
+        var dupeCheckPromise = emailChanged
+          ? client.from("members").select("id").ilike("email", newEmail).neq("id", ownMemberId || "00000000-0000-0000-0000-000000000000").maybeSingle()
+          : Promise.resolve({ data: null });
+
+        var savePromise = dupeCheckPromise.then(function (dupeRes) {
+          if (dupeRes.data) throw new Error("Diese E-Mail-Adresse wird bereits von einem anderen Mitglied verwendet.");
+          return ownMemberId
+            ? client.from("members").update(payload).eq("id", ownMemberId).then(function (res) {
+                if (res.error) throw res.error;
+              })
+            : client.from("members").insert(Object.assign({ user_id: userId, created_by: userId, is_child: false }, payload)).select().single().then(function (res) {
+                if (res.error) throw res.error;
+                ownMemberId = res.data.id;
+              });
+        });
 
         savePromise
           .then(function () {
@@ -1131,7 +1146,9 @@
           })
           .then(function () {
             ownMember = Object.assign({}, ownMember, payload);
-            accountNameModal.textContent = fullDisplayName((currentSession.user.user_metadata && currentSession.user.user_metadata.name) || currentSession.user.email);
+            var epFallbackName = (currentSession.user.user_metadata && currentSession.user.user_metadata.name) || currentSession.user.email;
+            accountNameModal.textContent = fullDisplayName(epFallbackName);
+            accountNameHeader.textContent = "Hallo " + headerDisplayName(epFallbackName);
             saveEditProfileBtn.disabled = false;
             saveEditProfileBtn.textContent = "Speichern";
             editProfileModal.classList.add("hidden");

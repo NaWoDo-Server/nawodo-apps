@@ -287,6 +287,7 @@ function MitgliederApp({ session }) {
   const [formTelefon, setFormTelefon] = useState("");
   const [formHandy, setFormHandy] = useState("");
   const [formGeburtstag, setFormGeburtstag] = useState("");
+  const [formGeburtstagVersteckt, setFormGeburtstagVersteckt] = useState(false);
   const [formFotoFile, setFormFotoFile] = useState(null);
   const [formFotoPreview, setFormFotoPreview] = useState(null);
   const [showAddGroup, setShowAddGroup] = useState(false);
@@ -507,6 +508,7 @@ function MitgliederApp({ session }) {
     setFormTelefon("");
     setFormHandy("");
     setFormGeburtstag("");
+    setFormGeburtstagVersteckt(false);
     setFormParent2("");
     setFormFotoFile(null);
     setFormFotoPreview(null);
@@ -553,6 +555,7 @@ function MitgliederApp({ session }) {
     setFormTelefon(m.telefon || "");
     setFormHandy(m.handy || "");
     setFormGeburtstag(m.geburtstag || "");
+    setFormGeburtstagVersteckt(m.geburtstag_versteckt === true);
     setFormFotoFile(null);
     setFormFotoPreview(m.foto_url || null);
     setFormError("");
@@ -610,6 +613,7 @@ function MitgliederApp({ session }) {
         telefon: formTelefon.trim() || null,
         handy: formHandy.trim() || null,
         geburtstag: formGeburtstag || null,
+        geburtstag_versteckt: formGeburtstagVersteckt,
         foto_url: fotoUrl,
       };
       let savedId = editingMember?.id || null;
@@ -1192,7 +1196,11 @@ function MitgliederApp({ session }) {
             <input value={formWohneinheit} onChange={(e) => setFormWohneinheit(e.target.value)} placeholder="z.B. WE 12" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
             <label className="text-xs font-medium block mb-1">Geburtstag</label>
-            <input type="date" value={formGeburtstag} onChange={(e) => setFormGeburtstag(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <input type="date" value={formGeburtstag} onChange={(e) => setFormGeburtstag(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <label className="flex items-center gap-2 text-xs mb-3" style={{ color: INK_SOFT }}>
+              <input type="checkbox" checked={formGeburtstagVersteckt} onChange={(e) => setFormGeburtstagVersteckt(e.target.checked)} />
+              Geburtstag nicht im Geburtstage-Widget der Hauptseite anzeigen
+            </label>
 
             {!formIsChild && (
               <>

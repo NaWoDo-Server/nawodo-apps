@@ -250,6 +250,22 @@ function Hofteiler({ session }) {
   // weil Kategorien/Artikel zwischen beiden Apps geteilt werden.
   const isElevated = isAdmin || isSuperAdmin || myModApps.includes("sharing") || myModApps.includes("termine");
 
+  // Fuer den "Zum Workshop"-Link bei verknuepften Terminen: nur anzeigen, wenn der
+  // User die Workshop-App auch wirklich nutzen darf (persoenlich nicht gesperrt und
+  // App nicht global deaktiviert).
+  const [canAccessWorkshop, setCanAccessWorkshop] = useState(true);
+  useEffect(() => {
+    if (isSuperAdmin) return;
+    Promise.all([
+      supabase.from("member_permissions").select("allowed").eq("user_id", user.id).eq("app_key", "workshop").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key", "app_enabled_workshop").maybeSingle(),
+    ]).then(([permRes, settingRes]) => {
+      const deniedPersonally = permRes.data?.allowed === false;
+      const globallyDisabled = settingRes.data?.value === false;
+      setCanAccessWorkshop(!deniedPersonally && !globallyDisabled);
+    }).catch(() => {});
+  }, [user.id, isSuperAdmin]);
+
   // Admins koennen eine Buchung fuer ein anderes Mitglied anlegen/umtragen.
   // Liste wird nur fuer Admins geladen (RPC prueft das serverseitig zusaetzlich ab).
   const [members, setMembers] = useState([{ id: user.id, name: userName }]);
@@ -875,6 +891,7 @@ function Hofteiler({ session }) {
                 eventCategory={eventCategory}
                 colorFor={colorFor}
                 isManageable={isManageable}
+                canAccessWorkshop={canAccessWorkshop}
                 onDelete={handleDelete}
                 onEdit={openEditBookingDialog}
                 onBook={(d) => openBookingDialog(d)}
@@ -1019,6 +1036,7 @@ function Hofteiler({ session }) {
             eventCategory={eventCategory}
             colorFor={colorFor}
             isManageable={isManageable}
+            canAccessWorkshop={canAccessWorkshop}
             onDelete={handleDelete}
             onEdit={openEditBookingDialog}
             onBook={(d) => openBookingDialog(d)}

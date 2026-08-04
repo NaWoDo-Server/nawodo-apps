@@ -1153,8 +1153,8 @@
     function loadBirthdayWidget(client) {
       var widget = document.getElementById("birthdayWidget");
       var list = document.getElementById("birthdayList");
-      client.from("members").select("vorname,nachname,geburtstag").then(function (res) {
-        var members = (res.data) || [];
+      client.from("members").select("vorname,nachname,geburtstag,geburtstag_versteckt").then(function (res) {
+        var members = ((res.data) || []).filter(function (m) { return m.geburtstag_versteckt !== true; });
 
         var today = new Date();
         today.setHours(0, 0, 0, 0);

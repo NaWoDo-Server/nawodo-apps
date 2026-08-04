@@ -41,6 +41,13 @@ const BULK_RIGHT_OPTIONS = [
 const APP_RIGHT_OPTIONS = APP_LIST.map((a) => ({ key: a.key, label: `App: ${a.label}` }));
 const USAGE_RIGHT_OPTIONS = BULK_RIGHT_OPTIONS.filter((o) => ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"].includes(o.key));
 
+// Fuer den "Rollen"-Reiter: globaler Admin-Status + Moderator-Zuordnung pro App,
+// als Kontrollkaestchen-Matrix statt einzeln ueber das Profil-Popup.
+const ROLE_RIGHT_OPTIONS = [
+  { key: "admin", label: "Admin" },
+  ...APP_LIST.map((a) => ({ key: `mod_${a.key}`, label: a.label, app: "Moderator" })),
+];
+
 const OPT_IN_KEYS = ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"];
 
 const SHORT_RIGHT_LABELS = {
@@ -271,7 +278,7 @@ function SettingsApp({ session }) {
   const [newPassword, setNewPassword] = useState("");
 
   const [activeTab, setActiveTab] = useState("benutzer"); // "benutzer" | "apps"
-  const [rightsView, setRightsView] = useState("apps"); // "apps" | "nutzung"
+  const [rightsView, setRightsView] = useState("apps"); // "apps" | "nutzung" | "rollen"
 
   // Apps-Tab: globale Ein/Aus-Schalter pro App (app_settings.app_enabled_<key>)
   const [appEnabledMap, setAppEnabledMap] = useState({});
@@ -469,6 +476,39 @@ function SettingsApp({ session }) {
     setActionError("");
     try {
       await callAdminFn({ type: "set_permission", target_user_id: userId, app_key: appKey, allowed: !isRightAllowed(userId, appKey) });
+      await loadAll();
+    } catch (e) {
+      setActionError(e.message || "Konnte nicht geändert werden.");
+    } finally {
+      setTogglingCell(null);
+    }
+  }
+
+  function isRoleAllowed(userId, key) {
+    if (key === "admin") {
+      const u = allUsers.find((x) => x.id === userId);
+      return u?.is_admin === true;
+    }
+    return modAppsFor(userId).includes(key.replace("mod_", ""));
+  }
+
+  async function handleToggleRoleCell(userId, key) {
+    const cellKey = `role:${userId}:${key}`;
+    setTogglingCell(cellKey);
+    setActionError("");
+    try {
+      if (key === "admin") {
+        await callAdminFn({ type: "toggle_admin", target_user_id: userId, is_admin: !isRoleAllowed(userId, "admin") });
+      } else {
+        const appKey = key.replace("mod_", "");
+        if (isRoleAllowed(userId, key)) {
+          const { error } = await supabase.from("app_moderators").delete().eq("user_id", userId).eq("app_key", appKey);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("app_moderators").insert({ user_id: userId, app_key: appKey });
+          if (error) throw error;
+        }
+      }
       await loadAll();
     } catch (e) {
       setActionError(e.message || "Konnte nicht geändert werden.");
@@ -875,15 +915,25 @@ function SettingsApp({ session }) {
           >
             Nutzung in einer App
           </button>
+          <button
+            onClick={() => setRightsView("rollen")}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={rightsView === "rollen" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Rollen
+          </button>
         </div>
+        {rightsView === "rollen" && (
+          <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Admin darf Inhalte in allen Apps bearbeiten. Moderator gilt nur für die jeweilige App.</p>
+        )}
         <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Name antippen öffnet das Profil (Adresse, Rolle, Passwort). Häkchen wirken sofort.</p>
         <div className="overflow-x-auto rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <table className="text-xs border-collapse" style={{ minWidth: 760 }}>
             <thead>
-              {rightsView === "nutzung" && (
+              {(rightsView === "nutzung" || rightsView === "rollen") && (
                 <tr>
                   <th className="sticky left-0" style={{ backgroundColor: "#fff" }}></th>
-                  {groupOptionsByApp(USAGE_RIGHT_OPTIONS).map((g, i) => (
+                  {groupOptionsByApp(rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((g, i) => (
                     <th
                       key={`${g.app}-${i}`}
                       colSpan={g.count}
@@ -897,7 +947,7 @@ function SettingsApp({ session }) {
               )}
               <tr>
                 <th className="text-left px-3 py-2.5 sticky left-0" style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Mitglied</th>
-                {(rightsView === "apps" ? APP_RIGHT_OPTIONS : USAGE_RIGHT_OPTIONS).map((opt) => (
+                {(rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((opt) => (
                   <th key={opt.key} title={opt.label} className="px-1.5 py-2.5 text-center font-semibold whitespace-nowrap" style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}` }}>
                     {shortRightLabel(opt)}
                   </th>
@@ -925,14 +975,14 @@ function SettingsApp({ session }) {
                         </div>
                       </button>
                     </td>
-                    {(rightsView === "apps" ? APP_RIGHT_OPTIONS : USAGE_RIGHT_OPTIONS).map((opt) => (
+                    {(rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((opt) => (
                       <td key={opt.key} className="text-center px-1.5 py-2">
                         {u ? (
                           <input
                             type="checkbox"
-                            checked={isRightAllowed(u.id, opt.key)}
-                            disabled={togglingCell === `${u.id}:${opt.key}`}
-                            onChange={() => handleToggleMatrixCell(u.id, opt.key)}
+                            checked={rightsView === "rollen" ? isRoleAllowed(u.id, opt.key) : isRightAllowed(u.id, opt.key)}
+                            disabled={togglingCell === (rightsView === "rollen" ? `role:${u.id}:${opt.key}` : `${u.id}:${opt.key}`)}
+                            onChange={() => (rightsView === "rollen" ? handleToggleRoleCell(u.id, opt.key) : handleToggleMatrixCell(u.id, opt.key))}
                           />
                         ) : (
                           <span style={{ color: BORDER_SOFT }}>–</span>

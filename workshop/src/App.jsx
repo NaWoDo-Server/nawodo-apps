@@ -240,6 +240,7 @@ function WorkshopApp({ session }) {
   const isElevated = isAdmin || isSuperAdmin || myModApps.includes("workshop");
 
   const [workshops, setWorkshops] = useState([]);
+  const [termineEventResourceId, setTermineEventResourceId] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [foodItems, setFoodItems] = useState([]);
   const [attendance, setAttendance] = useState([]);
@@ -270,13 +271,15 @@ function WorkshopApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [ws, att, food, at, mods, us] = await Promise.all([
+    const [ws, att, food, at, mods, us, cats, res] = await Promise.all([
       supabase.from("workshops").select("*").order("date", { ascending: false }),
       supabase.from("workshop_attachments").select("*"),
       supabase.from("workshop_food_items").select("*").order("created_at"),
       supabase.from("workshop_attendance").select("*"),
       supabase.from("app_moderators").select("app_key").eq("user_id", user.id),
       supabase.rpc("list_all_users"),
+      supabase.from("categories").select("*"),
+      supabase.from("resources").select("*"),
     ]);
     setWorkshops(ws.data || []);
     setAttachments(att.data || []);
@@ -284,6 +287,11 @@ function WorkshopApp({ session }) {
     setAttendance(at.data || []);
     setMyModApps((mods.data || []).map((r) => r.app_key));
     setAllUsers(us.data || []);
+    // Fuer die Termine-Verknuepfung: die Buchungs-"Resource" der Termine-App finden
+    // (die Kategorie mit event_mode=true, dort die erste/einzige Resource "Termin").
+    const eventCat = (cats.data || []).find((c) => c.event_mode);
+    const eventRes = eventCat ? (res.data || []).find((r) => r.category_id === eventCat.id) : null;
+    setTermineEventResourceId(eventRes?.id || null);
     setLoading(false);
   }
 
@@ -297,6 +305,18 @@ function WorkshopApp({ session }) {
     const archived = workshops.filter((w) => w.id !== current?.id).sort((a, b) => b.date.localeCompare(a.date));
     return { currentWorkshop: current, archivedWorkshops: archived };
   }, [workshops]);
+
+  // Deep-Link von der Termine-App aus (/workshop/?open=<id>): passenden Workshop
+  // automatisch im Archiv aufklappen, falls er nicht sowieso schon oben steht.
+  useEffect(() => {
+    if (loading) return;
+    const openId = new URLSearchParams(window.location.search).get("open");
+    if (!openId || openId === currentWorkshop?.id) return;
+    if (archivedWorkshops.some((w) => w.id === openId)) {
+      setShowArchive(true);
+      setExpandedArchiveId(openId);
+    }
+  }, [loading, currentWorkshop, archivedWorkshops]);
 
   function attachmentsFor(workshopId) { return attachments.filter((a) => a.workshop_id === workshopId); }
   function foodItemsFor(workshopId) { return foodItems.filter((f) => f.workshop_id === workshopId); }
@@ -356,6 +376,38 @@ function WorkshopApp({ session }) {
     setShowForm(true);
   }
 
+  // Legt fuer den Workshop automatisch einen (ganztaegigen) Termin im Termine-Kalender an
+  // bzw. aktualisiert ihn, damit Workshops auch dort im Kalender auftauchen. Faellt still
+  // durch, wenn die Termine-App noch keine Termin-Kategorie/Resource hat.
+  async function syncTermineBooking(workshopId, { date, moderatorName, themenTitle, agenda }) {
+    if (!termineEventResourceId) return;
+    const title = themenTitle ? `Workshop: ${themenTitle}` : "Workshop";
+    const payload = {
+      resource_id: termineEventResourceId,
+      date,
+      end_date: date,
+      all_day: true,
+      start_time: "00:00",
+      end_time: "23:59",
+      name: moderatorName || "Workshop",
+      title,
+      note: agenda || null,
+      user_id: user.id,
+      workshop_id: workshopId,
+    };
+    try {
+      const { data: existing } = await supabase.from("bookings").select("id").eq("workshop_id", workshopId).maybeSingle();
+      if (existing) {
+        await supabase.from("bookings").update(payload).eq("id", existing.id);
+      } else {
+        await supabase.from("bookings").insert(payload);
+      }
+    } catch {
+      // Verknuepfung mit dem Kalender ist ein Komfort-Feature - schlaegt sie fehl,
+      // soll das Speichern des Workshops selbst trotzdem nicht scheitern.
+    }
+  }
+
   async function handleSaveWorkshop() {
     setFormError("");
     if (!formDate) return setFormError("Bitte ein Datum eintragen.");
@@ -390,6 +442,8 @@ function WorkshopApp({ session }) {
         const { url, filename } = await uploadAttachment(file);
         await supabase.from("workshop_attachments").insert({ workshop_id: workshopId, url, filename, created_by: user.id });
       }
+
+      await syncTermineBooking(workshopId, { date: formDate, moderatorName: moderator?.name || null, themenTitle: cleanedThemen[0]?.title || "", agenda: payload.agenda });
 
       setShowForm(false);
       setEditingWorkshop(null);

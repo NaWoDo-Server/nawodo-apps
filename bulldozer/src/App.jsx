@@ -354,6 +354,16 @@ function BulldozerApp({ session }) {
     };
   }, [screen, parsed.width, parsed.height]);
 
+  // Spielflaeche horizontal zentrieren, statt links stehen zu lassen. Faengt vor allem den
+  // Fall ab, dass beim Levelwechsel eine alte Scroll-Position vom vorherigen (breiteren)
+  // Level uebrig bleibt und das Feld dadurch verschoben wirkt.
+  useLayoutEffect(() => {
+    if (screen !== "game") return;
+    const wrap = gridWrapRef.current;
+    if (!wrap) return;
+    wrap.scrollLeft = (wrap.scrollWidth - wrap.clientWidth) / 2;
+  }, [screen, cellSize, parsed.width, parsed.height, levelIndex]);
+
   function ownScoreFor(idx) {
     return scores.find((s) => s.user_id === user.id && s.level_index === idx) || null;
   }
@@ -498,10 +508,18 @@ function BulldozerApp({ session }) {
         <div className="w-14 lg:w-24 flex-shrink-0" aria-hidden="true" />
         <button
           onClick={onClick}
-          className="w-full max-w-[130px] lg:max-w-[220px] rounded-xl overflow-hidden block flex-shrink-0"
-          style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
+          className="w-full max-w-[130px] lg:max-w-[220px] rounded-xl overflow-hidden block flex-shrink-0 relative p-1.5"
+          style={{
+            backgroundColor: "#F7F5EF",
+            border: "1px solid rgba(255,255,255,0.6)",
+            boxShadow: "0 5px 10px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.14), inset 0 -3px 5px rgba(0,0,0,0.1)",
+          }}
         >
-          <img src={src} alt={alt} className="w-full block" style={{ imageRendering: "pixelated" }} />
+          <img src={src} alt={alt} className="w-full block rounded-lg" style={{ imageRendering: "pixelated", opacity: 0.82 }} />
+          <div
+            className="absolute inset-0 rounded-xl pointer-events-none"
+            style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.16) 28%, rgba(255,255,255,0) 48%, rgba(0,0,0,0.1) 100%)" }}
+          />
         </button>
         <div className="w-14 lg:w-24 flex-shrink-0 pl-2 lg:pl-3">
           {sub && (
@@ -614,8 +632,20 @@ function BulldozerApp({ session }) {
                   className="flex-1 min-w-0 h-7 lg:h-9 rounded-lg px-1.5 text-[10px] lg:text-xs border uppercase"
                   style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
                 />
-                <button onClick={jumpToCode} className="flex-shrink-0 h-7 lg:h-9">
-                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-full w-auto block" style={{ imageRendering: "pixelated" }} />
+                <button
+                  onClick={jumpToCode}
+                  className="flex-shrink-0 h-7 lg:h-9 rounded-lg overflow-hidden relative p-1"
+                  style={{
+                    backgroundColor: "#F7F5EF",
+                    border: "1px solid rgba(255,255,255,0.6)",
+                    boxShadow: "0 3px 6px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.14), inset 0 -2px 3px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  <img src="/bulldozer/btn-los.png" alt="Los" className="h-full w-auto block rounded" style={{ imageRendering: "pixelated", opacity: 0.82 }} />
+                  <div
+                    className="absolute inset-0 rounded-lg pointer-events-none"
+                    style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.16) 28%, rgba(255,255,255,0) 48%, rgba(0,0,0,0.1) 100%)" }}
+                  />
                 </button>
               </div>
               {codeError && <p className="text-xs lg:text-sm mt-1.5 px-1 text-center" style={{ color: "#A13D3D" }}>{codeError}</p>}

@@ -579,7 +579,7 @@ function WorkshopApp({ session }) {
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
             <img src="/workshop/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Workshop</h1>

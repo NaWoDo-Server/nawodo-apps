@@ -713,7 +713,7 @@ function BulldozerApp({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
           <div className="flex items-center gap-2.5">
             {screen !== "select" && (
               <button onClick={() => setScreen("select")} className="p-1.5 -ml-1.5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>

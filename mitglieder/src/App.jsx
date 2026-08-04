@@ -742,7 +742,7 @@ function MitgliederApp({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto">
-        <div className="px-5 pt-6 pb-3 flex items-center justify-between">
+        <div className="px-5 pt-6 pb-3 flex items-center justify-between sticky top-0 z-30" style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
             <img src="/mitglieder/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Mitglieder</h1>
@@ -827,7 +827,7 @@ function MitgliederApp({ session }) {
               </div>
             </div>
 
-            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap sticky z-20" style={{ backgroundColor: "#E4E1D3", top: "0.5rem" }}>
+            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap sticky z-20" style={{ backgroundColor: "#E4E1D3", top: "4.5rem" }}>
               {[
                 ...(isElevatedForMitglieder || canFilterGenossenschaft ? [["mitglieder", "Genossenschaftsmitglieder"]] : []),
                 ...(isElevatedForMitglieder || canFilterGast ? [["gast", "Gäste"]] : []),

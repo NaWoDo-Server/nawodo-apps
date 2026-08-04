@@ -782,7 +782,7 @@ function Hofteiler({ session }) {
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className={isDesktop ? "w-full" : "sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
-      <div className="px-5 lg:px-8 pt-6 pb-3 flex items-center justify-between">
+      <div className="px-5 lg:px-8 pt-6 pb-3 flex items-center justify-between sticky top-0 z-30" style={{ backgroundColor: PAPER }}>
         <a href="/" className="flex items-center gap-2.5">
           <img src="/termine/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
           <h1 className="font-bold text-lg lg:text-2xl">Termine</h1>

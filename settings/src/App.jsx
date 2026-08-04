@@ -582,10 +582,12 @@ function SettingsApp({ session }) {
     return applicable.every((r) => isCellCheckedFor(rightsView, r, optKey));
   }
 
-  async function handleBulkToggleColumn(optKey) {
+  async function handleBulkToggleColumn(optKey, optLabel) {
     const applicable = applicableRowsFor(rightsView);
     if (applicable.length === 0) return;
     const target = !isColumnAllChecked(optKey);
+    const verb = target ? "aktivieren" : "entfernen";
+    if (!window.confirm(`"${optLabel}" für alle ${applicable.length} sichtbaren Mitglieder ${verb}?`)) return;
     const cellKey = `bulk:${rightsView}:${optKey}`;
     setTogglingCell(cellKey);
     setActionError("");
@@ -789,7 +791,7 @@ function SettingsApp({ session }) {
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-full px-4 sm:px-6 lg:px-8 py-5">
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
             <img src="/settings/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Settings</h1>
@@ -842,7 +844,7 @@ function SettingsApp({ session }) {
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 mb-3 p-1 rounded-full w-fit sticky z-20" style={{ backgroundColor: "#E4E1D3", top: "0.5rem" }}>
+        <div className="flex items-center gap-1.5 mb-3 p-1 rounded-full w-fit sticky z-20" style={{ backgroundColor: "#E4E1D3", top: "3.5rem" }}>
           <button
             onClick={() => setRightsView("typ")}
             className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
@@ -886,18 +888,18 @@ function SettingsApp({ session }) {
           <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Noch keine Gruppen angelegt.</p>
         )}
         <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Name antippen öffnet das Profil (Passwort, Account löschen). Häkchen wirken sofort, das Kästchen im Spaltenkopf setzt/entfernt für alle auf einmal.</p>
-        <div className="overflow-x-auto overflow-y-visible rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+        <div className="overflow-auto rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", maxHeight: "65vh" }}>
           <table className="text-xs border-collapse" style={{ minWidth: 760 }}>
             <thead>
               {(rightsView === "nutzung" || rightsView === "rollen") && (
                 <tr>
-                  <th className="sticky left-0 z-20" style={{ backgroundColor: "#fff", top: "3.25rem" }}></th>
+                  <th className="sticky left-0 top-0 z-20" style={{ backgroundColor: "#fff" }}></th>
                   {groupOptionsByApp(rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((g, i) => (
                     <th
                       key={`${g.app}-${i}`}
                       colSpan={g.count}
-                      className="px-1.5 pt-2 pb-1 text-center text-[10px] font-bold uppercase tracking-wide sticky z-10"
-                      style={{ color: BLUE, backgroundColor: "#fff", top: "3.25rem" }}
+                      className="px-1.5 pt-2 pb-1 text-center text-[10px] font-bold uppercase tracking-wide sticky top-0 z-10"
+                      style={{ color: BLUE, backgroundColor: "#fff" }}
                     >
                       {g.app}
                     </th>
@@ -907,7 +909,7 @@ function SettingsApp({ session }) {
               <tr>
                 <th
                   className="text-left px-3 py-2.5 sticky left-0 z-20"
-                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "5.5rem" : "3.25rem" }}
+                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "2.25rem" : 0 }}
                 >
                   Mitglied
                 </th>
@@ -916,7 +918,7 @@ function SettingsApp({ session }) {
                     key={opt.key}
                     title={opt.label}
                     className="px-1.5 py-2 text-center font-semibold whitespace-nowrap sticky z-10"
-                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "5.5rem" : "3.25rem" }}
+                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "2.25rem" : 0 }}
                   >
                     {rightsView !== "typ" && (
                       <input
@@ -924,7 +926,7 @@ function SettingsApp({ session }) {
                         className="block mx-auto mb-1"
                         checked={isColumnAllChecked(opt.key)}
                         disabled={togglingCell === `bulk:${rightsView}:${opt.key}`}
-                        onChange={() => handleBulkToggleColumn(opt.key)}
+                        onChange={() => handleBulkToggleColumn(opt.key, opt.label)}
                         title="Für alle setzen/entfernen"
                       />
                     )}

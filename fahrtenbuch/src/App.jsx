@@ -633,7 +633,7 @@ function Fahrtenbuch({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className={isDesktop ? "lg:w-2/3 mx-auto" : "sm:max-w-2xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
-        <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6 flex items-center justify-between" : "px-5 pt-6 pb-3 flex items-center justify-between"}>
+        <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6 flex items-center justify-between sticky top-0 z-30" : "px-5 pt-6 pb-3 flex items-center justify-between sticky top-0 z-30"} style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
             <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-12 object-contain" : "h-8 object-contain"} />
             <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>

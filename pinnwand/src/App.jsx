@@ -646,7 +646,7 @@ function PinnwandApp({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto">
-        <div className="px-4 pt-6 pb-3 flex items-center justify-between">
+        <div className="px-4 pt-6 pb-3 flex items-center justify-between sticky top-0 z-30" style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
             <img src="/pinnwand/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Pinnwand</h1>

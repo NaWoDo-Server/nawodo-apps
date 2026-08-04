@@ -692,6 +692,32 @@
         }).catch(function () {});
       }
 
+      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer"];
+
+      function applyGlobalAppEnabled(client, session) {
+        // Suite-weiter Ein/Aus-Schalter aus der Settings-App (app_settings.app_enabled_<key>).
+        // Fuer normale Mitglieder verschwindet die Kachel komplett, wenn eine App deaktiviert ist.
+        // Der Superadmin sieht sie weiterhin (nur ausgegraut + markiert), damit er sie wieder
+        // einschalten oder testen kann.
+        var isSuperAdmin = session.user.user_metadata && session.user.user_metadata.is_superadmin === true;
+        var keys = STANDARD_APP_KEYS.map(function (k) { return "app_enabled_" + k; });
+        client.from("app_settings").select("key,value").in("key", keys).then(function (res) {
+          var rows = (res.data) || [];
+          rows.forEach(function (row) {
+            if (row.value !== false) return;
+            var appKey = row.key.replace("app_enabled_", "");
+            var tile = document.querySelector('.app[data-app="' + appKey + '"]');
+            if (!tile) return;
+            if (isSuperAdmin) {
+              tile.style.opacity = "0.4";
+              tile.title = "Aktuell für alle deaktiviert (Settings → Apps)";
+            } else {
+              tile.classList.add("hidden");
+            }
+          });
+        }).catch(function () {});
+      }
+
       function showApp(session) {
         loadingBox.classList.add("hidden");
         loginBox.classList.add("hidden");
@@ -712,6 +738,7 @@
         loadTodayWidget(client);
         loadBirthdayWidget(client);
         applyAppPermissions(client, session);
+        applyGlobalAppEnabled(client, session);
       }
 
       client.auth.getSession().then(function (res) {

@@ -193,7 +193,7 @@ function AuthGate() {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
   }
 
-  if (appEnabled === false) {
+  if (appEnabled === false && session.user.user_metadata?.is_superadmin !== true) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">

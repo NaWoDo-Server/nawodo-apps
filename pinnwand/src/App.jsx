@@ -660,7 +660,7 @@ function PinnwandApp({ session }) {
 
         <div className="flex items-start gap-3 px-4">
           {/* Icon-Leiste links: fungiert als Filter, oben die Gesamtübersicht */}
-          <div className="flex flex-col items-center gap-2.5 flex-shrink-0 pt-1">
+          <div className="flex flex-col items-center gap-2.5 flex-shrink-0 pt-1 sticky overflow-y-auto" style={{ top: "5.75rem", maxHeight: "calc(100vh - 6.25rem)" }}>
             <button
               onClick={() => setActiveFilter(null)}
               title="Gesamtübersicht"

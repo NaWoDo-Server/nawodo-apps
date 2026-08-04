@@ -893,13 +893,13 @@ function SettingsApp({ session }) {
             <thead>
               {(rightsView === "nutzung" || rightsView === "rollen") && (
                 <tr>
-                  <th className="sticky left-0 top-0 z-20" style={{ backgroundColor: "#fff" }}></th>
+                  <th className="sticky left-0 top-0 z-20" style={{ backgroundColor: "#fff", height: "2rem" }}></th>
                   {groupOptionsByApp(rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((g, i) => (
                     <th
                       key={`${g.app}-${i}`}
                       colSpan={g.count}
-                      className="px-1.5 pt-2 pb-1 text-center text-[10px] font-bold uppercase tracking-wide sticky top-0 z-10"
-                      style={{ color: BLUE, backgroundColor: "#fff" }}
+                      className="px-1.5 text-center text-[10px] font-bold uppercase tracking-wide sticky top-0 z-10"
+                      style={{ color: BLUE, backgroundColor: "#fff", height: "2rem" }}
                     >
                       {g.app}
                     </th>
@@ -909,7 +909,7 @@ function SettingsApp({ session }) {
               <tr>
                 <th
                   className="text-left px-3 py-2.5 sticky left-0 z-20"
-                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "2.25rem" : 0 }}
+                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "2rem" : 0 }}
                 >
                   Mitglied
                 </th>
@@ -918,7 +918,7 @@ function SettingsApp({ session }) {
                     key={opt.key}
                     title={opt.label}
                     className="px-1.5 py-2 text-center font-semibold whitespace-nowrap sticky z-10"
-                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "2.25rem" : 0 }}
+                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "2rem" : 0 }}
                   >
                     {rightsView !== "typ" && (
                       <input

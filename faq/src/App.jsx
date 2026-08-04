@@ -485,7 +485,7 @@ function FaqApp({ session }) {
           </div>
         </div>
 
-        <div className="px-5 mb-4">
+        <div className="px-5 mb-4 sticky z-20 pb-1" style={{ top: "5.75rem", backgroundColor: PAPER }}>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
             <input

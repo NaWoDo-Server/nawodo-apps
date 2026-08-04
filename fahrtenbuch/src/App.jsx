@@ -742,7 +742,7 @@ function Fahrtenbuch({ session }) {
             <p className="px-8 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
           ) : (
             <div className="max-w-6xl mx-auto px-8 pb-12 flex gap-8 items-start">
-              <div className="w-64 flex-shrink-0 flex flex-col gap-5">
+              <div className="w-64 flex-shrink-0 flex flex-col gap-5 sticky overflow-y-auto" style={{ top: "8rem", maxHeight: "calc(100vh - 9rem)" }}>
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Fahrzeuge</div>
                   <div className="flex flex-col gap-1.5">

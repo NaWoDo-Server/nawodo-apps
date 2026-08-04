@@ -331,13 +331,35 @@ function VorsorgeApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [docs, sh, dsh, np, us] = await Promise.all([
-      supabase.from("vorsorge_documents").select("*").order("created_at", { ascending: false }),
-      supabase.from("vorsorge_shares").select("*"),
-      supabase.from("vorsorge_document_shares").select("*"),
-      supabase.from("vorsorge_notfallpass").select("*"),
-      supabase.rpc("list_all_users"),
-    ]);
+    let docs, sh, dsh, np, us;
+    try {
+      [docs, sh, dsh, np, us] = await Promise.all([
+        supabase.from("vorsorge_documents").select("*").order("created_at", { ascending: false }),
+        supabase.from("vorsorge_shares").select("*"),
+        supabase.from("vorsorge_document_shares").select("*"),
+        supabase.from("vorsorge_notfallpass").select("*"),
+        supabase.rpc("list_all_users"),
+      ]);
+    } catch (e) {
+      console.error("Vorsorge loadAll fehlgeschlagen (Netzwerk/Exception):", e);
+      alert(`Laden fehlgeschlagen: ${e?.message || JSON.stringify(e)}`);
+      setLoading(false);
+      return;
+    }
+    const errors = [
+      ["Dokumente", docs.error],
+      ["Vertrauenspersonen", sh.error],
+      ["Dokument-Freigaben", dsh.error],
+      ["Notfallpass", np.error],
+      ["Mitgliederliste", us.error],
+    ].filter(([, err]) => !!err);
+    if (errors.length > 0) {
+      console.error("Vorsorge loadAll Fehler:", errors);
+      alert(
+        "Beim Laden ist etwas schiefgelaufen:\n" +
+          errors.map(([label, err]) => `- ${label}: ${err.message || JSON.stringify(err)}`).join("\n")
+      );
+    }
     setDocuments(docs.data || []);
     setShares(sh.data || []);
     setDocShares(dsh.data || []);

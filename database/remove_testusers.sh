@@ -13,13 +13,22 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 SERVICE_ROLE_KEY=""
-for c in supabase-auth supabase-kong supabase-rest supabase-storage; do
-  SERVICE_ROLE_KEY=$(docker inspect "$c" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^SERVICE_ROLE_KEY=' | head -1 | cut -d= -f2-)
-  if [ -n "$SERVICE_ROLE_KEY" ]; then break; fi
+for envfile in /root/supabase/docker/.env "$HOME/supabase/docker/.env"; do
+  if [ -f "$envfile" ]; then
+    SERVICE_ROLE_KEY=$(grep '^SERVICE_ROLE_KEY=' "$envfile" | head -1 | cut -d= -f2-)
+    [ -n "$SERVICE_ROLE_KEY" ] && break
+  fi
 done
 
 if [ -z "$SERVICE_ROLE_KEY" ]; then
-  echo "Konnte SERVICE_ROLE_KEY nicht automatisch finden."
+  for c in supabase-auth supabase-kong supabase-rest supabase-storage; do
+    SERVICE_ROLE_KEY=$(docker inspect "$c" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^SERVICE_ROLE_KEY=' | head -1 | cut -d= -f2-)
+    [ -n "$SERVICE_ROLE_KEY" ] && break
+  done
+fi
+
+if [ -z "$SERVICE_ROLE_KEY" ]; then
+  echo "Konnte SERVICE_ROLE_KEY nicht automatisch finden (weder in /root/supabase/docker/.env noch in den Containern)."
   exit 1
 fi
 

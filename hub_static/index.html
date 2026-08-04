@@ -234,6 +234,23 @@
     }
     .msg-error { color: #A13D3D; font-size: 13px; margin: 0 0 8px; }
     .msg-success { color: #2E7D4F; font-size: 13px; margin: 0 0 8px; }
+    .modal-secondary-btn {
+      width: 100%;
+      border-radius: 10px;
+      padding: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #2B2B26;
+      background: none;
+      border: 1.5px solid #D8D5C7;
+      cursor: pointer;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     .today-widget { display: block; cursor: default; }
     .today-widget .widget-label {
@@ -477,6 +494,8 @@
             </div>
           </div>
 
+          <button id="openEditProfileBtn" class="modal-secondary-btn">&#9998; Eintrag bearbeiten</button>
+
           <label class="field-label">Passwort ändern</label>
           <input type="password" id="newPasswordInput" class="modal-input" placeholder="Neues Passwort" autocomplete="new-password" />
           <input type="password" id="newPasswordConfirmInput" class="modal-input" placeholder="Neues Passwort wiederholen" autocomplete="new-password" />
@@ -485,6 +504,60 @@
           <button id="savePasswordBtn" class="modal-primary-btn">Passwort speichern</button>
 
           <button id="logoutBtn" class="modal-danger-btn">Abmelden</button>
+        </div>
+      </div>
+
+      <div id="editProfileModal" class="modal-overlay hidden">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h2>Eintrag bearbeiten</h2>
+            <button id="closeEditProfileModal" class="modal-close-btn">&times;</button>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 8px;">
+            <div>
+              <label class="field-label">Vorname</label>
+              <input id="epVorname" class="modal-input" style="margin-bottom: 0;" />
+            </div>
+            <div>
+              <label class="field-label">Nachname</label>
+              <input id="epNachname" class="modal-input" style="margin-bottom: 0;" />
+            </div>
+          </div>
+
+          <label class="field-label">Spitzname</label>
+          <input id="epSpitzname" class="modal-input" placeholder="optional" />
+
+          <div class="form-row" style="margin-bottom: 8px;">
+            <div>
+              <label class="field-label">Straße</label>
+              <input id="epStrasse" class="modal-input" style="margin-bottom: 0;" />
+            </div>
+            <div>
+              <label class="field-label">Hausnummer</label>
+              <input id="epHausnummer" class="modal-input" style="margin-bottom: 0;" />
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 8px;">
+            <div>
+              <label class="field-label">PLZ</label>
+              <input id="epPlz" class="modal-input" style="margin-bottom: 0;" />
+            </div>
+            <div>
+              <label class="field-label">Ort</label>
+              <input id="epWohnort" class="modal-input" style="margin-bottom: 0;" />
+            </div>
+          </div>
+
+          <label class="field-label">Wohneinheit</label>
+          <input id="epWohneinheit" class="modal-input" placeholder="z.B. WE 12" />
+
+          <label class="field-label">Login-Email</label>
+          <input type="email" id="epEmail" class="modal-input" />
+
+          <div class="msg-error hidden" id="epError"></div>
+          <button id="saveEditProfileBtn" class="modal-primary-btn" style="margin-bottom: 0;">Speichern</button>
         </div>
       </div>
 
@@ -678,10 +751,25 @@
       var passwordSuccess = document.getElementById("passwordSuccess");
       var savePasswordBtn = document.getElementById("savePasswordBtn");
       var logoutBtn = document.getElementById("logoutBtn");
+      var openEditProfileBtn = document.getElementById("openEditProfileBtn");
+      var editProfileModal = document.getElementById("editProfileModal");
+      var closeEditProfileModal = document.getElementById("closeEditProfileModal");
+      var epVorname = document.getElementById("epVorname");
+      var epNachname = document.getElementById("epNachname");
+      var epSpitzname = document.getElementById("epSpitzname");
+      var epStrasse = document.getElementById("epStrasse");
+      var epHausnummer = document.getElementById("epHausnummer");
+      var epPlz = document.getElementById("epPlz");
+      var epWohnort = document.getElementById("epWohnort");
+      var epWohneinheit = document.getElementById("epWohneinheit");
+      var epEmail = document.getElementById("epEmail");
+      var epError = document.getElementById("epError");
+      var saveEditProfileBtn = document.getElementById("saveEditProfileBtn");
 
       var BUCKET = "public-media";
       var currentSession = null;
       var ownMemberId = null;
+      var ownMember = null;
 
       var url = window.__SUPABASE_URL__;
       var key = window.__SUPABASE_ANON_KEY__;
@@ -713,11 +801,21 @@
         }
       }
 
-      function loadOwnAvatar(userId, initial) {
-        client.from("members").select("id, foto_url").eq("user_id", userId).maybeSingle().then(function (res) {
+      function fullDisplayName(fallbackName) {
+        if (!ownMember || !ownMember.vorname) return fallbackName;
+        var parts = ownMember.vorname;
+        if (ownMember.spitzname) parts += " \u201E" + ownMember.spitzname + "\u201C";
+        if (ownMember.nachname) parts += " " + ownMember.nachname;
+        return parts;
+      }
+
+      function loadOwnAvatar(userId, initial, fallbackName) {
+        client.from("members").select("*").eq("user_id", userId).maybeSingle().then(function (res) {
           var data = res.data;
           ownMemberId = data && data.id ? data.id : null;
+          ownMember = data || null;
           setAvatarDisplay(data && data.foto_url ? data.foto_url : null, initial);
+          accountNameModal.textContent = fullDisplayName(fallbackName);
         }).catch(function () {});
       }
 
@@ -775,7 +873,7 @@
         accountEmailModal.textContent = user.email;
         accountNameHeader.textContent = "Hallo " + name;
         setAvatarDisplay(null, initial);
-        loadOwnAvatar(user.id, initial);
+        loadOwnAvatar(user.id, initial, name);
         var settingsTile = document.getElementById("settingsTile");
         if (settingsTile) {
           var isSuperAdmin = user.user_metadata && user.user_metadata.is_superadmin === true;
@@ -939,6 +1037,111 @@
 
       logoutBtn.addEventListener("click", function () {
         client.auth.signOut().then(function () { showLogin(); });
+      });
+
+      openEditProfileBtn.addEventListener("click", function () {
+        accountModal.classList.add("hidden");
+        epVorname.value = (ownMember && ownMember.vorname) || "";
+        epNachname.value = (ownMember && ownMember.nachname) || "";
+        epSpitzname.value = (ownMember && ownMember.spitzname) || "";
+        epStrasse.value = (ownMember && ownMember.strasse) || "";
+        epHausnummer.value = (ownMember && ownMember.hausnummer) || "";
+        epPlz.value = (ownMember && ownMember.plz) || "";
+        epWohnort.value = (ownMember && ownMember.wohnort) || "";
+        epWohneinheit.value = (ownMember && ownMember.wohneinheit) || "";
+        epEmail.value = (ownMember && ownMember.email) || (currentSession && currentSession.user.email) || "";
+        epError.classList.add("hidden");
+        editProfileModal.classList.remove("hidden");
+      });
+
+      closeEditProfileModal.addEventListener("click", function () {
+        editProfileModal.classList.add("hidden");
+      });
+
+      var mouseDownOnEditOverlay = false;
+      editProfileModal.addEventListener("mousedown", function (e) {
+        mouseDownOnEditOverlay = e.target === editProfileModal;
+      });
+      editProfileModal.addEventListener("click", function (e) {
+        if (e.target === editProfileModal && mouseDownOnEditOverlay) {
+          editProfileModal.classList.add("hidden");
+        }
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          editProfileModal.classList.add("hidden");
+        }
+      });
+
+      function syncOwnLoginEmail(newEmail) {
+        return fetch(url + "/functions/v1/admin-create-account", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentSession.access_token },
+          body: JSON.stringify({ type: "set_email", target_user_id: currentSession.user.id, email: newEmail }),
+        }).then(function (resp) {
+          return resp.json().catch(function () { return {}; }).then(function (data) {
+            if (!resp.ok) throw new Error(data && data.error ? data.error : "Login-Email konnte nicht mit geändert werden.");
+          });
+        });
+      }
+
+      saveEditProfileBtn.addEventListener("click", function () {
+        epError.classList.add("hidden");
+        var vorname = epVorname.value.trim();
+        var newEmail = epEmail.value.trim().toLowerCase();
+        if (!vorname) {
+          epError.textContent = "Bitte einen Vornamen eintragen.";
+          epError.classList.remove("hidden");
+          return;
+        }
+        if (!newEmail) {
+          epError.textContent = "Bitte eine E-Mail-Adresse eintragen.";
+          epError.classList.remove("hidden");
+          return;
+        }
+        var payload = {
+          vorname: vorname,
+          nachname: epNachname.value.trim(),
+          spitzname: epSpitzname.value.trim() || null,
+          strasse: epStrasse.value.trim() || null,
+          hausnummer: epHausnummer.value.trim() || null,
+          plz: epPlz.value.trim() || null,
+          wohnort: epWohnort.value.trim() || null,
+          wohneinheit: epWohneinheit.value.trim() || null,
+          email: newEmail,
+        };
+        saveEditProfileBtn.disabled = true;
+        saveEditProfileBtn.textContent = "Speichern…";
+        var userId = currentSession.user.id;
+        var savePromise = ownMemberId
+          ? client.from("members").update(payload).eq("id", ownMemberId).then(function (res) {
+              if (res.error) throw res.error;
+            })
+          : client.from("members").insert(Object.assign({ user_id: userId, created_by: userId, is_child: false }, payload)).select().single().then(function (res) {
+              if (res.error) throw res.error;
+              ownMemberId = res.data.id;
+            });
+
+        var emailChanged = (ownMember && ownMember.email) !== newEmail;
+
+        savePromise
+          .then(function () {
+            if (emailChanged) return syncOwnLoginEmail(newEmail);
+          })
+          .then(function () {
+            ownMember = Object.assign({}, ownMember, payload);
+            accountNameModal.textContent = fullDisplayName((currentSession.user.user_metadata && currentSession.user.user_metadata.name) || currentSession.user.email);
+            saveEditProfileBtn.disabled = false;
+            saveEditProfileBtn.textContent = "Speichern";
+            editProfileModal.classList.add("hidden");
+          })
+          .catch(function (e) {
+            saveEditProfileBtn.disabled = false;
+            saveEditProfileBtn.textContent = "Speichern";
+            epError.textContent = (e && e.message) || "Konnte nicht gespeichert werden.";
+            epError.classList.remove("hidden");
+          });
       });
     })();
 

@@ -176,6 +176,7 @@ function SettingsApp({ session }) {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [epVorname, setEpVorname] = useState("");
   const [epNachname, setEpNachname] = useState("");
+  const [epSpitzname, setEpSpitzname] = useState("");
   const [epStrasse, setEpStrasse] = useState("");
   const [epHausnummer, setEpHausnummer] = useState("");
   const [epPlz, setEpPlz] = useState("");
@@ -188,6 +189,7 @@ function SettingsApp({ session }) {
   function openEditProfile() {
     setEpVorname(ownMember?.vorname || "");
     setEpNachname(ownMember?.nachname || "");
+    setEpSpitzname(ownMember?.spitzname || "");
     setEpStrasse(ownMember?.strasse || "");
     setEpHausnummer(ownMember?.hausnummer || "");
     setEpPlz(ownMember?.plz || "");
@@ -218,6 +220,7 @@ function SettingsApp({ session }) {
       const payload = {
         vorname: epVorname.trim(),
         nachname: epNachname.trim(),
+        spitzname: epSpitzname.trim() || null,
         strasse: epStrasse.trim() || null,
         hausnummer: epHausnummer.trim() || null,
         plz: epPlz.trim() || null,
@@ -1330,6 +1333,9 @@ function SettingsApp({ session }) {
                 <input value={epNachname} onChange={(e) => setEpNachname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
             </div>
+
+            <label className="text-xs font-medium block mb-1">Spitzname</label>
+            <input value={epSpitzname} onChange={(e) => setEpSpitzname(e.target.value)} placeholder="optional" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>

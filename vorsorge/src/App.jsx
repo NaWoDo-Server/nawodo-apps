@@ -285,15 +285,17 @@ function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, onShare, 
             <div className="text-xs mt-1 flex items-center gap-1" style={{ color: INK_SOFT }}><Bell size={11} /> Erinnerung alle 6 Monate aktiv</div>
           )}
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={onDownload} disabled={downloading} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>
+        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+          <button onClick={onDownload} disabled={downloading} title="Herunterladen" className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>
             {downloading ? <Loader2 size={14} className="animate-spin" style={{ color: INK_SOFT }} /> : <Download size={14} style={{ color: INK_SOFT }} />}
           </button>
           {canManage && (
             <>
-              <button onClick={onShare} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Share2 size={13} style={{ color: INK_SOFT }} /></button>
-              <button onClick={onEdit} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Pencil size={13} style={{ color: INK_SOFT }} /></button>
-              <button onClick={onDelete} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Trash2 size={13} style={{ color: "#A13D3D" }} /></button>
+              <button onClick={onShare} title="Gezielt an eine Person freigeben" className="h-8 pl-2 pr-3 rounded-full flex items-center gap-1" style={{ backgroundColor: "#E4E1D3" }}>
+                <Share2 size={13} style={{ color: INK_SOFT }} /> <span className="text-[11px] font-semibold" style={{ color: INK_SOFT }}>Teilen</span>
+              </button>
+              <button onClick={onEdit} title="Bearbeiten" className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Pencil size={13} style={{ color: INK_SOFT }} /></button>
+              <button onClick={onDelete} title="Löschen" className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Trash2 size={13} style={{ color: "#A13D3D" }} /></button>
             </>
           )}
         </div>
@@ -324,6 +326,7 @@ function VorsorgeApp({ session }) {
   const [docShares, setDocShares] = useState([]);
   const [notfallpassList, setNotfallpassList] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
   const [expandedOwners, setExpandedOwners] = useState(() => new Set());
@@ -331,14 +334,15 @@ function VorsorgeApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    let docs, sh, dsh, np, us;
+    let docs, sh, dsh, np, us, mb;
     try {
-      [docs, sh, dsh, np, us] = await Promise.all([
+      [docs, sh, dsh, np, us, mb] = await Promise.all([
         supabase.from("vorsorge_documents").select("*").order("created_at", { ascending: false }),
         supabase.from("vorsorge_shares").select("*"),
         supabase.from("vorsorge_document_shares").select("*"),
         supabase.from("vorsorge_notfallpass").select("*"),
         supabase.rpc("list_all_users"),
+        supabase.from("members").select("user_id, vorname, nachname"),
       ]);
     } catch (e) {
       console.error("Vorsorge loadAll fehlgeschlagen (Netzwerk/Exception):", e);
@@ -365,6 +369,7 @@ function VorsorgeApp({ session }) {
     setDocShares(dsh.data || []);
     setNotfallpassList(np.data || []);
     setAllUsers(us.data || []);
+    setMembers(mb?.data || []);
     setLoading(false);
   }
 
@@ -372,10 +377,17 @@ function VorsorgeApp({ session }) {
     return notfallpassList.find((n) => n.owner_user_id === ownerId) || null;
   }
 
-  function nameFor(userId) {
-    if (userId === user.id) return `${userName} (Du)`;
+  function fullNameFor(userId) {
+    const m = members.find((x) => x.user_id === userId);
+    const memberName = m ? [m.vorname, m.nachname].filter(Boolean).join(" ").trim() : "";
+    if (memberName) return memberName;
     const u = allUsers.find((x) => x.id === userId);
     return u?.name || u?.email || "Unbekannt";
+  }
+
+  function nameFor(userId) {
+    if (userId === user.id) return `${fullNameFor(userId)} (Du)`;
+    return fullNameFor(userId);
   }
 
   function toggleOwnerExpanded(ownerId) {
@@ -806,12 +818,15 @@ function VorsorgeApp({ session }) {
               </div>
             </button>
 
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Meine Dokumente</h2>
               <button onClick={() => { resetUploadForm(); setShowUploadForm(true); }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
                 <Plus size={14} /> Dokument hochladen
               </button>
             </div>
+            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>
+              Über den "Teilen"-Button bei einem Dokument gibst du es gezielt nur einer einzelnen Person frei – unabhängig von deinen Vertrauenspersonen weiter unten, die automatisch alles sehen.
+            </p>
 
             {myDocuments.length === 0 ? (
               <div className="text-center py-10 rounded-xl mb-6" style={{ backgroundColor: "#fff" }}>
@@ -826,7 +841,7 @@ function VorsorgeApp({ session }) {
               </div>
             )}
 
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Vertrauenspersonen</h2>
               <button onClick={() => { setShowAddTrusted(true); setTrustedError(""); }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
                 <UserPlus size={14} /> Hinzufügen
@@ -1047,7 +1062,7 @@ function VorsorgeApp({ session }) {
               <option value="">Bitte wählen…</option>
               {allUsers
                 .filter((u) => u.id !== user.id && !trustedByMeIds.has(u.id) && !docSharesFor(sharingDoc.id).some((ds) => ds.trusted_user_id === u.id))
-                .map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                .map((u) => <option key={u.id} value={u.id}>{fullNameFor(u.id)}</option>)}
             </select>
             {docShareError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{docShareError}</p>}
             <button onClick={handleAddDocShare} disabled={savingDocShare || !addDocShareUserId} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingDocShare || !addDocShareUserId ? 0.6 : 1 }}>
@@ -1064,7 +1079,7 @@ function VorsorgeApp({ session }) {
             <select value={addTrustedUserId} onChange={(e) => setAddTrustedUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
               <option value="">Bitte wählen…</option>
               {allUsers.filter((u) => u.id !== user.id && !trustedByMeIds.has(u.id)).map((u) => (
-                <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                <option key={u.id} value={u.id}>{fullNameFor(u.id)}</option>
               ))}
             </select>
             {trustedError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{trustedError}</p>}

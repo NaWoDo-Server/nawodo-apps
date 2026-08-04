@@ -27,11 +27,11 @@ const APP_LIST = [
 // setzen lassen - die 8 Standard-Apps (opt-out) + die 5 Opt-in-Unterfilter.
 const BULK_RIGHT_OPTIONS = [
   ...APP_LIST.map((a) => ({ key: a.key, label: `App: ${a.label}` })),
-  { key: "faq_projekt", label: "FAQ: Rund um das Projekt" },
-  { key: "mitglieder_genossenschaft", label: "Mitglieder-Filter: Genossenschaftsmitglieder" },
-  { key: "mitglieder_gaeste", label: "Mitglieder-Filter: Gäste" },
-  { key: "mitglieder_bewohner", label: "Mitglieder-Filter: Bewohner" },
-  { key: "mitglieder_kinder", label: "Mitglieder-Filter: Kinder" },
+  { key: "faq_projekt", label: "FAQ: Rund um das Projekt", app: "FAQ" },
+  { key: "mitglieder_genossenschaft", label: "Mitglieder-Filter: Genossenschaftsmitglieder", app: "Mitglieder" },
+  { key: "mitglieder_gaeste", label: "Mitglieder-Filter: Gäste", app: "Mitglieder" },
+  { key: "mitglieder_bewohner", label: "Mitglieder-Filter: Bewohner", app: "Mitglieder" },
+  { key: "mitglieder_kinder", label: "Mitglieder-Filter: Kinder", app: "Mitglieder" },
 ];
 
 // Fuer die Rechte-Matrix: bewusst getrennt zwischen "Apps" (ganze App an/aus pro
@@ -52,6 +52,22 @@ const SHORT_RIGHT_LABELS = {
 };
 function shortRightLabel(opt) {
   return SHORT_RIGHT_LABELS[opt.key] || opt.label.replace("App: ", "");
+}
+
+// Fasst aufeinanderfolgende Spalten mit gleicher App zu einer Gruppe zusammen,
+// damit im "Nutzung in einer App"-Tab eine Kopfzeile zeigt, zu welcher App
+// welche Spalten gehoeren - wichtig, sobald mehrere Apps eigene Unter-Rechte haben.
+function groupOptionsByApp(options) {
+  const groups = [];
+  for (const opt of options) {
+    const last = groups[groups.length - 1];
+    if (last && last.app === opt.app) {
+      last.count += 1;
+    } else {
+      groups.push({ app: opt.app || "", count: 1 });
+    }
+  }
+  return groups;
 }
 
 const BULK_CATEGORY_OPTIONS = [
@@ -767,6 +783,21 @@ function SettingsApp({ session }) {
         <div className="overflow-x-auto rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <table className="text-xs border-collapse" style={{ minWidth: 760 }}>
             <thead>
+              {rightsView === "nutzung" && (
+                <tr>
+                  <th className="sticky left-0" style={{ backgroundColor: "#fff" }}></th>
+                  {groupOptionsByApp(USAGE_RIGHT_OPTIONS).map((g, i) => (
+                    <th
+                      key={`${g.app}-${i}`}
+                      colSpan={g.count}
+                      className="px-1.5 pt-2 pb-1 text-center text-[10px] font-bold uppercase tracking-wide"
+                      style={{ color: BLUE }}
+                    >
+                      {g.app}
+                    </th>
+                  ))}
+                </tr>
+              )}
               <tr>
                 <th className="text-left px-3 py-2.5 sticky left-0" style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Mitglied</th>
                 {(rightsView === "apps" ? APP_RIGHT_OPTIONS : USAGE_RIGHT_OPTIONS).map((opt) => (

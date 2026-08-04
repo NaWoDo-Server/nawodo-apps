@@ -206,7 +206,7 @@ function AuthGate() {
 
 const NOTFALLPASS_BLANK = {
   name: "", geburtsdatum: "", adresse: "", blutgruppe: "",
-  vorerkrankungen: "", allergien: "", medikamente: "", implantate: "", operationen: "",
+  vorerkrankungen: "", allergien: "", medikamente_liste: [], implantate: "", operationen: "",
   kontakt1_name: "", kontakt1_telefon: "", kontakt2_name: "", kontakt2_telefon: "",
   hausarzt_name: "", hausarzt_telefon: "", facharzt_name: "", facharzt_telefon: "",
   krankenkasse: "", versichertennummer: "",
@@ -215,7 +215,7 @@ const NOTFALLPASS_BLANK = {
 
 const NOTFALLPASS_LABELS = {
   name: "Name", geburtsdatum: "Geburtsdatum", adresse: "Adresse", blutgruppe: "Blutgruppe",
-  vorerkrankungen: "Vorerkrankungen", allergien: "Allergien / Unverträglichkeiten", medikamente: "Aktuelle Medikation (mit Dosierung)",
+  vorerkrankungen: "Vorerkrankungen", allergien: "Allergien / Unverträglichkeiten",
   implantate: "Implantate / Geräte", operationen: "Frühere Operationen (falls relevant)",
   kontakt1_name: "Notfallkontakt 1", kontakt1_telefon: "Telefon Notfallkontakt 1",
   kontakt2_name: "Notfallkontakt 2", kontakt2_telefon: "Telefon Notfallkontakt 2",
@@ -245,25 +245,95 @@ function NpTextArea({ label, value, onChange, placeholder, rows }) {
   );
 }
 
+function NpMedicationList({ value, onChange }) {
+  const list = Array.isArray(value) && value.length > 0 ? value : [{ name: "", dosierung: "" }];
+
+  function updateRow(idx, key, v) {
+    const next = list.map((row, i) => (i === idx ? { ...row, [key]: v } : row));
+    onChange(next);
+  }
+
+  function addRow() {
+    onChange([...list, { name: "", dosierung: "" }]);
+  }
+
+  function removeRow(idx) {
+    const next = list.filter((_, i) => i !== idx);
+    onChange(next.length > 0 ? next : [{ name: "", dosierung: "" }]);
+  }
+
+  return (
+    <div className="mb-3">
+      <label className="text-xs font-medium block mb-1">Aktuelle Medikation</label>
+      <div className="flex flex-col gap-2">
+        {list.map((row, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={row.name || ""}
+              onChange={(e) => updateRow(idx, "name", e.target.value)}
+              placeholder="Medikament"
+              className="flex-1 min-w-0 rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+            <input
+              type="text"
+              value={row.dosierung || ""}
+              onChange={(e) => updateRow(idx, "dosierung", e.target.value)}
+              placeholder="Dosierung"
+              className="w-28 flex-shrink-0 rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+            {list.length > 1 && (
+              <button type="button" onClick={() => removeRow(idx)} className="w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>
+                <X size={13} style={{ color: INK_SOFT }} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={addRow} className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
+        <Plus size={13} /> Weiteres Medikament
+      </button>
+    </div>
+  );
+}
+
 function NotfallpassReadonly({ record }) {
   const entries = Object.keys(NOTFALLPASS_LABELS).filter((k) => {
     const v = record[k];
     return v !== null && v !== undefined && v !== "";
   });
+  const medications = Array.isArray(record.medikamente_liste)
+    ? record.medikamente_liste.filter((m) => (m?.name || "").trim() || (m?.dosierung || "").trim())
+    : [];
+
   return (
     <div className="flex flex-col gap-2.5">
       {record.organspendeausweis && (
         <div className="text-xs font-semibold px-2.5 py-1.5 rounded-lg inline-block w-fit" style={{ backgroundColor: "#FF92921A", color: "#C0453F" }}>Hat einen Organspendeausweis</div>
       )}
-      {entries.length === 0 ? (
+      {entries.length === 0 && medications.length === 0 ? (
         <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Angaben.</p>
       ) : (
-        entries.map((k) => (
-          <div key={k}>
-            <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>{NOTFALLPASS_LABELS[k]}</div>
-            <div className="text-sm whitespace-pre-wrap">{record[k]}</div>
-          </div>
-        ))
+        <>
+          {medications.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>Aktuelle Medikation</div>
+              <div className="flex flex-col gap-0.5">
+                {medications.map((m, i) => (
+                  <div key={i} className="text-sm">{m.name}{m.dosierung ? ` – ${m.dosierung}` : ""}</div>
+                ))}
+              </div>
+            </div>
+          )}
+          {entries.map((k) => (
+            <div key={k}>
+              <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>{NOTFALLPASS_LABELS[k]}</div>
+              <div className="text-sm whitespace-pre-wrap">{record[k]}</div>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );
@@ -884,7 +954,12 @@ function VorsorgeApp({ session }) {
                           {expanded ? <ChevronDown size={14} style={{ color: INK }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK }} className="flex-shrink-0" />}
                           <span className="text-sm font-semibold truncate">{nameFor(ownerId)}</span>
                         </div>
-                        <span className="text-xs flex-shrink-0" style={{ color: INK_SOFT }}>{docs.length} Dokument{docs.length === 1 ? "" : "e"}</span>
+                        <span className="flex items-center gap-1.5 flex-shrink-0">
+                          {ownerNp && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#FF92921A", color: "#C0453F" }}>Notfallpass</span>
+                          )}
+                          <span className="text-xs" style={{ color: INK_SOFT }}>{docs.length} Dokument{docs.length === 1 ? "" : "e"}</span>
+                        </span>
                       </button>
                       {expanded && (
                         <div className="px-3.5 pb-3.5">
@@ -1105,7 +1180,7 @@ function VorsorgeApp({ session }) {
             <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Medizinische Angaben</div>
             <NpTextArea label="Bekannte Vorerkrankungen" value={npForm.vorerkrankungen} onChange={(v) => updateNpField("vorerkrankungen", v)} placeholder="z.B. Diabetes, Herzerkrankung, Epilepsie" />
             <NpTextArea label="Allergien / Unverträglichkeiten" value={npForm.allergien} onChange={(v) => updateNpField("allergien", v)} placeholder="besonders Medikamentenallergien" />
-            <NpTextArea label="Aktuelle Medikation (mit Dosierung)" value={npForm.medikamente} onChange={(v) => updateNpField("medikamente", v)} />
+            <NpMedicationList value={npForm.medikamente_liste} onChange={(v) => updateNpField("medikamente_liste", v)} />
             <NpTextArea label="Implantate / Geräte" value={npForm.implantate} onChange={(v) => updateNpField("implantate", v)} placeholder="z.B. Herzschrittmacher, künstliches Gelenk, Insulinpumpe" rows={2} />
             <NpTextArea label="Frühere Operationen (falls relevant)" value={npForm.operationen} onChange={(v) => updateNpField("operationen", v)} rows={2} />
 

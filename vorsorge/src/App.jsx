@@ -299,24 +299,64 @@ function NpMedicationList({ value, onChange }) {
   );
 }
 
+function NpField({ label, value }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div>
+      <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>{label}</div>
+      <div className="text-sm whitespace-pre-wrap">{value}</div>
+    </div>
+  );
+}
+
+function NpPhoneLink({ number }) {
+  if (!number) return null;
+  return <a href={`tel:${number.replace(/\s+/g, "")}`} className="underline" style={{ color: GREEN }}>{number}</a>;
+}
+
+function NpContactBlock({ title, name, phone }) {
+  if (!name && !phone) return null;
+  return (
+    <div>
+      <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>{title}</div>
+      <div className="text-sm">
+        {name}
+        {name && phone && " · "}
+        <NpPhoneLink number={phone} />
+      </div>
+    </div>
+  );
+}
+
 function NotfallpassReadonly({ record }) {
-  const entries = Object.keys(NOTFALLPASS_LABELS).filter((k) => {
-    const v = record[k];
-    return v !== null && v !== undefined && v !== "";
-  });
   const medications = Array.isArray(record.medikamente_liste)
     ? record.medikamente_liste.filter((m) => (m?.name || "").trim() || (m?.dosierung || "").trim())
     : [];
+  const hasKontakt1 = !!(record.kontakt1_name || record.kontakt1_telefon);
+  const hasKontakt2 = !!(record.kontakt2_name || record.kontakt2_telefon);
+  const hasMain = !!(
+    record.name || record.geburtsdatum || record.adresse || record.vorerkrankungen || medications.length > 0 ||
+    record.operationen || record.implantate || record.blutgruppe || hasKontakt1 || hasKontakt2 ||
+    record.hausarzt_name || record.hausarzt_telefon || record.krankenkasse
+  );
+  const hasExtra = !!(
+    record.allergien || record.facharzt_name || record.facharzt_telefon || record.versichertennummer ||
+    record.vorsorge_hinweis || record.patientenverfuegung_kurzform || record.besondere_hinweise
+  );
 
   return (
     <div className="flex flex-col gap-2.5">
       {record.organspendeausweis && (
         <div className="text-xs font-semibold px-2.5 py-1.5 rounded-lg inline-block w-fit" style={{ backgroundColor: "#FF92921A", color: "#C0453F" }}>Hat einen Organspendeausweis</div>
       )}
-      {entries.length === 0 && medications.length === 0 ? (
+      {!hasMain && !hasExtra ? (
         <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Angaben.</p>
       ) : (
         <>
+          <NpField label="Name" value={record.name} />
+          <NpField label="Geburtsdatum" value={record.geburtsdatum} />
+          <NpField label="Adresse" value={record.adresse} />
+          <NpField label="Vorerkrankungen" value={record.vorerkrankungen} />
           {medications.length > 0 && (
             <div>
               <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>Aktuelle Medikation</div>
@@ -327,12 +367,44 @@ function NotfallpassReadonly({ record }) {
               </div>
             </div>
           )}
-          {entries.map((k) => (
-            <div key={k}>
-              <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>{NOTFALLPASS_LABELS[k]}</div>
-              <div className="text-sm whitespace-pre-wrap">{record[k]}</div>
+          <NpField label="Frühere Operationen (falls relevant)" value={record.operationen} />
+          <NpField label="Implantate / Geräte" value={record.implantate} />
+          <NpField label="Blutgruppe" value={record.blutgruppe} />
+          {(hasKontakt1 || hasKontakt2) && (
+            <div>
+              <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>Notfallkontakte</div>
+              <div className="flex flex-col gap-1">
+                {hasKontakt1 && (
+                  <div className="text-sm">
+                    {record.kontakt1_name}
+                    {record.kontakt1_name && record.kontakt1_telefon && " · "}
+                    <NpPhoneLink number={record.kontakt1_telefon} />
+                  </div>
+                )}
+                {hasKontakt2 && (
+                  <div className="text-sm">
+                    {record.kontakt2_name}
+                    {record.kontakt2_name && record.kontakt2_telefon && " · "}
+                    <NpPhoneLink number={record.kontakt2_telefon} />
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
+          )}
+          <NpContactBlock title="Hausarzt" name={record.hausarzt_name} phone={record.hausarzt_telefon} />
+          <NpField label="Krankenkasse" value={record.krankenkasse} />
+
+          {hasExtra && (
+            <>
+              <div className="text-xs font-bold uppercase tracking-wide mt-1" style={{ color: INK_SOFT }}>Weitere Angaben</div>
+              <NpField label="Allergien / Unverträglichkeiten" value={record.allergien} />
+              <NpContactBlock title="Facharzt" name={record.facharzt_name} phone={record.facharzt_telefon} />
+              <NpField label="Versichertennummer" value={record.versichertennummer} />
+              <NpField label={NOTFALLPASS_LABELS.vorsorge_hinweis} value={record.vorsorge_hinweis} />
+              <NpField label="Patientenverfügung (Kurzform)" value={record.patientenverfuegung_kurzform} />
+              <NpField label="Besondere Hinweise" value={record.besondere_hinweise} />
+            </>
+          )}
         </>
       )}
     </div>
@@ -375,6 +447,22 @@ function VorsorgeApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const initial = userName.charAt(0).toUpperCase();
+
+  // Popups per ESC-Taste schliessbar machen.
+  useEffect(() => {
+    function handleEscape(e) {
+      if (e.key !== "Escape") return;
+      setShowUploadForm(false);
+      setEditingDoc(null);
+      setShowAddTrusted(false);
+      setShowNotfallpassForm(false);
+      setViewingNotfallpassOwnerId(null);
+      setShowAccount(false);
+      setShowEditProfile(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
   const isAdmin = user.user_metadata?.is_admin === true;
   const isSuperAdmin = user.user_metadata?.is_superadmin === true;
 
@@ -944,9 +1032,9 @@ function VorsorgeApp({ session }) {
             <h1 className="font-bold text-lg lg:text-2xl">Vorsorge</h1>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
-            <span className="text-xs lg:text-sm font-semibold truncate max-w-[90px] lg:max-w-[160px]" style={{ color: INK_SOFT }}>{userName}</span>
+            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
           </div>
         </div>
 
@@ -968,7 +1056,7 @@ function VorsorgeApp({ session }) {
         {activeTab === "meine" && (
           <>
             <button
-              onClick={openNotfallpassForm}
+              onClick={() => { if (myNotfallpass) { setViewingNotfallpassOwnerId(user.id); } else { openNotfallpassForm(); } }}
               className="w-full flex items-center gap-3 p-4 rounded-xl mb-6 text-left"
               style={{ backgroundColor: "#FF9292", color: "#fff" }}
             >
@@ -977,7 +1065,7 @@ function VorsorgeApp({ session }) {
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-bold">Notfallpass</div>
-                <div className="text-xs opacity-90">{myNotfallpass ? "Ausgefüllt – hier bearbeiten" : "Noch nicht ausgefüllt – jetzt anlegen"}</div>
+                <div className="text-xs opacity-90">{myNotfallpass ? "Ausgefüllt – hier ansehen" : "Noch nicht ausgefüllt – jetzt anlegen"}</div>
               </div>
             </button>
 
@@ -1329,7 +1417,19 @@ function VorsorgeApp({ session }) {
       {viewingNotfallpassOwnerId && viewingNp && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setViewingNotfallpassOwnerId(null); } }}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Notfallpass – {nameFor(viewingNotfallpassOwnerId)}</h2><button onClick={() => setViewingNotfallpassOwnerId(null)}><X size={20} /></button></div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">{viewingNotfallpassOwnerId === user.id ? "Mein Notfallpass" : `Notfallpass – ${nameFor(viewingNotfallpassOwnerId)}`}</h2>
+              <button onClick={() => setViewingNotfallpassOwnerId(null)}><X size={20} /></button>
+            </div>
+            {viewingNotfallpassOwnerId === user.id && (
+              <button
+                onClick={() => { setViewingNotfallpassOwnerId(null); openNotfallpassForm(); }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold mb-4"
+                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK }}
+              >
+                <Pencil size={14} /> Bearbeiten
+              </button>
+            )}
             <NotfallpassReadonly record={viewingNp} />
           </div>
         </div>

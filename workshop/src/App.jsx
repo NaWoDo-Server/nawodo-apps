@@ -130,6 +130,18 @@ function WorkshopApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const initial = userName.charAt(0).toUpperCase();
+
+  // Popups per ESC-Taste schliessbar machen.
+  useEffect(() => {
+    function handleEscape(e) {
+      if (e.key !== "Escape") return;
+      setShowForm(false);
+      setShowAccount(false);
+      setShowEditProfile(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
   const [ownMemberId, setOwnMemberId] = useState(null);
   const [ownFotoUrl, setOwnFotoUrl] = useState(null);
   const [ownMember, setOwnMember] = useState(null);
@@ -511,9 +523,9 @@ function WorkshopApp({ session }) {
             <h1 className="font-bold text-lg lg:text-2xl">Workshop</h1>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
-            <span className="text-xs lg:text-sm font-semibold truncate max-w-[90px] lg:max-w-[160px]" style={{ color: INK_SOFT }}>{userName}</span>
+            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
           </div>
         </div>
 

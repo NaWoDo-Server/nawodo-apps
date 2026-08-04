@@ -84,6 +84,18 @@
       top: 20px;
       right: 20px;
       z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .account-menu-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2B2B26;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .avatar-btn {
       width: 36px;
@@ -441,6 +453,7 @@
 
     <div id="appBox" class="hidden">
       <div class="account-menu">
+        <span id="accountNameHeader" class="account-menu-name"></span>
         <button id="avatarBtn" class="avatar-btn">?</button>
       </div>
 
@@ -656,6 +669,7 @@
       var closeAccountModal = document.getElementById("closeAccountModal");
       var accountAvatarLg = document.getElementById("accountAvatarLg");
       var accountNameModal = document.getElementById("accountNameModal");
+      var accountNameHeader = document.getElementById("accountNameHeader");
       var accountEmailModal = document.getElementById("accountEmailModal");
       var avatarFileInput = document.getElementById("avatarFileInput");
       var avatarError = document.getElementById("avatarError");
@@ -760,6 +774,7 @@
         var initial = name.charAt(0).toUpperCase();
         accountNameModal.textContent = name;
         accountEmailModal.textContent = user.email;
+        accountNameHeader.textContent = "Hallo " + name;
         setAvatarDisplay(null, initial);
         loadOwnAvatar(user.id, initial);
         var settingsTile = document.getElementById("settingsTile");
@@ -851,6 +866,12 @@
       });
       accountModal.addEventListener("click", function (e) {
         if (e.target === accountModal && mouseDownOnOverlay) {
+          accountModal.classList.add("hidden");
+        }
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
           accountModal.classList.add("hidden");
         }
       });

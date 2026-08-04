@@ -222,6 +222,19 @@ function Hofteiler({ session }) {
     }
   }
   const initial = userName.charAt(0).toUpperCase();
+
+  // Popups per ESC-Taste schliessbar machen.
+  useEffect(() => {
+    function handleEscape(e) {
+      if (e.key !== "Escape") return;
+      setShowResourceForm(false);
+      setShowEditResourceForm(false);
+      setShowSettings(false);
+      setShowEditProfile(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
   const isAdmin = user.user_metadata?.is_admin === true;
   const isSuperAdmin = user.user_metadata?.is_superadmin === true;
   const [myModApps, setMyModApps] = useState([]);
@@ -751,9 +764,9 @@ function Hofteiler({ session }) {
           <h1 className="font-bold text-lg lg:text-2xl">Sharing</h1>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
-          <span className="text-xs lg:text-sm font-semibold truncate max-w-[90px] lg:max-w-[160px]" style={{ color: INK_SOFT }}>{userName}</span>
+          <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
           <button onClick={() => setShowSettings(true)} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+          <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
         </div>
       </div>
 

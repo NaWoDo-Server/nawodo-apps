@@ -236,6 +236,21 @@ function Fahrtenbuch({ session }) {
   }, [user.id]);
   const isElevated = isAdmin || isSuperAdmin || myModApps.includes("fahrtenbuch");
   const initial = userName.charAt(0).toUpperCase();
+
+  // Popups per ESC-Taste schliessbar machen.
+  useEffect(() => {
+    function handleEscape(e) {
+      if (e.key !== "Escape") return;
+      setShowForm(false);
+      setShowCarForm(false);
+      setShowRangePicker(false);
+      setShowStats(false);
+      setShowAccount(false);
+      setShowEditProfile(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
   const isDesktop = useIsDesktop();
 
   const [cars, setCars] = useState([]);
@@ -616,9 +631,9 @@ function Fahrtenbuch({ session }) {
             <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/" className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"} style={{ backgroundColor: "#E4E1D3" }}><Home size={isDesktop ? 24 : 16} style={{ color: INK_SOFT }} /></a>
-            <span className={isDesktop ? "text-sm font-semibold truncate max-w-[160px]" : "text-xs font-semibold truncate max-w-[90px]"} style={{ color: INK_SOFT }}>{userName}</span>
+            <span className={isDesktop ? "text-sm font-bold truncate max-w-[180px]" : "text-xs font-bold truncate max-w-[110px]"} style={{ color: INK_SOFT }}>Hallo {userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg text-white flex-shrink-0 overflow-hidden" : "w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden"} style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+            <a href="/" className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"} style={{ backgroundColor: "#E4E1D3" }}><Home size={isDesktop ? 24 : 16} style={{ color: INK_SOFT }} /></a>
           </div>
         </div>
 

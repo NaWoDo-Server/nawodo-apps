@@ -246,6 +246,8 @@ function WorkshopApp({ session }) {
 
   const [workshops, setWorkshops] = useState([]);
   const [termineEventResourceId, setTermineEventResourceId] = useState(null);
+  const [gmrResourceId, setGmrResourceId] = useState(null);
+  const [termineSyncWarning, setTermineSyncWarning] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [foodItems, setFoodItems] = useState([]);
   const [attendance, setAttendance] = useState([]);
@@ -297,6 +299,9 @@ function WorkshopApp({ session }) {
     const eventCat = (cats.data || []).find((c) => c.event_mode);
     const eventRes = eventCat ? (res.data || []).find((r) => r.category_id === eventCat.id) : null;
     setTermineEventResourceId(eventRes?.id || null);
+    // Der GMR-Raum wird bei jedem Workshop automatisch mitgebucht.
+    const gmrRes = (res.data || []).find((r) => (r.name || "").trim().toLowerCase() === "gmr");
+    setGmrResourceId(gmrRes?.id || null);
     setLoading(false);
   }
 
@@ -381,36 +386,55 @@ function WorkshopApp({ session }) {
     setShowForm(true);
   }
 
-  // Legt fuer den Workshop automatisch einen (ganztaegigen) Termin im Termine-Kalender an
-  // bzw. aktualisiert ihn, damit Workshops auch dort im Kalender auftauchen. Faellt still
-  // durch, wenn die Termine-App noch keine Termin-Kategorie/Resource hat.
+  // Legt fuer den Workshop automatisch einen Termin im Termine-Kalender an (10-16 Uhr)
+  // bzw. aktualisiert ihn, und bucht den GMR-Raum fuer denselben Zeitraum gleich mit.
+  // Ein Fehler hier lässt das Speichern des Workshops selbst nicht scheitern, wird aber
+  // sichtbar gemacht (termineSyncWarning), statt still zu verschwinden.
   async function syncTermineBooking(workshopId, { date, moderatorName, themenTitle, agenda }) {
-    if (!termineEventResourceId) return;
     const title = themenTitle ? `Workshop: ${themenTitle}` : "Workshop";
-    const payload = {
-      resource_id: termineEventResourceId,
-      date,
-      end_date: date,
-      all_day: true,
-      start_time: "00:00",
-      end_time: "23:59",
-      name: moderatorName || "Workshop",
-      title,
-      note: agenda || null,
-      user_id: user.id,
-      workshop_id: workshopId,
-    };
-    try {
-      const { data: existing } = await supabase.from("bookings").select("id").eq("workshop_id", workshopId).maybeSingle();
-      if (existing) {
-        await supabase.from("bookings").update(payload).eq("id", existing.id);
-      } else {
-        await supabase.from("bookings").insert(payload);
-      }
-    } catch {
-      // Verknuepfung mit dem Kalender ist ein Komfort-Feature - schlaegt sie fehl,
-      // soll das Speichern des Workshops selbst trotzdem nicht scheitern.
+    const targets = [
+      { resourceId: termineEventResourceId, label: "Termin" },
+      { resourceId: gmrResourceId, label: "GMR" },
+    ].filter((t) => t.resourceId);
+
+    if (targets.length === 0) {
+      const warning = "Konnte nicht im Termine-Kalender eingetragen werden: Termin- oder GMR-Ressource nicht gefunden.";
+      setTermineSyncWarning(warning);
+      return warning;
     }
+
+    const problems = [];
+    for (const t of targets) {
+      const payload = {
+        resource_id: t.resourceId,
+        date,
+        end_date: date,
+        all_day: false,
+        start_time: "10:00",
+        end_time: "16:00",
+        name: moderatorName || "Workshop",
+        title: t.label === "GMR" ? `${title} (GMR)` : title,
+        note: agenda || null,
+        user_id: user.id,
+        workshop_id: workshopId,
+      };
+      try {
+        const { data: existing, error: selErr } = await supabase.from("bookings").select("id").eq("workshop_id", workshopId).eq("resource_id", t.resourceId).maybeSingle();
+        if (selErr) throw selErr;
+        if (existing) {
+          const { error } = await supabase.from("bookings").update(payload).eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("bookings").insert(payload);
+          if (error) throw error;
+        }
+      } catch (e) {
+        problems.push(`${t.label}: ${e.message || "unbekannter Fehler"}`);
+      }
+    }
+    const warning = problems.length ? `Termine-Kalender: ${problems.join(" · ")}` : "";
+    setTermineSyncWarning(warning);
+    return warning;
   }
 
   async function handleSaveWorkshop() {
@@ -448,11 +472,12 @@ function WorkshopApp({ session }) {
         await supabase.from("workshop_attachments").insert({ workshop_id: workshopId, url, filename, created_by: user.id });
       }
 
-      await syncTermineBooking(workshopId, { date: formDate, moderatorName: moderator?.name || null, themenTitle: cleanedThemen[0]?.title || "", agenda: payload.agenda });
+      const syncWarning = await syncTermineBooking(workshopId, { date: formDate, moderatorName: moderator?.name || null, themenTitle: cleanedThemen[0]?.title || "", agenda: payload.agenda });
 
       setShowForm(false);
       setEditingWorkshop(null);
       await loadAll();
+      if (syncWarning) alert(syncWarning);
     } catch (e) {
       setFormError(e.message || "Speichern hat nicht geklappt.");
     } finally {

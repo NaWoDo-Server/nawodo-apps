@@ -376,12 +376,14 @@
       .subtitle { margin-bottom: 44px; }
 
       .page {
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        gap: 48px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: start;
+        gap: 0 48px;
       }
       .widgets {
+        grid-column: 1;
+        justify-self: end;
         width: 260px;
         flex-shrink: 0;
         margin-bottom: 0;
@@ -392,7 +394,7 @@
       .weather-temp { font-size: 28px; }
       .today-widget .widget-label { margin-bottom: 0; }
 
-      .main { flex: 0 0 auto; }
+      .main { grid-column: 2; }
       .grid {
         grid-template-columns: repeat(3, minmax(88px, max-content));
         justify-content: center;

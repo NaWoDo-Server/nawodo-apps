@@ -378,6 +378,7 @@
       .page {
         display: flex;
         align-items: flex-start;
+        justify-content: center;
         gap: 48px;
       }
       .widgets {
@@ -391,10 +392,10 @@
       .weather-temp { font-size: 28px; }
       .today-widget .widget-label { margin-bottom: 0; }
 
-      .main { flex: 1; }
+      .main { flex: 0 0 auto; }
       .grid {
         grid-template-columns: repeat(3, minmax(88px, max-content));
-        justify-content: start;
+        justify-content: center;
         gap: 28px;
       }
       .icon { width: 88px; height: 88px; border-radius: 22px; }

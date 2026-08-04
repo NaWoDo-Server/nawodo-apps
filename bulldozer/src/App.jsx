@@ -712,8 +712,10 @@ function BulldozerApp({ session }) {
                 <ChevronLeft size={16} style={{ color: INK_SOFT }} />
               </button>
             )}
-            <img src="/bulldozer/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
-            <h1 className="font-bold text-lg lg:text-2xl">Bulldozer</h1>
+            <a href="/" className="flex items-center gap-2.5">
+              <img src="/bulldozer/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
+              <h1 className="font-bold text-lg lg:text-2xl">Bulldozer</h1>
+            </a>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>

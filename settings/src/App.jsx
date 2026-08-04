@@ -756,10 +756,10 @@ function SettingsApp({ session }) {
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-full px-4 sm:px-6 lg:px-8 py-5">
         <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2.5">
+          <a href="/" className="flex items-center gap-2.5">
             <img src="/settings/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Settings</h1>
-          </div>
+          </a>
           <div className="flex items-center gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
             <button onClick={() => { setShowAccount(true); setSelfPasswordError(""); setSelfPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>

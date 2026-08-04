@@ -759,10 +759,10 @@ function Hofteiler({ session }) {
     <div className="min-h-screen pb-28" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className={isDesktop ? "w-full" : "sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
       <div className="px-5 lg:px-8 pt-6 pb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2.5">
           <img src="/termine/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
           <h1 className="font-bold text-lg lg:text-2xl">Termine</h1>
-        </div>
+        </a>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {userName}</span>
           <button onClick={() => setShowSettings(true)} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>

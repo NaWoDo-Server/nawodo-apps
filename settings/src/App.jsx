@@ -96,8 +96,6 @@ function SettingsApp({ session }) {
   const [memberPermissions, setMemberPermissions] = useState([]);
   const [bereiche, setBereiche] = useState([]);
   const [memberBereiche, setMemberBereiche] = useState([]);
-  const [faqProjektVisible, setFaqProjektVisible] = useState(false);
-  const [savingFaqSetting, setSavingFaqSetting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState("");
@@ -107,6 +105,7 @@ function SettingsApp({ session }) {
   const [pendingIsAdmin, setPendingIsAdmin] = useState(false);
   const [pendingMods, setPendingMods] = useState([]);
   const [pendingDenied, setPendingDenied] = useState([]);
+  const [pendingFaqProjekt, setPendingFaqProjekt] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -134,14 +133,13 @@ function SettingsApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [u, m, mods, perms, gr, mb, faqSetting] = await Promise.all([
+    const [u, m, mods, perms, gr, mb] = await Promise.all([
       supabase.rpc("list_all_users"),
       supabase.from("members").select("*"),
       supabase.from("app_moderators").select("*"),
       supabase.from("member_permissions").select("*"),
       supabase.from("bereiche").select("*"),
       supabase.from("member_bereiche").select("*"),
-      supabase.from("app_settings").select("value").eq("key", "faq_projekt_visible").maybeSingle(),
     ]);
     setAllUsers(u.data || []);
     setMembers(m.data || []);
@@ -149,22 +147,7 @@ function SettingsApp({ session }) {
     setMemberPermissions(perms.data || []);
     setBereiche(gr.data || []);
     setMemberBereiche(mb.data || []);
-    setFaqProjektVisible(faqSetting.data?.value === true);
     setLoading(false);
-  }
-
-  async function handleToggleFaqProjekt() {
-    const next = !faqProjektVisible;
-    setSavingFaqSetting(true);
-    try {
-      const { error } = await supabase.from("app_settings").upsert({ key: "faq_projekt_visible", value: next, updated_at: new Date().toISOString() });
-      if (error) throw error;
-      setFaqProjektVisible(next);
-    } catch (e) {
-      setActionError(e.message || "Einstellung konnte nicht gespeichert werden.");
-    } finally {
-      setSavingFaqSetting(false);
-    }
   }
 
   function modAppsFor(userId) {
@@ -172,6 +155,10 @@ function SettingsApp({ session }) {
   }
   function deniedAppsFor(userId) {
     return memberPermissions.filter((r) => r.user_id === userId && r.allowed === false).map((r) => r.app_key);
+  }
+  // Opt-in-Recht (anders als die App-Keys oben): fehlende Zeile = NICHT erlaubt.
+  function faqProjektAllowedFor(userId) {
+    return memberPermissions.some((r) => r.user_id === userId && r.app_key === "faq_projekt" && r.allowed === true);
   }
   function groupsForMember(memberId) {
     return memberBereiche.filter((r) => r.member_id === memberId).map((r) => r.bereich_key);
@@ -239,6 +226,7 @@ function SettingsApp({ session }) {
     setPendingIsAdmin(u.is_admin === true);
     setPendingMods(modAppsFor(u.id));
     setPendingDenied(deniedAppsFor(u.id));
+    setPendingFaqProjekt(faqProjektAllowedFor(u.id));
   }
 
   async function handleApplyRoles() {
@@ -278,6 +266,10 @@ function SettingsApp({ session }) {
       const changed = APP_LIST.filter((a) => currentDenied.includes(a.key) !== pendingDenied.includes(a.key));
       for (const a of changed) {
         await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: a.key, allowed: !pendingDenied.includes(a.key) });
+      }
+      const currentFaqProjekt = faqProjektAllowedFor(selectedAuthUser.id);
+      if (currentFaqProjekt !== pendingFaqProjekt) {
+        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "faq_projekt", allowed: pendingFaqProjekt });
       }
       await loadAll();
     } catch (e) {
@@ -487,22 +479,6 @@ function SettingsApp({ session }) {
           </div>
         </div>
 
-        <div className="mb-4 rounded-xl p-4 flex items-center justify-between gap-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold">FAQ: Bereich "Rund ums Wohnprojekt"</div>
-            <div className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Nur sichtbar, wenn hier aktiviert. Der Bereich "Rund um die App" ist immer für alle Mitglieder sichtbar.</div>
-          </div>
-          <button
-            onClick={handleToggleFaqProjekt}
-            disabled={savingFaqSetting}
-            className="flex-shrink-0 w-12 h-7 rounded-full relative transition-colors"
-            style={{ backgroundColor: faqProjektVisible ? BLUE : "#D8D5C7", opacity: savingFaqSetting ? 0.6 : 1 }}
-            title={faqProjektVisible ? "Sichtbar – zum Deaktivieren klicken" : "Ausgeblendet – zum Aktivieren klicken"}
-          >
-            <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all" style={{ left: faqProjektVisible ? "22px" : "2px" }} />
-          </button>
-        </div>
-
         <div className="mb-4 flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
@@ -666,15 +642,28 @@ function SettingsApp({ session }) {
                 {APP_LIST.map((a) => {
                   const denied = pendingDenied.includes(a.key);
                   return (
-                    <label key={a.key} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        disabled={savingAction}
-                        checked={!denied}
-                        onChange={(e) => setPendingDenied((list) => (e.target.checked ? list.filter((k) => k !== a.key) : [...list, a.key]))}
-                      />
-                      {a.label}
-                    </label>
+                    <React.Fragment key={a.key}>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          disabled={savingAction}
+                          checked={!denied}
+                          onChange={(e) => setPendingDenied((list) => (e.target.checked ? list.filter((k) => k !== a.key) : [...list, a.key]))}
+                        />
+                        {a.label}
+                      </label>
+                      {a.key === "faq" && (
+                        <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
+                          <input
+                            type="checkbox"
+                            disabled={savingAction || denied}
+                            checked={pendingFaqProjekt}
+                            onChange={(e) => setPendingFaqProjekt(e.target.checked)}
+                          />
+                          ↳ Rund um das Projekt
+                        </label>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </div>

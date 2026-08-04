@@ -12,6 +12,9 @@
 // Alle Aufrufe erwarten den Access-Token des aufrufenden Superadmins im Authorization-Header.
 
 const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer"];
+// Feingranulare Unter-Rechte (kein eigener App-Zugriff, sondern ein Bereich innerhalb
+// einer App). Anders als bei APP_KEYS gilt hier: fehlende Zeile = NICHT erlaubt (Opt-in).
+const OPT_IN_PERMISSION_KEYS = ["faq_projekt"];
 const MITGLIEDSTYP_VALUES = ["mitglied", "gast", "bewohner"];
 
 Deno.serve(async (req) => {
@@ -150,24 +153,29 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true }, 200);
     }
 
-    // --- App-Zugriff einzeln erlauben/sperren (member_permissions). Fehlende Zeile heisst
-    // erlaubt (Standard); zum Sperren wird eine Zeile mit allowed=false angelegt. ---
+    // --- App-Zugriff bzw. Unter-Recht einzeln erlauben/sperren (member_permissions). ---
+    // Fuer normale App-Keys (APP_KEYS) gilt: fehlende Zeile = erlaubt (Standard), zum
+    // Sperren wird eine Zeile mit allowed=false angelegt.
+    // Fuer Opt-in-Keys (OPT_IN_PERMISSION_KEYS) gilt das Gegenteil: fehlende Zeile =
+    // NICHT erlaubt, zum Erlauben wird eine Zeile mit allowed=true angelegt.
     if (type === "set_permission") {
       const targetUserId = body.target_user_id;
       const appKey = body.app_key;
+      const isOptIn = OPT_IN_PERMISSION_KEYS.includes(appKey);
       const allowed = body.allowed !== false;
-      if (!targetUserId || !APP_KEYS.includes(appKey)) {
+      if (!targetUserId || !(APP_KEYS.includes(appKey) || isOptIn)) {
         return jsonResponse({ error: "Ungültige Angabe." }, 400);
       }
       await fetch(
         `${SUPABASE_URL}/rest/v1/member_permissions?user_id=eq.${targetUserId}&app_key=eq.${appKey}`,
         { method: "DELETE", headers: restHeaders }
       );
-      if (!allowed) {
+      const needsRow = isOptIn ? allowed : !allowed;
+      if (needsRow) {
         const insResp = await fetch(`${SUPABASE_URL}/rest/v1/member_permissions`, {
           method: "POST",
           headers: restHeaders,
-          body: JSON.stringify({ user_id: targetUserId, app_key: appKey, allowed: false }),
+          body: JSON.stringify({ user_id: targetUserId, app_key: appKey, allowed }),
         });
         if (!insResp.ok) {
           const errBody = await insResp.json().catch(() => ({}));

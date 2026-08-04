@@ -164,8 +164,10 @@ function FaqApp({ session }) {
   const [search, setSearch] = useState("");
   const [openIds, setOpenIds] = useState(() => new Set());
   const [sectionOpen, setSectionOpen] = useState({ projekt: true, app: false });
-  // Ob der Bereich "Rund ums Wohnprojekt" ueberhaupt sichtbar ist, legt der
-  // Superadmin ueber die Settings-App fest (app_settings.faq_projekt_visible).
+  // Ob der Bereich "Rund ums Wohnprojekt" sichtbar ist, legt der Superadmin pro
+  // Mitglied ueber die Settings-App fest (App-Zugriff -> "Rund um das Projekt"),
+  // analog zu member_permissions fuer ganze Apps, nur mit umgekehrtem Standard:
+  // fehlende Zeile = NICHT sichtbar (Opt-in statt Opt-out).
   const [projektVisible, setProjektVisible] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
@@ -188,12 +190,12 @@ function FaqApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [{ data }, { data: setting }] = await Promise.all([
+    const [{ data }, { data: perm }] = await Promise.all([
       supabase.from("faq_entries").select("*").order("section").order("sort_order"),
-      supabase.from("app_settings").select("value").eq("key", "faq_projekt_visible").maybeSingle(),
+      supabase.from("member_permissions").select("allowed").eq("user_id", user.id).eq("app_key", "faq_projekt").maybeSingle(),
     ]);
     setEntries(data || []);
-    setProjektVisible(setting?.value === true);
+    setProjektVisible(perm?.allowed === true);
     setLoading(false);
   }
 

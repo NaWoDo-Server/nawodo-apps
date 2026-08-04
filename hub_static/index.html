@@ -328,10 +328,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.35), inset 0 -3px 5px rgba(0,0,0,0.16);
+      border: 1px solid rgba(255,255,255,0.15);
       position: relative;
       overflow: hidden;
+      transition: transform 0.15s ease;
     }
+    a.app:active .icon { transform: scale(0.94); }
     .icon img { width: 100%; height: 100%; object-fit: cover; }
     .icon svg { width: 32px; height: 32px; }
     .label {
@@ -480,43 +483,43 @@
         <div class="main">
           <div class="grid">
             <a class="app" href="/termine/" data-app="termine">
-              <div class="icon" style="background:#C0392B;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/><circle cx="12" cy="15" r="1.6" fill="#fff" stroke="none"/></svg>
+              <div class="icon" style="background:#DF3626;">
+                <img src="/icon-termine.png" alt="" />
               </div>
               <span class="label">Termine</span>
             </a>
 
             <a class="app" href="/sharing/" data-app="sharing">
-              <div class="icon" style="background:#D6A428;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.6" fill="#fff" stroke="none"/><circle cx="6" cy="12" r="2.6" fill="#fff" stroke="none"/><circle cx="18" cy="19" r="2.6" fill="#fff" stroke="none"/><line x1="8.4" y1="10.6" x2="15.6" y2="6.5"/><line x1="8.4" y1="13.4" x2="15.6" y2="17.5"/></svg>
+              <div class="icon" style="background:#E7A505;">
+                <img src="/icon-sharing.png" alt="" />
               </div>
               <span class="label">Sharing</span>
             </a>
 
             <a class="app" href="/fahrtenbuch/" data-app="fahrtenbuch">
-              <div class="icon" style="background:#2E86AB;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M5 17a2 2 0 0 1-2-2v-1.2a1 1 0 0 1 .35-.76l1.8-1.55A2 2 0 0 0 6 10.2V9a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1.2a2 2 0 0 0 .85 1.29l1.8 1.55a1 1 0 0 1 .35.76V15a2 2 0 0 1-2 2M5 17a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2M19 17a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2M8 12h.01M16 12h.01"/></svg>
+              <div class="icon" style="background:#0087AE;">
+                <img src="/icon-fahrtenbuch.png" alt="" />
               </div>
               <span class="label">Fahrtenbuch</span>
             </a>
 
             <a class="app" href="/pinnwand/" data-app="pinnwand">
-              <div class="icon" style="background:#C9752F;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 22v-8M5 9h14l-1.5 5h-11z"/><circle cx="12" cy="6" r="1.5" fill="#fff" stroke="none"/></svg>
+              <div class="icon" style="background:#E27624;">
+                <img src="/icon-pinnwand.png" alt="" />
               </div>
               <span class="label">Pinnwand</span>
             </a>
 
             <a class="app" href="/mitglieder/" data-app="mitglieder">
-              <div class="icon" style="background:#2E86AB;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <div class="icon" style="background:#0087AC;">
+                <img src="/icon-mitglieder.png" alt="" />
               </div>
               <span class="label">Mitglieder</span>
             </a>
 
             <a class="app" href="/workshop/" data-app="workshop">
-              <div class="icon" style="background:#6C63A6;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+              <div class="icon" style="background:#7063AA;">
+                <img src="/icon-workshop.png" alt="" />
               </div>
               <span class="label">Workshop</span>
             </a>
@@ -530,21 +533,21 @@
 
             <a class="app" href="https://www.nawodo.de" target="_blank" rel="noopener">
               <div class="icon" style="background:#1F6F5C;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M4 11.5L12 4l8 7.5" fill="none" stroke="#F1F0EA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10.3V19a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-8.7" fill="#F1F0EA"/><rect x="10" y="13.5" width="4" height="6.5" fill="#1F6F5C"/></svg>
               </div>
               <span class="label">Homepage</span>
             </a>
 
             <a class="app" href="/faq/" data-app="faq">
-              <div class="icon" style="background:#2FA8A0;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div class="icon" style="background:#00AAA1;">
+                <img src="/icon-faq.png" alt="" />
               </div>
               <span class="label">FAQ</span>
             </a>
 
             <a class="app hidden" href="/settings/" data-app="settings" id="settingsTile">
-              <div class="icon" style="background:#2B2B26;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+              <div class="icon" style="background:#000000;">
+                <img src="/icon-settings.png" alt="" />
               </div>
               <span class="label">Settings</span>
             </a>

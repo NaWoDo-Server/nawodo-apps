@@ -34,6 +34,13 @@ const BULK_RIGHT_OPTIONS = [
   { key: "mitglieder_kinder", label: "Mitglieder-Filter: Kinder" },
 ];
 
+// Fuer die Rechte-Matrix: bewusst getrennt zwischen "Apps" (ganze App an/aus pro
+// Mitglied) und "Nutzung in einer App" (Unter-Rechte INNERHALB einer App, z.B.
+// welche Mitglieder-Filter sichtbar sind) - das sind zwei unterschiedliche Ebenen,
+// die nicht in einer Spaltenliste vermischt werden sollen.
+const APP_RIGHT_OPTIONS = APP_LIST.map((a) => ({ key: a.key, label: `App: ${a.label}` }));
+const USAGE_RIGHT_OPTIONS = BULK_RIGHT_OPTIONS.filter((o) => ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"].includes(o.key));
+
 const OPT_IN_KEYS = ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"];
 
 const SHORT_RIGHT_LABELS = {
@@ -152,6 +159,7 @@ function SettingsApp({ session }) {
   const [newPassword, setNewPassword] = useState("");
 
   const [activeTab, setActiveTab] = useState("benutzer"); // "benutzer" | "apps"
+  const [rightsView, setRightsView] = useState("apps"); // "apps" | "nutzung"
 
   // Apps-Tab: globale Ein/Aus-Schalter pro App (app_settings.app_enabled_<key>)
   const [appEnabledMap, setAppEnabledMap] = useState({});
@@ -637,7 +645,7 @@ function SettingsApp({ session }) {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
-      <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
+      <div className="max-w-3xl mx-auto lg:max-w-none lg:w-full px-4 sm:px-6 lg:px-8 py-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
             <img src="/settings/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
@@ -739,13 +747,29 @@ function SettingsApp({ session }) {
           </button>
         </div>
 
+        <div className="flex items-center gap-1.5 mb-3 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
+          <button
+            onClick={() => setRightsView("apps")}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={rightsView === "apps" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Apps
+          </button>
+          <button
+            onClick={() => setRightsView("nutzung")}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={rightsView === "nutzung" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Nutzung in einer App
+          </button>
+        </div>
         <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Name antippen öffnet das Profil (Adresse, Rolle, Passwort). Häkchen wirken sofort.</p>
         <div className="overflow-x-auto rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <table className="text-xs border-collapse" style={{ minWidth: 760 }}>
             <thead>
               <tr>
                 <th className="text-left px-3 py-2.5 sticky left-0" style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Mitglied</th>
-                {BULK_RIGHT_OPTIONS.map((opt) => (
+                {(rightsView === "apps" ? APP_RIGHT_OPTIONS : USAGE_RIGHT_OPTIONS).map((opt) => (
                   <th key={opt.key} title={opt.label} className="px-1.5 py-2.5 text-center font-semibold whitespace-nowrap" style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}` }}>
                     {shortRightLabel(opt)}
                   </th>
@@ -773,7 +797,7 @@ function SettingsApp({ session }) {
                         </div>
                       </button>
                     </td>
-                    {BULK_RIGHT_OPTIONS.map((opt) => (
+                    {(rightsView === "apps" ? APP_RIGHT_OPTIONS : USAGE_RIGHT_OPTIONS).map((opt) => (
                       <td key={opt.key} className="text-center px-1.5 py-2">
                         {u ? (
                           <input

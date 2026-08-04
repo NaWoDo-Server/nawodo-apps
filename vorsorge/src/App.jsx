@@ -461,7 +461,10 @@ function VorsorgeApp({ session }) {
       resetUploadForm();
       await loadAll();
     } catch (e) {
-      setFormError(e.message || "Hochladen fehlgeschlagen.");
+      console.error("Vorsorge-Upload fehlgeschlagen:", e);
+      const msg = e?.message || e?.error_description || JSON.stringify(e) || "Hochladen fehlgeschlagen.";
+      setFormError(msg);
+      alert(`Hochladen fehlgeschlagen: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -521,7 +524,10 @@ function VorsorgeApp({ session }) {
       setEditFile(null);
       await loadAll();
     } catch (e) {
-      setEditError(e.message || "Konnte nicht gespeichert werden.");
+      console.error("Vorsorge-Bearbeiten fehlgeschlagen:", e);
+      const msg = e?.message || e?.error_description || JSON.stringify(e) || "Konnte nicht gespeichert werden.";
+      setEditError(msg);
+      alert(`Speichern fehlgeschlagen: ${msg}`);
     } finally {
       setSavingEdit(false);
     }

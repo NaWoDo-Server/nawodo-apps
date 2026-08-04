@@ -21,6 +21,7 @@ const APP_LIST = [
   { key: "workshop", label: "Workshop" },
   { key: "bulldozer", label: "Bulldozer" },
   { key: "vorsorge", label: "Vorsorge" },
+  { key: "schadenmelder", label: "Schadenmelder" },
 ];
 
 // Fuer die Bulk-Rechtevergabe: alle Rechte, die sich pro Kategorie auf einmal

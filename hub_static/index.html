@@ -676,6 +676,13 @@
               <span class="label">Vorsorge</span>
             </a>
 
+            <a class="app" href="/schadenmelder/" data-app="schadenmelder">
+              <div class="icon" style="background:#C2410C;">
+                <img src="/icon-schadenmelder.png" alt="" />
+              </div>
+              <span class="label">Schadenmelder</span>
+            </a>
+
             <a class="app hidden" href="/settings/" data-app="settings" id="settingsTile">
               <div class="icon" style="background:#000000;">
                 <img src="/icon-settings.png" alt="" />
@@ -843,7 +850,7 @@
         }).catch(function () {});
       }
 
-      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer", "vorsorge"];
+      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer", "vorsorge", "schadenmelder"];
 
       function applyGlobalAppEnabled(client, session) {
         // Suite-weiter Ein/Aus-Schalter aus der Settings-App (app_settings.app_enabled_<key>).

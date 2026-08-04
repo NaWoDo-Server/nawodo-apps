@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Search, Trash2, UserX, KeyRound,
-  Check, Users,
+  Check, Users, Pencil,
 } from "lucide-react";
 import { supabase, configMissing } from "./supabaseClient";
 

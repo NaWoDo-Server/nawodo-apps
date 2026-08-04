@@ -651,6 +651,7 @@ function Hofteiler({ session }) {
       </div>
 
       {!isDesktop && (
+      <>
       <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         {(primaryCategoryIds ? primaryCategoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) : categories).map((c) => {
           const Icon = ICONS[c.icon] || Package;
@@ -676,6 +677,10 @@ function Hofteiler({ session }) {
           );
         })}
       </div>
+      <div className="px-5 mt-3">
+        <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#D6A428" }}><Plus size={14} /> Buchen</button>
+      </div>
+      </>
       )}
 
       {isDesktop && (

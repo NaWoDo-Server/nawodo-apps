@@ -506,6 +506,9 @@ function MitgliederApp({ session }) {
     setTargetSelfUserId(row.user_id);
     setFormIsChild(false);
     setFormVorname(row.vorname || "");
+    // Die Login-Email steht schon fest (der Account existiert ja bereits) - deshalb hier
+    // direkt vorbelegen, statt das Feld leer zu lassen und erneutes Eintippen zu verlangen.
+    setFormEmail(row.email || "");
     setShowForm(true);
   }
 

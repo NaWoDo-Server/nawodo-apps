@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Lock, FileText, Download, Trash2, Pencil,
-  Users, UserPlus, ShieldCheck, ChevronDown, ChevronRight, Share2,
+  Users, UserPlus, ShieldCheck, ChevronDown, ChevronRight, Share2, Bell, Siren,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET, VORSORGE_BUCKET } from "./supabaseClient";
 
@@ -114,13 +114,8 @@ function AuthGate() {
       .catch(() => setAppEnabled(true));
   }, [session]);
 
-  // Zusaetzliche Passwortabfrage beim Oeffnen dieser einen App (auch wenn schon
-  // eingeloggt) - einmal pro Browser-Tab-Sitzung, nicht bei jedem Klick innerhalb
-  // der App.
-  useEffect(() => {
-    if (session && sessionStorage.getItem("vorsorge_pw_ok") === "1") setPwConfirmed(true);
-  }, [session]);
-
+  // Zusaetzliche Passwortabfrage bei JEDEM Oeffnen dieser einen App (auch wenn
+  // schon eingeloggt) - bewusst ohne Merken/Ueberspringen, jedes Mal aufs Neue.
   async function handleConfirmPassword() {
     setPwError("");
     if (!pwInput) return;
@@ -128,7 +123,6 @@ function AuthGate() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: session.user.email, password: pwInput });
       if (error) throw error;
-      sessionStorage.setItem("vorsorge_pw_ok", "1");
       setPwConfirmed(true);
       setPwInput("");
     } catch (e) {
@@ -210,6 +204,71 @@ function AuthGate() {
   return <VorsorgeApp session={session} />;
 }
 
+const NOTFALLPASS_BLANK = {
+  name: "", geburtsdatum: "", adresse: "", blutgruppe: "",
+  vorerkrankungen: "", allergien: "", medikamente: "", implantate: "", operationen: "",
+  kontakt1_name: "", kontakt1_telefon: "", kontakt2_name: "", kontakt2_telefon: "",
+  hausarzt_name: "", hausarzt_telefon: "", facharzt_name: "", facharzt_telefon: "",
+  krankenkasse: "", versichertennummer: "",
+  vorsorge_hinweis: "", organspendeausweis: false, patientenverfuegung_kurzform: "", besondere_hinweise: "",
+};
+
+const NOTFALLPASS_LABELS = {
+  name: "Name", geburtsdatum: "Geburtsdatum", adresse: "Adresse", blutgruppe: "Blutgruppe",
+  vorerkrankungen: "Vorerkrankungen", allergien: "Allergien / Unverträglichkeiten", medikamente: "Aktuelle Medikation (mit Dosierung)",
+  implantate: "Implantate / Geräte", operationen: "Frühere Operationen (falls relevant)",
+  kontakt1_name: "Notfallkontakt 1", kontakt1_telefon: "Telefon Notfallkontakt 1",
+  kontakt2_name: "Notfallkontakt 2", kontakt2_telefon: "Telefon Notfallkontakt 2",
+  hausarzt_name: "Hausarzt", hausarzt_telefon: "Telefon Hausarzt",
+  facharzt_name: "Facharzt", facharzt_telefon: "Telefon Facharzt",
+  krankenkasse: "Krankenkasse", versichertennummer: "Versichertennummer",
+  vorsorge_hinweis: "Patientenverfügung / Vorsorgevollmacht – Aufbewahrungsort & Kontakt der bevollmächtigten Person",
+  patientenverfuegung_kurzform: "Patientenverfügung (Kurzform)",
+  besondere_hinweise: "Besondere Hinweise (z.B. Schwangerschaft, Sprachbarriere, Behinderung)",
+};
+
+function NpTextInput({ label, value, onChange, placeholder, type }) {
+  return (
+    <div className="mb-3">
+      <label className="text-xs font-medium block mb-1">{label}</label>
+      <input type={type || "text"} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+    </div>
+  );
+}
+
+function NpTextArea({ label, value, onChange, placeholder, rows }) {
+  return (
+    <div className="mb-3">
+      <label className="text-xs font-medium block mb-1">{label}</label>
+      <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={rows || 2} className="w-full rounded-lg px-3 py-2.5 text-sm border resize-none" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+    </div>
+  );
+}
+
+function NotfallpassReadonly({ record }) {
+  const entries = Object.keys(NOTFALLPASS_LABELS).filter((k) => {
+    const v = record[k];
+    return v !== null && v !== undefined && v !== "";
+  });
+  return (
+    <div className="flex flex-col gap-2.5">
+      {record.organspendeausweis && (
+        <div className="text-xs font-semibold px-2.5 py-1.5 rounded-lg inline-block w-fit" style={{ backgroundColor: "#FF92921A", color: "#C0453F" }}>Hat einen Organspendeausweis</div>
+      )}
+      {entries.length === 0 ? (
+        <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Angaben.</p>
+      ) : (
+        entries.map((k) => (
+          <div key={k}>
+            <div className="text-xs font-semibold" style={{ color: INK_SOFT }}>{NOTFALLPASS_LABELS[k]}</div>
+            <div className="text-sm whitespace-pre-wrap">{record[k]}</div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, onShare, shareCount, canManage }) {
   return (
     <div className="p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
@@ -221,6 +280,9 @@ function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, onShare, 
           {doc.note && <div className="text-xs mt-1 whitespace-pre-wrap" style={{ color: INK_SOFT }}>{doc.note}</div>}
           {canManage && shareCount > 0 && (
             <div className="text-xs mt-1" style={{ color: GREEN }}>Einzeln freigegeben an {shareCount} {shareCount === 1 ? "Person" : "Personen"}</div>
+          )}
+          {canManage && doc.reminder_enabled && (
+            <div className="text-xs mt-1 flex items-center gap-1" style={{ color: INK_SOFT }}><Bell size={11} /> Erinnerung alle 6 Monate aktiv</div>
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -260,6 +322,7 @@ function VorsorgeApp({ session }) {
   const [documents, setDocuments] = useState([]);
   const [shares, setShares] = useState([]);
   const [docShares, setDocShares] = useState([]);
+  const [notfallpassList, setNotfallpassList] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -268,17 +331,23 @@ function VorsorgeApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [docs, sh, dsh, us] = await Promise.all([
+    const [docs, sh, dsh, np, us] = await Promise.all([
       supabase.from("vorsorge_documents").select("*").order("created_at", { ascending: false }),
       supabase.from("vorsorge_shares").select("*"),
       supabase.from("vorsorge_document_shares").select("*"),
+      supabase.from("vorsorge_notfallpass").select("*"),
       supabase.rpc("list_all_users"),
     ]);
     setDocuments(docs.data || []);
     setShares(sh.data || []);
     setDocShares(dsh.data || []);
+    setNotfallpassList(np.data || []);
     setAllUsers(us.data || []);
     setLoading(false);
+  }
+
+  function notfallpassFor(ownerId) {
+    return notfallpassList.find((n) => n.owner_user_id === ownerId) || null;
   }
 
   function nameFor(userId) {
@@ -344,8 +413,9 @@ function VorsorgeApp({ session }) {
     const ids = new Set();
     documents.forEach((d) => ids.add(d.owner_user_id));
     shares.forEach((s) => ids.add(s.owner_user_id));
+    notfallpassList.forEach((n) => ids.add(n.owner_user_id));
     return [...ids];
-  }, [documents, shares]);
+  }, [documents, shares, notfallpassList]);
 
   // --- Hochladen ---
   const [showUploadForm, setShowUploadForm] = useState(false);
@@ -354,6 +424,7 @@ function VorsorgeApp({ session }) {
   const [formTitle, setFormTitle] = useState("");
   const [formNote, setFormNote] = useState("");
   const [formFile, setFormFile] = useState(null);
+  const [formReminderEnabled, setFormReminderEnabled] = useState(false);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -363,6 +434,7 @@ function VorsorgeApp({ session }) {
     setFormTitle("");
     setFormNote("");
     setFormFile(null);
+    setFormReminderEnabled(false);
     setFormError("");
   }
 
@@ -382,6 +454,7 @@ function VorsorgeApp({ session }) {
         note: formNote.trim() || null,
         file_path: path,
         file_name: formFile.name,
+        reminder_enabled: formReminderEnabled,
       });
       if (error) throw error;
       setShowUploadForm(false);
@@ -401,6 +474,7 @@ function VorsorgeApp({ session }) {
   const [editCategory, setEditCategory] = useState("testament");
   const [editCustomCategory, setEditCustomCategory] = useState("");
   const [editFile, setEditFile] = useState(null);
+  const [editReminderEnabled, setEditReminderEnabled] = useState(false);
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -411,6 +485,7 @@ function VorsorgeApp({ session }) {
     setEditCategory(doc.category);
     setEditCustomCategory(doc.custom_category || "");
     setEditFile(null);
+    setEditReminderEnabled(doc.reminder_enabled === true);
     setEditError("");
   }
 
@@ -435,6 +510,7 @@ function VorsorgeApp({ session }) {
         custom_category: editCategory === "eigene" ? editCustomCategory.trim() : null,
         file_path: filePath,
         file_name: fileName,
+        reminder_enabled: editReminderEnabled,
         updated_at: new Date().toISOString(),
       }).eq("id", editingDoc.id);
       if (error) throw error;
@@ -548,6 +624,48 @@ function VorsorgeApp({ session }) {
     }
   }
 
+  // --- Notfallpass: ein Formular pro Person, getrennt von den hochgeladenen
+  // Dokumenten. Sichtbar fuer volle Vertrauenspersonen und den Superadmin.
+  const [showNotfallpassForm, setShowNotfallpassForm] = useState(false);
+  const [npForm, setNpForm] = useState(NOTFALLPASS_BLANK);
+  const [savingNp, setSavingNp] = useState(false);
+  const [npError, setNpError] = useState("");
+  const [viewingNotfallpassOwnerId, setViewingNotfallpassOwnerId] = useState(null);
+
+  const myNotfallpass = notfallpassFor(user.id);
+  const viewingNp = viewingNotfallpassOwnerId ? notfallpassFor(viewingNotfallpassOwnerId) : null;
+
+  function updateNpField(key, value) {
+    setNpForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function openNotfallpassForm() {
+    setNpForm(myNotfallpass ? { ...NOTFALLPASS_BLANK, ...myNotfallpass } : NOTFALLPASS_BLANK);
+    setNpError("");
+    setShowNotfallpassForm(true);
+  }
+
+  async function handleSaveNotfallpass() {
+    setNpError("");
+    setSavingNp(true);
+    try {
+      const payload = {
+        owner_user_id: user.id,
+        ...npForm,
+        geburtsdatum: npForm.geburtsdatum || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from("vorsorge_notfallpass").upsert(payload, { onConflict: "owner_user_id" });
+      if (error) throw error;
+      setShowNotfallpassForm(false);
+      await loadAll();
+    } catch (e) {
+      setNpError(e.message || "Konnte nicht gespeichert werden.");
+    } finally {
+      setSavingNp(false);
+    }
+  }
+
   // --- Konto (identisch zum Muster in den anderen Apps) ---
   const [showAccount, setShowAccount] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -646,6 +764,20 @@ function VorsorgeApp({ session }) {
 
         {activeTab === "meine" && (
           <>
+            <button
+              onClick={openNotfallpassForm}
+              className="w-full flex items-center gap-3 p-4 rounded-xl mb-6 text-left"
+              style={{ backgroundColor: "#FF9292", color: "#fff" }}
+            >
+              <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.25)" }}>
+                <Siren size={20} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold">Notfallpass</div>
+                <div className="text-xs opacity-90">{myNotfallpass ? "Ausgefüllt – hier bearbeiten" : "Noch nicht ausgefüllt – jetzt anlegen"}</div>
+              </div>
+            </button>
+
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Meine Dokumente</h2>
               <button onClick={() => { resetUploadForm(); setShowUploadForm(true); }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
@@ -700,6 +832,8 @@ function VorsorgeApp({ session }) {
                 {sharedWithMeOwnerIds.map((ownerId) => {
                   const docs = docsForSharedOwner(ownerId);
                   const expanded = expandedOwners.has(ownerId);
+                  const isFull = sharedWithMeGroups[ownerId]?.full;
+                  const ownerNp = isFull ? notfallpassFor(ownerId) : null;
                   return (
                     <div key={ownerId} className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
                       <button onClick={() => toggleOwnerExpanded(ownerId)} className="w-full flex items-center justify-between gap-2 px-3.5 py-3 text-left">
@@ -711,6 +845,15 @@ function VorsorgeApp({ session }) {
                       </button>
                       {expanded && (
                         <div className="px-3.5 pb-3.5">
+                          {ownerNp && (
+                            <button
+                              onClick={() => setViewingNotfallpassOwnerId(ownerId)}
+                              className="w-full flex items-center gap-2 p-2.5 rounded-lg mb-2.5 text-left text-sm font-semibold"
+                              style={{ backgroundColor: "#FF92921A", color: "#C0453F" }}
+                            >
+                              <Siren size={14} /> Notfallpass ansehen
+                            </button>
+                          )}
                           {docs.length === 0 ? (
                             <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Dokumente hochgeladen.</p>
                           ) : (
@@ -739,12 +882,22 @@ function VorsorgeApp({ session }) {
               allOwnerIds.map((ownerId) => {
                 const docs = documents.filter((d) => d.owner_user_id === ownerId);
                 const trustedFor = shares.filter((s) => s.owner_user_id === ownerId);
+                const ownerNp = notfallpassFor(ownerId);
                 return (
                   <div key={ownerId} className="mb-6">
                     <h2 className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>{nameFor(ownerId)}</h2>
                     <p className="text-xs mb-2" style={{ color: INK_SOFT }}>
                       {docs.length} Dokument{docs.length === 1 ? "" : "e"} · Vertrauenspersonen: {trustedFor.length === 0 ? "keine" : trustedFor.map((s) => nameFor(s.trusted_user_id)).join(", ")}
                     </p>
+                    {ownerNp && (
+                      <button
+                        onClick={() => setViewingNotfallpassOwnerId(ownerId)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg mb-2.5 text-sm font-semibold"
+                        style={{ backgroundColor: "#FF92921A", color: "#C0453F" }}
+                      >
+                        <Siren size={14} /> Notfallpass ansehen
+                      </button>
+                    )}
                     {docs.length > 0 && (
                       <div className="flex flex-col gap-2">
                         {docs.map((doc) => (
@@ -787,6 +940,11 @@ function VorsorgeApp({ session }) {
             <label className="text-xs font-medium block mb-1">Datei</label>
             <input type="file" onChange={(e) => setFormFile(e.target.files[0] || null)} className="w-full text-sm mb-3" />
 
+            <label className="flex items-center gap-2 text-xs font-medium mb-3">
+              <input type="checkbox" checked={formReminderEnabled} onChange={(e) => setFormReminderEnabled(e.target.checked)} />
+              Alle 6 Monate per Email an mich erinnern, dieses Dokument zu aktualisieren
+            </label>
+
             {formError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{formError}</p>}
             <button onClick={handleUpload} disabled={saving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: saving ? 0.7 : 1 }}>
               {saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Wird hochgeladen…" : "Hochladen"}
@@ -823,6 +981,11 @@ function VorsorgeApp({ session }) {
             <p className="text-xs mb-1.5" style={{ color: INK_SOFT }}>Aktuell: {editingDoc.file_name}</p>
             <input type="file" onChange={(e) => setEditFile(e.target.files[0] || null)} className="w-full text-sm mb-3" />
             <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Leer lassen, um die aktuelle Datei zu behalten.</p>
+
+            <label className="flex items-center gap-2 text-xs font-medium mb-3">
+              <input type="checkbox" checked={editReminderEnabled} onChange={(e) => setEditReminderEnabled(e.target.checked)} />
+              Alle 6 Monate per Email an mich erinnern, dieses Dokument zu aktualisieren
+            </label>
 
             {editError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{editError}</p>}
             <button onClick={handleSaveEdit} disabled={savingEdit} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingEdit ? 0.7 : 1 }}>
@@ -880,6 +1043,69 @@ function VorsorgeApp({ session }) {
             <button onClick={handleAddTrusted} disabled={savingTrusted || !addTrustedUserId} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingTrusted || !addTrustedUserId ? 0.6 : 1 }}>
               {savingTrusted && <Loader2 size={15} className="animate-spin" />} {savingTrusted ? "Speichern…" : "Hinzufügen"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {showNotfallpassForm && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowNotfallpassForm(false); } }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Notfallpass</h2><button onClick={() => setShowNotfallpassForm(false)}><X size={20} /></button></div>
+            <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Wichtige Angaben für den medizinischen Ernstfall. Sichtbar für dich, deine Vertrauenspersonen und den Superadmin.</p>
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: GREEN }}>Persönliche Daten</div>
+            <NpTextInput label="Name" value={npForm.name} onChange={(v) => updateNpField("name", v)} />
+            <NpTextInput label="Geburtsdatum" type="date" value={npForm.geburtsdatum} onChange={(v) => updateNpField("geburtsdatum", v)} />
+            <NpTextInput label="Adresse" value={npForm.adresse} onChange={(v) => updateNpField("adresse", v)} />
+            <NpTextInput label="Blutgruppe" value={npForm.blutgruppe} onChange={(v) => updateNpField("blutgruppe", v)} placeholder="z.B. A positiv" />
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Medizinische Angaben</div>
+            <NpTextArea label="Bekannte Vorerkrankungen" value={npForm.vorerkrankungen} onChange={(v) => updateNpField("vorerkrankungen", v)} placeholder="z.B. Diabetes, Herzerkrankung, Epilepsie" />
+            <NpTextArea label="Allergien / Unverträglichkeiten" value={npForm.allergien} onChange={(v) => updateNpField("allergien", v)} placeholder="besonders Medikamentenallergien" />
+            <NpTextArea label="Aktuelle Medikation (mit Dosierung)" value={npForm.medikamente} onChange={(v) => updateNpField("medikamente", v)} />
+            <NpTextArea label="Implantate / Geräte" value={npForm.implantate} onChange={(v) => updateNpField("implantate", v)} placeholder="z.B. Herzschrittmacher, künstliches Gelenk, Insulinpumpe" rows={2} />
+            <NpTextArea label="Frühere Operationen (falls relevant)" value={npForm.operationen} onChange={(v) => updateNpField("operationen", v)} rows={2} />
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Notfallkontakte</div>
+            <NpTextInput label="Notfallkontakt 1 – Name" value={npForm.kontakt1_name} onChange={(v) => updateNpField("kontakt1_name", v)} />
+            <NpTextInput label="Notfallkontakt 1 – Telefon" value={npForm.kontakt1_telefon} onChange={(v) => updateNpField("kontakt1_telefon", v)} />
+            <NpTextInput label="Notfallkontakt 2 – Name (optional)" value={npForm.kontakt2_name} onChange={(v) => updateNpField("kontakt2_name", v)} />
+            <NpTextInput label="Notfallkontakt 2 – Telefon (optional)" value={npForm.kontakt2_telefon} onChange={(v) => updateNpField("kontakt2_telefon", v)} />
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Behandelnde Ärzte</div>
+            <NpTextInput label="Hausarzt – Name" value={npForm.hausarzt_name} onChange={(v) => updateNpField("hausarzt_name", v)} />
+            <NpTextInput label="Hausarzt – Telefon" value={npForm.hausarzt_telefon} onChange={(v) => updateNpField("hausarzt_telefon", v)} />
+            <NpTextInput label="Facharzt – Name (optional)" value={npForm.facharzt_name} onChange={(v) => updateNpField("facharzt_name", v)} />
+            <NpTextInput label="Facharzt – Telefon (optional)" value={npForm.facharzt_telefon} onChange={(v) => updateNpField("facharzt_telefon", v)} />
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Versicherung</div>
+            <NpTextInput label="Krankenkasse" value={npForm.krankenkasse} onChange={(v) => updateNpField("krankenkasse", v)} />
+            <NpTextInput label="Versichertennummer" value={npForm.versichertennummer} onChange={(v) => updateNpField("versichertennummer", v)} />
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Verweise auf Vorsorgedokumente</div>
+            <NpTextArea label="Patientenverfügung / Vorsorgevollmacht – Aufbewahrungsort & Kontakt der bevollmächtigten Person" value={npForm.vorsorge_hinweis} onChange={(v) => updateNpField("vorsorge_hinweis", v)} placeholder="Das Dokument selbst gehört nicht hierher, nur der Hinweis darauf" rows={2} />
+
+            <div className="text-xs font-bold uppercase tracking-wide mb-2 mt-2" style={{ color: GREEN }}>Optional</div>
+            <label className="flex items-center gap-2 text-xs font-medium mb-3">
+              <input type="checkbox" checked={npForm.organspendeausweis} onChange={(e) => updateNpField("organspendeausweis", e.target.checked)} />
+              Hat einen Organspendeausweis
+            </label>
+            <NpTextArea label="Patientenverfügung (Kurzform)" value={npForm.patientenverfuegung_kurzform} onChange={(v) => updateNpField("patientenverfuegung_kurzform", v)} rows={3} />
+            <NpTextArea label="Besondere Hinweise" value={npForm.besondere_hinweise} onChange={(v) => updateNpField("besondere_hinweise", v)} placeholder="z.B. Schwangerschaft, Sprachbarriere, Behinderung" rows={2} />
+
+            {npError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{npError}</p>}
+            <button onClick={handleSaveNotfallpass} disabled={savingNp} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingNp ? 0.7 : 1 }}>
+              {savingNp && <Loader2 size={15} className="animate-spin" />} {savingNp ? "Speichern…" : "Speichern"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {viewingNotfallpassOwnerId && viewingNp && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setViewingNotfallpassOwnerId(null); } }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Notfallpass – {nameFor(viewingNotfallpassOwnerId)}</h2><button onClick={() => setViewingNotfallpassOwnerId(null)}><X size={20} /></button></div>
+            <NotfallpassReadonly record={viewingNp} />
           </div>
         </div>
       )}

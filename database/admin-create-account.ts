@@ -245,9 +245,11 @@ Deno.serve(async (req) => {
       }
 
       let childUserId: string | null = null;
+      let childEmailForMember: string | null = null;
 
       if (body.email) {
         const childEmail = (body.email || "").trim().toLowerCase();
+        childEmailForMember = childEmail;
         const childPassword = body.password || "";
         if (!childEmail || !childEmail.includes("@")) {
           return jsonResponse({ error: "Bitte eine gültige Email-Adresse angeben." }, 400);
@@ -287,7 +289,7 @@ Deno.serve(async (req) => {
           parent1_user_id: parent1UserId,
           parent2_user_id: parent2UserId,
           mitgliedstyp,
-          ...(childUserId ? { user_id: childUserId } : {}),
+          ...(childUserId ? { user_id: childUserId, email: childEmailForMember } : {}),
         }),
       });
       const inserted = await insertResp.json();
@@ -363,6 +365,7 @@ Deno.serve(async (req) => {
         nachname,
         mitgliedstyp,
         related_user_id: relatedUserId,
+        email,
       }),
     });
 

@@ -271,6 +271,14 @@ function FaqApp({ session }) {
     }
   }
   const isAdmin = user.user_metadata?.is_admin === true;
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true;
+  const [myModApps, setMyModApps] = useState([]);
+  useEffect(() => {
+    supabase.from("app_moderators").select("app_key").eq("user_id", user.id).then(({ data }) => {
+      setMyModApps((data || []).map((r) => r.app_key));
+    });
+  }, [user.id]);
+  const isElevated = isAdmin || isSuperAdmin || myModApps.includes("faq");
   const initial = userName.charAt(0).toUpperCase();
 
   // Popups per ESC-Taste schliessbar machen.
@@ -510,7 +518,7 @@ function FaqApp({ session }) {
                   {expanded ? <ChevronDown size={14} style={{ color: INK }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK }} className="flex-shrink-0" />}
                   <span className="text-sm font-bold uppercase tracking-wide" style={{ color: INK }}>{sec.label}</span>
                 </button>
-                {isAdmin && (
+                {isElevated && (
                   <button onClick={() => openNewForm(sec.key)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ border: "1.5px dashed #B8B4A2", color: INK_SOFT }}>
                     <Plus size={12} /> Neue Frage
                   </button>
@@ -532,7 +540,7 @@ function FaqApp({ session }) {
                             {open ? <ChevronDown size={14} style={{ color: INK_SOFT }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK_SOFT }} className="flex-shrink-0" />}
                             <span className="text-sm font-semibold truncate">{e.question}</span>
                           </div>
-                          {isAdmin && (
+                          {isElevated && (
                             <span
                               onClick={(ev) => { ev.stopPropagation(); openEditForm(e); }}
                               className="flex-shrink-0 p-1"

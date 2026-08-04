@@ -756,15 +756,19 @@ function MitgliederApp({ session }) {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {!m.isPlaceholder && <button onClick={() => exportVCard(m)} title="Als vCard herunterladen"><Download size={14} style={{ color: "#B8B4A2" }} /></button>}
-                        {isElevatedForMitglieder && !m.isPlaceholder && m.id && !m.is_child && (
-                          <button onClick={() => setGroupAssignFor(m)} title="Gruppen zuweisen"><Tag size={14} style={{ color: "#B8B4A2" }} /></button>
-                        )}
-                        {canManage && (
-                          <>
-                            <button onClick={() => openEditForm(m)}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
-                            <button onClick={() => handleDelete(m)}><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
-                          </>
-                        )}
+                        {/* Auf Desktop (sm+) bleiben die Bearbeiten-Buttons oben neben dem Namen. Auf Mobile wandern sie
+                            weiter unten in den aufklappbaren Bereich, unten rechts. */}
+                        <div className="hidden sm:flex items-center gap-2">
+                          {isElevatedForMitglieder && !m.isPlaceholder && m.id && !m.is_child && (
+                            <button onClick={() => setGroupAssignFor(m)} title="Gruppen zuweisen"><Tag size={14} style={{ color: "#B8B4A2" }} /></button>
+                          )}
+                          {canManage && (
+                            <>
+                              <button onClick={() => openEditForm(m)}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
+                              <button onClick={() => handleDelete(m)}><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
+                            </>
+                          )}
+                        </div>
                         {canFill && (
                           <button onClick={() => openFillPlaceholder(m)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: "#C9752F1A", color: "#C9752F" }}>
                             Ausfüllen
@@ -798,6 +802,21 @@ function MitgliederApp({ session }) {
                             if (!b) return null;
                             return <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${b.color}1A`, color: b.color }}>{b.label}</span>;
                           })}
+                        </div>
+                      )}
+
+                      {/* Mobile-only: Bearbeiten-Buttons unten rechts nach dem Aufklappen. */}
+                      {(!m.isPlaceholder && (isElevatedForMitglieder || canManage) && (m.id || canManage)) && (
+                        <div className="flex sm:hidden items-center justify-end gap-2 mt-3">
+                          {isElevatedForMitglieder && m.id && !m.is_child && (
+                            <button onClick={() => setGroupAssignFor(m)} title="Gruppen zuweisen"><Tag size={14} style={{ color: "#B8B4A2" }} /></button>
+                          )}
+                          {canManage && (
+                            <>
+                              <button onClick={() => openEditForm(m)}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
+                              <button onClick={() => handleDelete(m)}><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>

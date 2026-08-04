@@ -96,6 +96,8 @@ function SettingsApp({ session }) {
   const [memberPermissions, setMemberPermissions] = useState([]);
   const [bereiche, setBereiche] = useState([]);
   const [memberBereiche, setMemberBereiche] = useState([]);
+  const [faqProjektVisible, setFaqProjektVisible] = useState(false);
+  const [savingFaqSetting, setSavingFaqSetting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState("");
@@ -132,13 +134,14 @@ function SettingsApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [u, m, mods, perms, gr, mb] = await Promise.all([
+    const [u, m, mods, perms, gr, mb, faqSetting] = await Promise.all([
       supabase.rpc("list_all_users"),
       supabase.from("members").select("*"),
       supabase.from("app_moderators").select("*"),
       supabase.from("member_permissions").select("*"),
       supabase.from("bereiche").select("*"),
       supabase.from("member_bereiche").select("*"),
+      supabase.from("app_settings").select("value").eq("key", "faq_projekt_visible").maybeSingle(),
     ]);
     setAllUsers(u.data || []);
     setMembers(m.data || []);
@@ -146,7 +149,22 @@ function SettingsApp({ session }) {
     setMemberPermissions(perms.data || []);
     setBereiche(gr.data || []);
     setMemberBereiche(mb.data || []);
+    setFaqProjektVisible(faqSetting.data?.value === true);
     setLoading(false);
+  }
+
+  async function handleToggleFaqProjekt() {
+    const next = !faqProjektVisible;
+    setSavingFaqSetting(true);
+    try {
+      const { error } = await supabase.from("app_settings").upsert({ key: "faq_projekt_visible", value: next, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setFaqProjektVisible(next);
+    } catch (e) {
+      setActionError(e.message || "Einstellung konnte nicht gespeichert werden.");
+    } finally {
+      setSavingFaqSetting(false);
+    }
   }
 
   function modAppsFor(userId) {
@@ -467,6 +485,22 @@ function SettingsApp({ session }) {
               {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
             </button>
           </div>
+        </div>
+
+        <div className="mb-4 rounded-xl p-4 flex items-center justify-between gap-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold">FAQ: Bereich "Rund ums Wohnprojekt"</div>
+            <div className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Nur sichtbar, wenn hier aktiviert. Der Bereich "Rund um die App" ist immer für alle Mitglieder sichtbar.</div>
+          </div>
+          <button
+            onClick={handleToggleFaqProjekt}
+            disabled={savingFaqSetting}
+            className="flex-shrink-0 w-12 h-7 rounded-full relative transition-colors"
+            style={{ backgroundColor: faqProjektVisible ? BLUE : "#D8D5C7", opacity: savingFaqSetting ? 0.6 : 1 }}
+            title={faqProjektVisible ? "Sichtbar – zum Deaktivieren klicken" : "Ausgeblendet – zum Aktivieren klicken"}
+          >
+            <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all" style={{ left: faqProjektVisible ? "22px" : "2px" }} />
+          </button>
         </div>
 
         <div className="mb-4 flex items-center gap-2 flex-wrap">

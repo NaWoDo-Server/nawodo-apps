@@ -9,7 +9,7 @@ const TEAL = "#3E8E7E";
 
 const SECTIONS = [
   { key: "projekt", label: "Rund ums Wohnprojekt", color: "#C9752F" },
-  { key: "app", label: "Rund um diese Seite", color: "#3E8E7E" },
+  { key: "app", label: "Rund um die App", color: "#3E8E7E" },
 ];
 
 // Sentinel-Wert: Wenn eine FAQ-Antwort genau diesem Text entspricht, wird statt
@@ -164,6 +164,9 @@ function FaqApp({ session }) {
   const [search, setSearch] = useState("");
   const [openIds, setOpenIds] = useState(() => new Set());
   const [sectionOpen, setSectionOpen] = useState({ projekt: true, app: false });
+  // Ob der Bereich "Rund ums Wohnprojekt" ueberhaupt sichtbar ist, legt der
+  // Superadmin ueber die Settings-App fest (app_settings.faq_projekt_visible).
+  const [projektVisible, setProjektVisible] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -185,8 +188,12 @@ function FaqApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const { data } = await supabase.from("faq_entries").select("*").order("section").order("sort_order");
+    const [{ data }, { data: setting }] = await Promise.all([
+      supabase.from("faq_entries").select("*").order("section").order("sort_order"),
+      supabase.from("app_settings").select("value").eq("key", "faq_projekt_visible").maybeSingle(),
+    ]);
     setEntries(data || []);
+    setProjektVisible(setting?.value === true);
     setLoading(false);
   }
 
@@ -351,7 +358,7 @@ function FaqApp({ session }) {
           </div>
         </div>
 
-        {SECTIONS.map((sec) => {
+        {SECTIONS.filter((sec) => sec.key !== "projekt" || projektVisible).map((sec) => {
           const items = filtered.filter((e) => e.section === sec.key);
           if (q && items.length === 0) return null;
           const expanded = q ? true : sectionOpen[sec.key];

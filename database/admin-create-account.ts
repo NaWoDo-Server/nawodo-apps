@@ -14,7 +14,7 @@
 const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer"];
 // Feingranulare Unter-Rechte (kein eigener App-Zugriff, sondern ein Bereich innerhalb
 // einer App). Anders als bei APP_KEYS gilt hier: fehlende Zeile = NICHT erlaubt (Opt-in).
-const OPT_IN_PERMISSION_KEYS = ["faq_projekt"];
+const OPT_IN_PERMISSION_KEYS = ["faq_projekt", "mitglieder_gaeste", "mitglieder_bewohner"];
 const MITGLIEDSTYP_VALUES = ["mitglied", "gast", "bewohner"];
 
 Deno.serve(async (req) => {

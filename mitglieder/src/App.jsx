@@ -219,7 +219,11 @@ function MitgliederApp({ session }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeBereich, setActiveBereich] = useState(null);
-  const [typeFilter, setTypeFilter] = useState("mitglieder"); // "mitglieder" | "kinder" | "alle"
+  const [typeFilter, setTypeFilter] = useState("mitglieder"); // "mitglieder" | "gast" | "bewohner" | "kinder" | "alle"
+  // Die Filter-Tabs "Gaeste" und "Bewohner" sind Opt-in: nur sichtbar, wenn der Superadmin
+  // sie fuer dieses Mitglied ueber die Settings-App freigeschaltet hat (member_permissions).
+  const [canFilterGast, setCanFilterGast] = useState(false);
+  const [canFilterBewohner, setCanFilterBewohner] = useState(false);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [profileMember, setProfileMember] = useState(null);
@@ -264,18 +268,21 @@ function MitgliederApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [m, bu, ba, gr, mods] = await Promise.all([
+    const [m, bu, ba, gr, mods, filterPerms] = await Promise.all([
       supabase.from("members").select("*"),
       supabase.rpc("list_all_users"),
       supabase.from("member_bereiche").select("*"),
       supabase.from("bereiche").select("*"),
       supabase.from("app_moderators").select("*"),
+      supabase.from("member_permissions").select("app_key,allowed").eq("user_id", user.id).in("app_key", ["mitglieder_gaeste", "mitglieder_bewohner"]),
     ]);
     setMembers(m.data || []);
     setAllUsers(bu.data || []);
     setBereicheAssign(ba.data || []);
     setBereiche(gr.data || []);
     setAppModerators(mods.data || []);
+    setCanFilterGast((filterPerms.data || []).some((r) => r.app_key === "mitglieder_gaeste" && r.allowed === true));
+    setCanFilterBewohner((filterPerms.data || []).some((r) => r.app_key === "mitglieder_bewohner" && r.allowed === true));
     setLoading(false);
   }
 
@@ -416,7 +423,13 @@ function MitgliederApp({ session }) {
   const q = search.trim().toLowerCase();
   const visibleMembers = useMemo(() => {
     return roster
-      .filter((m) => typeFilter === "alle" || (typeFilter === "mitglieder" ? !m.is_child : m.is_child))
+      .filter((m) => {
+        if (typeFilter === "alle") return true;
+        if (typeFilter === "kinder") return m.is_child;
+        if (typeFilter === "gast") return !m.is_child && m.mitgliedstyp === "gast";
+        if (typeFilter === "bewohner") return !m.is_child && m.mitgliedstyp === "bewohner";
+        return !m.is_child && (m.mitgliedstyp || "mitglied") === "mitglied";
+      })
       .filter((m) => !activeBereich || (m.id && bereicheForMember(m.id).includes(activeBereich)))
       .filter((m) => !q || `${m.vorname} ${m.nachname} ${formatAddress(m)} ${m.wohneinheit || ""} ${m.email || ""}`.toLowerCase().includes(q));
   }, [roster, activeBereich, q, bereicheAssign, typeFilter]);
@@ -701,8 +714,14 @@ function MitgliederApp({ session }) {
               </div>
             </div>
 
-            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
-              {[["mitglieder", "Mitglieder"], ["kinder", "Kinder"], ["alle", "Alle"]].map(([key, label]) => (
+            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap" style={{ backgroundColor: "#E4E1D3" }}>
+              {[
+                ["mitglieder", "Genossenschaftsmitglieder"],
+                ...(isElevatedForMitglieder || canFilterGast ? [["gast", "Gäste"]] : []),
+                ...(isElevatedForMitglieder || canFilterBewohner ? [["bewohner", "Bewohner"]] : []),
+                ["kinder", "Kinder"],
+                ["alle", "Alle"],
+              ].map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setTypeFilter(key)}

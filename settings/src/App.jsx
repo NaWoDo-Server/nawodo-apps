@@ -106,6 +106,8 @@ function SettingsApp({ session }) {
   const [pendingMods, setPendingMods] = useState([]);
   const [pendingDenied, setPendingDenied] = useState([]);
   const [pendingFaqProjekt, setPendingFaqProjekt] = useState(false);
+  const [pendingMitgliederGaeste, setPendingMitgliederGaeste] = useState(false);
+  const [pendingMitgliederBewohner, setPendingMitgliederBewohner] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -156,9 +158,15 @@ function SettingsApp({ session }) {
   function deniedAppsFor(userId) {
     return memberPermissions.filter((r) => r.user_id === userId && r.allowed === false).map((r) => r.app_key);
   }
-  // Opt-in-Recht (anders als die App-Keys oben): fehlende Zeile = NICHT erlaubt.
+  // Opt-in-Rechte (anders als die App-Keys oben): fehlende Zeile = NICHT erlaubt.
   function faqProjektAllowedFor(userId) {
     return memberPermissions.some((r) => r.user_id === userId && r.app_key === "faq_projekt" && r.allowed === true);
+  }
+  function mitgliederGaesteAllowedFor(userId) {
+    return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_gaeste" && r.allowed === true);
+  }
+  function mitgliederBewohnerAllowedFor(userId) {
+    return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_bewohner" && r.allowed === true);
   }
   function groupsForMember(memberId) {
     return memberBereiche.filter((r) => r.member_id === memberId).map((r) => r.bereich_key);
@@ -227,6 +235,8 @@ function SettingsApp({ session }) {
     setPendingMods(modAppsFor(u.id));
     setPendingDenied(deniedAppsFor(u.id));
     setPendingFaqProjekt(faqProjektAllowedFor(u.id));
+    setPendingMitgliederGaeste(mitgliederGaesteAllowedFor(u.id));
+    setPendingMitgliederBewohner(mitgliederBewohnerAllowedFor(u.id));
   }
 
   async function handleApplyRoles() {
@@ -270,6 +280,14 @@ function SettingsApp({ session }) {
       const currentFaqProjekt = faqProjektAllowedFor(selectedAuthUser.id);
       if (currentFaqProjekt !== pendingFaqProjekt) {
         await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "faq_projekt", allowed: pendingFaqProjekt });
+      }
+      const currentMitgliederGaeste = mitgliederGaesteAllowedFor(selectedAuthUser.id);
+      if (currentMitgliederGaeste !== pendingMitgliederGaeste) {
+        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_gaeste", allowed: pendingMitgliederGaeste });
+      }
+      const currentMitgliederBewohner = mitgliederBewohnerAllowedFor(selectedAuthUser.id);
+      if (currentMitgliederBewohner !== pendingMitgliederBewohner) {
+        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_bewohner", allowed: pendingMitgliederBewohner });
       }
       await loadAll();
     } catch (e) {
@@ -662,6 +680,28 @@ function SettingsApp({ session }) {
                           />
                           ↳ Rund um das Projekt
                         </label>
+                      )}
+                      {a.key === "mitglieder" && (
+                        <>
+                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
+                            <input
+                              type="checkbox"
+                              disabled={savingAction || denied}
+                              checked={pendingMitgliederGaeste}
+                              onChange={(e) => setPendingMitgliederGaeste(e.target.checked)}
+                            />
+                            ↳ Filter: Gäste
+                          </label>
+                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
+                            <input
+                              type="checkbox"
+                              disabled={savingAction || denied}
+                              checked={pendingMitgliederBewohner}
+                              onChange={(e) => setPendingMitgliederBewohner(e.target.checked)}
+                            />
+                            ↳ Filter: Bewohner
+                          </label>
+                        </>
                       )}
                     </React.Fragment>
                   );

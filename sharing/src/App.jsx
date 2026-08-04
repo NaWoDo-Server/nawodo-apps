@@ -135,12 +135,92 @@ function Hofteiler({ session }) {
   const userName = user.user_metadata?.name || user.email;
   const [ownMemberId, setOwnMemberId] = useState(null);
   const [ownFotoUrl, setOwnFotoUrl] = useState(null);
+  const [ownMember, setOwnMember] = useState(null);
   useEffect(() => {
-    supabase.from("members").select("id, foto_url").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("members").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
       setOwnMemberId(data?.id || null);
       setOwnFotoUrl(data?.foto_url || null);
+      setOwnMember(data || null);
     });
   }, [user.id]);
+
+  // --- Eigenes Profil bearbeiten (aus dem Konto-Popup heraus erreichbar) ---
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [epVorname, setEpVorname] = useState("");
+  const [epNachname, setEpNachname] = useState("");
+  const [epStrasse, setEpStrasse] = useState("");
+  const [epHausnummer, setEpHausnummer] = useState("");
+  const [epPlz, setEpPlz] = useState("");
+  const [epWohnort, setEpWohnort] = useState("");
+  const [epWohneinheit, setEpWohneinheit] = useState("");
+  const [epEmail, setEpEmail] = useState("");
+  const [epError, setEpError] = useState("");
+  const [epSaving, setEpSaving] = useState(false);
+
+  function openEditProfile() {
+    setEpVorname(ownMember?.vorname || "");
+    setEpNachname(ownMember?.nachname || "");
+    setEpStrasse(ownMember?.strasse || "");
+    setEpHausnummer(ownMember?.hausnummer || "");
+    setEpPlz(ownMember?.plz || "");
+    setEpWohnort(ownMember?.wohnort || "");
+    setEpWohneinheit(ownMember?.wohneinheit || "");
+    setEpEmail(ownMember?.email || user.email || "");
+    setEpError("");
+    setShowEditProfile(true);
+  }
+
+  async function syncOwnLoginEmail(newEmail) {
+    const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ type: "set_email", target_user_id: user.id, email: newEmail }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data?.error || "Login-Email konnte nicht mit geändert werden.");
+  }
+
+  async function handleSaveEditProfile() {
+    setEpError("");
+    if (!epVorname.trim()) return setEpError("Bitte einen Vornamen eintragen.");
+    if (!epEmail.trim()) return setEpError("Bitte eine E-Mail-Adresse eintragen.");
+    setEpSaving(true);
+    try {
+      const newEmail = epEmail.trim().toLowerCase();
+      const payload = {
+        vorname: epVorname.trim(),
+        nachname: epNachname.trim(),
+        strasse: epStrasse.trim() || null,
+        hausnummer: epHausnummer.trim() || null,
+        plz: epPlz.trim() || null,
+        wohnort: epWohnort.trim() || null,
+        wohneinheit: epWohneinheit.trim() || null,
+        email: newEmail,
+      };
+      if (ownMemberId) {
+        const { error } = await supabase.from("members").update(payload).eq("id", ownMemberId);
+        if (error) throw error;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("members")
+          .insert({ user_id: user.id, created_by: user.id, is_child: false, ...payload })
+          .select()
+          .single();
+        if (error) throw error;
+        setOwnMemberId(inserted.id);
+      }
+      const emailChanged = (ownMember?.email || null) !== newEmail;
+      if (emailChanged) {
+        await syncOwnLoginEmail(newEmail);
+      }
+      setOwnMember((prev) => ({ ...(prev || {}), ...payload }));
+      setShowEditProfile(false);
+    } catch (e) {
+      setEpError(e.message || "Konnte nicht gespeichert werden.");
+    } finally {
+      setEpSaving(false);
+    }
+  }
   const initial = userName.charAt(0).toUpperCase();
   const isAdmin = user.user_metadata?.is_admin === true;
   const isSuperAdmin = user.user_metadata?.is_superadmin === true;
@@ -672,6 +752,7 @@ function Hofteiler({ session }) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
+          <span className="text-xs lg:text-sm font-semibold truncate max-w-[90px] lg:max-w-[160px]" style={{ color: INK_SOFT }}>{userName}</span>
           <button onClick={() => setShowSettings(true)} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
         </div>
       </div>
@@ -1083,6 +1164,10 @@ function Hofteiler({ session }) {
               </div>
             </div>
 
+            <button onClick={() => { setShowSettings(false); openEditProfile(); }} className="w-full rounded-lg py-2.5 mb-4 text-sm font-semibold flex items-center justify-center gap-2" style={{ border: "1.5px solid #D8D5C7", color: INK }}>
+              <Pencil size={14} /> Eintrag bearbeiten
+            </button>
+
             <label className="text-xs font-medium block mb-1">Passwort ändern</label>
             <input
               type="password"
@@ -1107,6 +1192,58 @@ function Hofteiler({ session }) {
             </button>
 
             <button onClick={handleLogout} className="w-full rounded-lg py-2.5 text-sm border" style={{ borderColor: "#E0B8B8", color: "#A13D3D" }}>Abmelden</button>
+          </div>
+        </div>
+      )}
+
+      {showEditProfile && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowEditProfile(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Eintrag bearbeiten</h2><button onClick={() => setShowEditProfile(false)}><X size={20} /></button></div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Vorname</label>
+                <input value={epVorname} onChange={(e) => setEpVorname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Nachname</label>
+                <input value={epNachname} onChange={(e) => setEpNachname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Straße</label>
+                <input value={epStrasse} onChange={(e) => setEpStrasse(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Hausnummer</label>
+                <input value={epHausnummer} onChange={(e) => setEpHausnummer(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">PLZ</label>
+                <input value={epPlz} onChange={(e) => setEpPlz(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1">Ort</label>
+                <input value={epWohnort} onChange={(e) => setEpWohnort(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+            </div>
+
+            <label className="text-xs font-medium block mb-1">Wohneinheit</label>
+            <input value={epWohneinheit} onChange={(e) => setEpWohneinheit(e.target.value)} placeholder="z.B. WE 12" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+
+            <label className="text-xs font-medium block mb-1">Login-Email</label>
+            <input type="email" value={epEmail} onChange={(e) => setEpEmail(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+
+            {epError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{epError}</p>}
+            <button onClick={handleSaveEditProfile} disabled={epSaving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: INK, opacity: epSaving ? 0.7 : 1 }}>
+              {epSaving && <Loader2 size={15} className="animate-spin" />} {epSaving ? "Speichern…" : "Speichern"}
+            </button>
           </div>
         </div>
       )}

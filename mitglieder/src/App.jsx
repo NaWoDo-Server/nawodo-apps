@@ -512,6 +512,17 @@ function MitgliederApp({ session }) {
     setShowForm(true);
   }
 
+  // Fuer den Button "Eintrag bearbeiten" im Konto-Popup: eigenen bestehenden
+  // Eintrag oeffnen, oder falls noch keiner existiert, den Platzhalter-Fluss.
+  function openOwnEntry() {
+    const own = members.find((m) => m.user_id === user.id && !m.is_child);
+    if (own) {
+      openEditForm(own);
+    } else {
+      openFillPlaceholder({ user_id: user.id, vorname: userName, email: user.email });
+    }
+  }
+
   function openEditForm(m) {
     setEditingMember(m);
     setTargetSelfUserId(m.user_id || null);
@@ -715,6 +726,7 @@ function MitgliederApp({ session }) {
           </div>
           <div className="flex items-center gap-2">
             <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
+            <span className="text-xs lg:text-sm font-semibold truncate max-w-[90px] lg:max-w-[160px]" style={{ color: INK_SOFT }}>{userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
           </div>
         </div>
@@ -1218,6 +1230,10 @@ function MitgliederApp({ session }) {
                 {avatarError && <div className="text-xs mt-0.5" style={{ color: "#A13D3D" }}>{avatarError}</div>}
               </div>
             </div>
+            <button onClick={() => { setShowAccount(false); openOwnEntry(); }} className="w-full rounded-lg py-2.5 mb-4 text-sm font-semibold flex items-center justify-center gap-2" style={{ border: "1.5px solid #D8D5C7", color: INK }}>
+              <Pencil size={14} /> Eintrag bearbeiten
+            </button>
+
             <label className="text-xs font-medium block mb-1">Passwort ändern</label>
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Neues Passwort" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />
             <input type="password" value={newPasswordConfirm} onChange={(e) => setNewPasswordConfirm(e.target.value)} placeholder="Neues Passwort wiederholen" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }} />

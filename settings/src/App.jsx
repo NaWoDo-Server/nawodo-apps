@@ -22,6 +22,24 @@ const APP_LIST = [
   { key: "bulldozer", label: "Bulldozer" },
 ];
 
+// Fuer die Bulk-Rechtevergabe: alle Rechte, die sich pro Kategorie auf einmal
+// setzen lassen - die 8 Standard-Apps (opt-out) + die 5 Opt-in-Unterfilter.
+const BULK_RIGHT_OPTIONS = [
+  ...APP_LIST.map((a) => ({ key: a.key, label: `App: ${a.label}` })),
+  { key: "faq_projekt", label: "FAQ: Rund um das Projekt" },
+  { key: "mitglieder_genossenschaft", label: "Mitglieder-Filter: Genossenschaftsmitglieder" },
+  { key: "mitglieder_gaeste", label: "Mitglieder-Filter: Gäste" },
+  { key: "mitglieder_bewohner", label: "Mitglieder-Filter: Bewohner" },
+  { key: "mitglieder_kinder", label: "Mitglieder-Filter: Kinder" },
+];
+
+const BULK_CATEGORY_OPTIONS = [
+  { key: "mitglied", label: "Genossenschaftsmitglieder" },
+  { key: "gast", label: "Gäste" },
+  { key: "bewohner", label: "Bewohner" },
+  { key: "kind", label: "Kinder" },
+];
+
 export default function App() {
   if (configMissing) {
     return (
@@ -112,6 +130,19 @@ function SettingsApp({ session }) {
   const [pendingMitgliederKinder, setPendingMitgliederKinder] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
+  const [activeTab, setActiveTab] = useState("benutzer"); // "benutzer" | "apps"
+
+  // Apps-Tab: globale Ein/Aus-Schalter pro App (app_settings.app_enabled_<key>)
+  const [appEnabledMap, setAppEnabledMap] = useState({});
+  const [savingAppToggle, setSavingAppToggle] = useState(null);
+
+  // Benutzer-Tab: Bulk-Rechtevergabe nach Kategorie
+  const [bulkCategories, setBulkCategories] = useState([]);
+  const [bulkRightKey, setBulkRightKey] = useState("");
+  const [bulkAllowed, setBulkAllowed] = useState(true);
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkResult, setBulkResult] = useState("");
+
   const [showCreate, setShowCreate] = useState(false);
   const [newType, setNewType] = useState("account"); // "account" | "child"
   const [newVorname, setNewVorname] = useState("");
@@ -137,13 +168,14 @@ function SettingsApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [u, m, mods, perms, gr, mb] = await Promise.all([
+    const [u, m, mods, perms, gr, mb, appSet] = await Promise.all([
       supabase.rpc("list_all_users"),
       supabase.from("members").select("*"),
       supabase.from("app_moderators").select("*"),
       supabase.from("member_permissions").select("*"),
       supabase.from("bereiche").select("*"),
       supabase.from("member_bereiche").select("*"),
+      supabase.from("app_settings").select("key,value").in("key", APP_LIST.map((a) => `app_enabled_${a.key}`)),
     ]);
     setAllUsers(u.data || []);
     setMembers(m.data || []);
@@ -151,7 +183,61 @@ function SettingsApp({ session }) {
     setMemberPermissions(perms.data || []);
     setBereiche(gr.data || []);
     setMemberBereiche(mb.data || []);
+    const enabledMap = {};
+    APP_LIST.forEach((a) => { enabledMap[a.key] = true; });
+    (appSet.data || []).forEach((row) => {
+      const key = row.key.replace("app_enabled_", "");
+      enabledMap[key] = row.value !== false;
+    });
+    setAppEnabledMap(enabledMap);
     setLoading(false);
+  }
+
+  async function handleToggleAppEnabled(appKey, nextEnabled) {
+    setSavingAppToggle(appKey);
+    setActionError("");
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert({ key: `app_enabled_${appKey}`, value: nextEnabled, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setAppEnabledMap((prev) => ({ ...prev, [appKey]: nextEnabled }));
+    } catch (e) {
+      setActionError(e.message || "Konnte nicht gespeichert werden.");
+    } finally {
+      setSavingAppToggle(null);
+    }
+  }
+
+  // Ermittelt alle Login-Accounts (user_id), deren Mitgliedsprofil zu mindestens
+  // einer der ausgewaehlten Kategorien passt.
+  function memberIdsForCategories(categories) {
+    return members
+      .filter((m) => {
+        if (!m.user_id) return false;
+        if (m.is_child) return categories.includes("kind");
+        const typ = m.mitgliedstyp || "mitglied";
+        return categories.includes(typ);
+      })
+      .map((m) => m.user_id);
+  }
+
+  async function handleBulkApply() {
+    if (bulkCategories.length === 0 || !bulkRightKey) return;
+    setBulkApplying(true);
+    setBulkResult("");
+    try {
+      const targetIds = [...new Set(memberIdsForCategories(bulkCategories))];
+      for (const uid of targetIds) {
+        await callAdminFn({ type: "set_permission", target_user_id: uid, app_key: bulkRightKey, allowed: bulkAllowed });
+      }
+      setBulkResult(targetIds.length === 0 ? "Keine passenden Mitglieder mit Login gefunden." : `Erledigt für ${targetIds.length} Mitglieder.`);
+      await loadAll();
+    } catch (e) {
+      setBulkResult(e.message || "Fehler beim Anwenden.");
+    } finally {
+      setBulkApplying(false);
+    }
   }
 
   function modAppsFor(userId) {
@@ -515,6 +601,74 @@ function SettingsApp({ session }) {
           </div>
         </div>
 
+        <div className="flex items-center gap-1.5 mb-5 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
+          <button
+            onClick={() => setActiveTab("benutzer")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+            style={activeTab === "benutzer" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            <Users size={14} /> Benutzer
+          </button>
+          <button
+            onClick={() => setActiveTab("apps")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+            style={activeTab === "apps" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Apps
+          </button>
+        </div>
+
+        {activeTab === "benutzer" && (
+        <>
+        <div className="mb-4 p-4 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+          <div className="text-sm font-semibold mb-3">Recht für mehrere Mitglieder auf einmal setzen</div>
+          <div className="text-xs font-semibold mb-1.5" style={{ color: INK_SOFT }}>Für welche Kategorien?</div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {BULK_CATEGORY_OPTIONS.map((c) => {
+              const active = bulkCategories.includes(c.key);
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => setBulkCategories((list) => (active ? list.filter((k) => k !== c.key) : [...list, c.key]))}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ backgroundColor: active ? BLUE : "transparent", color: active ? "#fff" : INK_SOFT, border: `1.5px solid ${active ? BLUE : BORDER_SOFT}` }}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-xs font-semibold mb-1.5" style={{ color: INK_SOFT }}>Welches Recht?</div>
+          <select
+            value={bulkRightKey}
+            onChange={(e) => setBulkRightKey(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border"
+            style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+          >
+            <option value="">Bitte wählen…</option>
+            {BULK_RIGHT_OPTIONS.map((r) => (
+              <option key={r.key} value={r.key}>{r.label}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-4 mb-3">
+            <label className="flex items-center gap-1.5 text-xs font-semibold">
+              <input type="radio" checked={bulkAllowed === true} onChange={() => setBulkAllowed(true)} /> Erlauben
+            </label>
+            <label className="flex items-center gap-1.5 text-xs font-semibold">
+              <input type="radio" checked={bulkAllowed === false} onChange={() => setBulkAllowed(false)} /> Sperren
+            </label>
+          </div>
+          <button
+            onClick={handleBulkApply}
+            disabled={bulkApplying || bulkCategories.length === 0 || !bulkRightKey}
+            className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+            style={{ backgroundColor: BLUE, opacity: bulkApplying || bulkCategories.length === 0 || !bulkRightKey ? 0.6 : 1 }}
+          >
+            {bulkApplying && <Loader2 size={14} className="animate-spin" />} {bulkApplying ? "Wird angewendet…" : "Anwenden"}
+          </button>
+          {bulkResult && <p className="text-xs mt-2" style={{ color: INK_SOFT }}>{bulkResult}</p>}
+        </div>
+
         <div className="mb-4 flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
@@ -573,6 +727,33 @@ function SettingsApp({ session }) {
             );
           })}
         </div>
+        </>
+        )}
+
+        {activeTab === "apps" && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs mb-1" style={{ color: INK_SOFT }}>
+            Hier kannst du einzelne Apps für die ganze Genossenschaft aus- und wieder einschalten. Ausgeschaltete Apps sind für alle (außer dir als Superadmin) gesperrt.
+          </p>
+          {APP_LIST.map((a) => {
+            const enabled = appEnabledMap[a.key] !== false;
+            const saving = savingAppToggle === a.key;
+            return (
+              <div key={a.key} className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                <div className="text-sm font-semibold">{a.label}</div>
+                <button
+                  onClick={() => handleToggleAppEnabled(a.key, !enabled)}
+                  disabled={saving}
+                  className="w-12 h-7 rounded-full relative flex-shrink-0"
+                  style={{ backgroundColor: enabled ? BLUE : "#D8D5C7", opacity: saving ? 0.6 : 1, transition: "background-color 0.15s" }}
+                >
+                  <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        )}
       </div>
 
       {selectedRow && (

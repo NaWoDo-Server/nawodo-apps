@@ -154,6 +154,7 @@ export default function App() {
 function AuthGate() {
   const [session, setSession] = useState(undefined);
   const [access, setAccess] = useState(undefined);
+  const [appEnabled, setAppEnabled] = useState(undefined);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -177,8 +178,32 @@ function AuthGate() {
       .catch(() => setAccess(true));
   }, [session]);
 
-  if (session === undefined || session === null || access === undefined) {
+  useEffect(() => {
+    if (!session) return;
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "app_enabled_bulldozer")
+      .maybeSingle()
+      .then(({ data }) => setAppEnabled(!data || data.value !== false))
+      .catch(() => setAppEnabled(true));
+  }, [session]);
+
+  if (session === undefined || session === null || access === undefined || appEnabled === undefined) {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
+  }
+
+  if (appEnabled === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+        <div className="max-w-sm text-center">
+          <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
+          <p className="font-semibold mb-1">Vorübergehend deaktiviert</p>
+          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Diese App ist derzeit ausgeschaltet.</p>
+          <a href="/" className="text-sm font-semibold" style={{ color: INK }}>Zurück zur Startseite</a>
+        </div>
+      </div>
+    );
   }
 
   if (access === false) {

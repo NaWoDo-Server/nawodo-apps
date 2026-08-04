@@ -58,7 +58,7 @@ async function openSignedFile(path) {
 export default function App() {
   if (configMissing) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">
           <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
           <p className="font-semibold mb-1">Noch nicht eingerichtet</p>
@@ -134,7 +134,7 @@ function AuthGate() {
 
   if (session === undefined || (session && (access === undefined || appEnabled === undefined))) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center" style={{ backgroundColor: PAPER }}>
         <Loader2 className="animate-spin" size={24} style={{ color: INK_SOFT }} />
       </div>
     );
@@ -143,7 +143,7 @@ function AuthGate() {
 
   if (appEnabled === false && session.user.user_metadata?.is_superadmin !== true) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">
           <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
           <p className="font-semibold mb-1">Vorübergehend deaktiviert</p>
@@ -156,7 +156,7 @@ function AuthGate() {
 
   if (access === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">
           <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
           <p className="font-semibold mb-1">Kein Zugriff</p>
@@ -169,7 +169,7 @@ function AuthGate() {
 
   if (!pwConfirmed) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm w-full text-center">
           <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: "#3B6E5E1A" }}>
             <Lock size={24} style={{ color: GREEN }} />
@@ -191,7 +191,7 @@ function AuthGate() {
             onClick={handleConfirmPassword}
             disabled={pwChecking || !pwInput}
             className="w-full rounded-lg py-2.5 text-sm font-semibold text-white flex items-center justify-center gap-2 mb-3"
-            style={{ backgroundColor: GREEN, opacity: pwChecking || !pwInput ? 0.6 : 1 }}
+            style={{ backgroundColor: "#FF9292", opacity: pwChecking || !pwInput ? 0.6 : 1 }}
           >
             {pwChecking && <Loader2 size={15} className="animate-spin" />} {pwChecking ? "Prüfe…" : "Bestätigen"}
           </button>
@@ -1020,7 +1020,7 @@ function VorsorgeApp({ session }) {
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={24} style={{ color: INK_SOFT }} /></div>;
+    return <div className="min-h-[100dvh] flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={24} style={{ color: INK_SOFT }} /></div>;
   }
 
   return (
@@ -1261,8 +1261,8 @@ function VorsorgeApp({ session }) {
       </div>
 
       {showUploadForm && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowUploadForm(false); } }}>
-          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowUploadForm(false); } }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Dokument hochladen</h2><button onClick={() => setShowUploadForm(false)}><X size={20} /></button></div>
 
             <label className="text-xs font-medium block mb-1">Kategorie</label>
@@ -1301,8 +1301,8 @@ function VorsorgeApp({ session }) {
       )}
 
       {editingDoc && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setEditingDoc(null); } }}>
-          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setEditingDoc(null); } }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Dokument bearbeiten</h2><button onClick={() => setEditingDoc(null)}><X size={20} /></button></div>
 
             <label className="text-xs font-medium block mb-1">Kategorie</label>
@@ -1343,8 +1343,8 @@ function VorsorgeApp({ session }) {
       )}
 
       {showAddTrusted && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAddTrusted(false); } }}>
-          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAddTrusted(false); } }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Vertrauensperson hinzufügen</h2><button onClick={() => setShowAddTrusted(false)}><X size={20} /></button></div>
             <select value={addTrustedUserId} onChange={(e) => setAddTrustedUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
               <option value="">Bitte wählen…</option>
@@ -1361,8 +1361,8 @@ function VorsorgeApp({ session }) {
       )}
 
       {showNotfallpassForm && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowNotfallpassForm(false); } }}>
-          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowNotfallpassForm(false); } }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Notfallpass</h2><button onClick={() => setShowNotfallpassForm(false)}><X size={20} /></button></div>
             <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Wichtige Angaben für den medizinischen Ernstfall. Sichtbar für dich, deine Vertrauenspersonen und den Superadmin.</p>
 
@@ -1415,8 +1415,8 @@ function VorsorgeApp({ session }) {
       )}
 
       {viewingNotfallpassOwnerId && viewingNp && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setViewingNotfallpassOwnerId(null); } }}>
-          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setViewingNotfallpassOwnerId(null); } }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">{viewingNotfallpassOwnerId === user.id ? "Mein Notfallpass" : `Notfallpass – ${nameFor(viewingNotfallpassOwnerId)}`}</h2>
               <button onClick={() => setViewingNotfallpassOwnerId(null)}><X size={20} /></button>
@@ -1436,8 +1436,8 @@ function VorsorgeApp({ session }) {
       )}
 
       {showAccount && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAccount(false); } }}>
-          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAccount(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Konto</h2><button onClick={() => setShowAccount(false)}><X size={20} /></button></div>
             <div className="flex items-center gap-3 mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
               <div className="relative flex-shrink-0">
@@ -1474,8 +1474,8 @@ function VorsorgeApp({ session }) {
       )}
 
       {showEditProfile && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowEditProfile(false); } }}>
-          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowEditProfile(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Eintrag bearbeiten</h2><button onClick={() => setShowEditProfile(false)}><X size={20} /></button></div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">

@@ -139,7 +139,7 @@ function LevelPreview({ level, cellSize = 8 }) {
 export default function App() {
   if (configMissing) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">
           <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
           <p className="font-semibold mb-1">Noch nicht eingerichtet</p>
@@ -190,12 +190,12 @@ function AuthGate() {
   }, [session]);
 
   if (session === undefined || session === null || access === undefined || appEnabled === undefined) {
-    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
+    return <div className="min-h-[100dvh] flex items-center justify-center" style={{ backgroundColor: PAPER }}><Loader2 className="animate-spin" size={28} style={{ color: INK_SOFT }} /></div>;
   }
 
   if (appEnabled === false && session.user.user_metadata?.is_superadmin !== true) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">
           <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
           <p className="font-semibold mb-1">Vorübergehend deaktiviert</p>
@@ -208,7 +208,7 @@ function AuthGate() {
 
   if (access === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
+      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
         <div className="max-w-sm text-center">
           <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
           <p className="font-semibold mb-1">Kein Zugriff</p>
@@ -824,7 +824,7 @@ function BulldozerApp({ session }) {
             </div>
 
             {won && (
-              <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+              <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }}>
                 <div className="w-full max-w-sm rounded-2xl p-6 text-center" style={{ backgroundColor: PAPER }}>
                   <Trophy className="mx-auto mb-2" size={28} style={{ color: LIGHT_GRAY }} />
                   <h2 className="font-bold text-lg mb-1">Level geschafft!</h2>
@@ -875,8 +875,8 @@ function BulldozerApp({ session }) {
       </div>
 
       {showLevelTable && isSuperAdmin && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowLevelTable(false); setPreviewLevelIdx(null); } }}>
-          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowLevelTable(false); setPreviewLevelIdx(null); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">Levelcode-Tabelle</h2>
               <button onClick={() => { setShowLevelTable(false); setPreviewLevelIdx(null); }}><X size={20} /></button>
@@ -921,8 +921,8 @@ function BulldozerApp({ session }) {
       )}
 
       {showHelp && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowHelp(false); } }}>
-          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowHelp(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">So wird gespielt</h2>
               <button onClick={() => setShowHelp(false)}><X size={20} /></button>
@@ -962,8 +962,8 @@ function BulldozerApp({ session }) {
       )}
 
       {showAccount && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAccount(false); } }}>
-          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowAccount(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Konto</h2><button onClick={() => setShowAccount(false)}><X size={20} /></button></div>
             <div className="flex items-center gap-3 mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "#E4E1D3" }}>
               <div className="relative flex-shrink-0">
@@ -1002,8 +1002,8 @@ function BulldozerApp({ session }) {
       )}
 
       {showEditProfile && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowEditProfile(false); } }}>
-          <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowEditProfile(false); } }}>
+          <div className="w-full max-w-md rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Eintrag bearbeiten</h2><button onClick={() => setShowEditProfile(false)}><X size={20} /></button></div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">

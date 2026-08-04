@@ -56,7 +56,11 @@ const SHORT_RIGHT_LABELS = {
   mitglieder_gaeste: "Gäste",
   mitglieder_bewohner: "Bewohner",
   mitglieder_kinder: "Kinder",
+  mitgliedstyp: "Typ",
 };
+
+// Fuer den "Typ"-Reiter: eine einzelne Spalte mit Dropdown statt Kontrollkaestchen.
+const TYP_OPTIONS = [{ key: "mitgliedstyp", label: "Mitgliedstyp" }];
 function shortRightLabel(opt) {
   return SHORT_RIGHT_LABELS[opt.key] || opt.label.replace("App: ", "");
 }
@@ -76,13 +80,6 @@ function groupOptionsByApp(options) {
   }
   return groups;
 }
-
-const BULK_CATEGORY_OPTIONS = [
-  { key: "mitglied", label: "Genossenschaftsmitglieder" },
-  { key: "gast", label: "Gäste" },
-  { key: "bewohner", label: "Bewohner" },
-  { key: "kind", label: "Kinder" },
-];
 
 const WIDGET_LIST = [
   { key: "wetter", label: "Wetter" },
@@ -278,12 +275,10 @@ function SettingsApp({ session }) {
   const [togglingCell, setTogglingCell] = useState(null); // `${userId}:${appKey}` waehrend des Speicherns
 
   const [selectedRowKey, setSelectedRowKey] = useState(null);
-  const [pendingIsAdmin, setPendingIsAdmin] = useState(false);
-  const [pendingMods, setPendingMods] = useState([]);
   const [newPassword, setNewPassword] = useState("");
 
   const [activeTab, setActiveTab] = useState("benutzer"); // "benutzer" | "apps"
-  const [rightsView, setRightsView] = useState("apps"); // "apps" | "nutzung" | "rollen"
+  const [rightsView, setRightsView] = useState("typ"); // "typ" | "rollen" | "gruppen" | "apps" | "nutzung"
 
   // Apps-Tab: globale Ein/Aus-Schalter pro App (app_settings.app_enabled_<key>)
   const [appEnabledMap, setAppEnabledMap] = useState({});
@@ -294,11 +289,6 @@ function SettingsApp({ session }) {
   const [savingFaqTabToggle, setSavingFaqTabToggle] = useState(null);
 
   // Benutzer-Tab: Bulk-Rechtevergabe nach Kategorie
-  const [bulkCategories, setBulkCategories] = useState([]);
-  const [bulkRightKey, setBulkRightKey] = useState("");
-  const [bulkAllowed, setBulkAllowed] = useState(true);
-  const [bulkApplying, setBulkApplying] = useState(false);
-  const [bulkResult, setBulkResult] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
   const [newType, setNewType] = useState("account"); // "account" | "child"
@@ -410,37 +400,6 @@ function SettingsApp({ session }) {
       setActionError(e.message || "Konnte nicht gespeichert werden.");
     } finally {
       setSavingFaqTabToggle(null);
-    }
-  }
-
-  // Ermittelt alle Login-Accounts (user_id), deren Mitgliedsprofil zu mindestens
-  // einer der ausgewaehlten Kategorien passt.
-  function memberIdsForCategories(categories) {
-    return members
-      .filter((m) => {
-        if (!m.user_id) return false;
-        if (m.is_child) return categories.includes("kind");
-        const typ = m.mitgliedstyp || "mitglied";
-        return categories.includes(typ);
-      })
-      .map((m) => m.user_id);
-  }
-
-  async function handleBulkApply() {
-    if (bulkCategories.length === 0 || !bulkRightKey) return;
-    setBulkApplying(true);
-    setBulkResult("");
-    try {
-      const targetIds = [...new Set(memberIdsForCategories(bulkCategories))];
-      for (const uid of targetIds) {
-        await callAdminFn({ type: "set_permission", target_user_id: uid, app_key: bulkRightKey, allowed: bulkAllowed });
-      }
-      setBulkResult(targetIds.length === 0 ? "Keine passenden Mitglieder mit Login gefunden." : `Erledigt für ${targetIds.length} Mitglieder.`);
-      await loadAll();
-    } catch (e) {
-      setBulkResult(e.message || "Fehler beim Anwenden.");
-    } finally {
-      setBulkApplying(false);
     }
   }
 
@@ -559,14 +518,6 @@ function SettingsApp({ session }) {
   const selectedAuthUser = selectedRow?.authUser || null;
   const selectedMember = selectedRow?.member || null;
 
-  useEffect(() => {
-    if (selectedRowKey) {
-      const r = rows.find((x) => rowKey(x) === selectedRowKey);
-      if (r?.authUser) loadPendingFor(r.authUser);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRowKey]);
-
   async function callAdminFn(body, method = "POST") {
     const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
       method,
@@ -580,40 +531,6 @@ function SettingsApp({ session }) {
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || "Aktion fehlgeschlagen.");
     return data;
-  }
-
-  function loadPendingFor(u) {
-    if (!u) return;
-    setPendingIsAdmin(u.is_admin === true);
-    setPendingMods(modAppsFor(u.id));
-  }
-
-  async function handleApplyRoles() {
-    if (!selectedAuthUser) return;
-    setActionError("");
-    setSavingAction(true);
-    try {
-      const currentIsAdmin = selectedAuthUser.is_admin === true;
-      if (pendingIsAdmin !== currentIsAdmin) {
-        await callAdminFn({ type: "toggle_admin", target_user_id: selectedAuthUser.id, is_admin: pendingIsAdmin });
-      }
-      const currentMods = modAppsFor(selectedAuthUser.id);
-      const toAdd = pendingMods.filter((k) => !currentMods.includes(k));
-      const toRemove = currentMods.filter((k) => !pendingMods.includes(k));
-      for (const k of toAdd) {
-        const { error } = await supabase.from("app_moderators").insert({ user_id: selectedAuthUser.id, app_key: k });
-        if (error) throw error;
-      }
-      for (const k of toRemove) {
-        const { error } = await supabase.from("app_moderators").delete().eq("user_id", selectedAuthUser.id).eq("app_key", k);
-        if (error) throw error;
-      }
-      await loadAll();
-    } catch (e) {
-      setActionError(e.message || "Rollen konnten nicht gespeichert werden.");
-    } finally {
-      setSavingAction(false);
-    }
   }
 
   async function handleToggleGroup(memberId, bereichKey, nextValue) {
@@ -646,6 +563,75 @@ function SettingsApp({ session }) {
       setActionError(e.message || "Typ konnte nicht geändert werden.");
     } finally {
       setSavingAction(false);
+    }
+  }
+
+  // Fuer den Kopfzeilen-Checkbox-Bulk-Toggle in den Matrix-Reitern (Apps/Nutzung/Rollen/
+  // Gruppen): ersetzt die alte separate "Recht fuer mehrere Mitglieder setzen"-Box.
+  function applicableRowsFor(view) {
+    return view === "gruppen" ? rows.filter((r) => r.member) : rows.filter((r) => r.authUser);
+  }
+  function isCellCheckedFor(view, r, optKey) {
+    if (view === "gruppen") return groupsForMember(r.member.id).includes(optKey);
+    if (view === "rollen") return isRoleAllowed(r.authUser.id, optKey);
+    return isRightAllowed(r.authUser.id, optKey);
+  }
+  function isColumnAllChecked(optKey) {
+    const applicable = applicableRowsFor(rightsView);
+    if (applicable.length === 0) return false;
+    return applicable.every((r) => isCellCheckedFor(rightsView, r, optKey));
+  }
+
+  async function handleBulkToggleColumn(optKey) {
+    const applicable = applicableRowsFor(rightsView);
+    if (applicable.length === 0) return;
+    const target = !isColumnAllChecked(optKey);
+    const cellKey = `bulk:${rightsView}:${optKey}`;
+    setTogglingCell(cellKey);
+    setActionError("");
+    try {
+      if (rightsView === "gruppen") {
+        await Promise.all(applicable.map(async (r) => {
+          const memberId = r.member.id;
+          const active = groupsForMember(memberId).includes(optKey);
+          if (active === target) return;
+          if (target) {
+            const { error } = await supabase.from("member_bereiche").insert({ member_id: memberId, bereich_key: optKey });
+            if (error) throw error;
+          } else {
+            const { error } = await supabase.from("member_bereiche").delete().eq("member_id", memberId).eq("bereich_key", optKey);
+            if (error) throw error;
+          }
+        }));
+      } else if (rightsView === "rollen") {
+        await Promise.all(applicable.map(async (r) => {
+          const userId = r.authUser.id;
+          if (isRoleAllowed(userId, optKey) === target) return;
+          if (optKey === "admin") {
+            await callAdminFn({ type: "toggle_admin", target_user_id: userId, is_admin: target });
+          } else {
+            const appKey = optKey.replace("mod_", "");
+            if (target) {
+              const { error } = await supabase.from("app_moderators").insert({ user_id: userId, app_key: appKey });
+              if (error) throw error;
+            } else {
+              const { error } = await supabase.from("app_moderators").delete().eq("user_id", userId).eq("app_key", appKey);
+              if (error) throw error;
+            }
+          }
+        }));
+      } else {
+        await Promise.all(applicable.map(async (r) => {
+          const userId = r.authUser.id;
+          if (isRightAllowed(userId, optKey) === target) return;
+          await callAdminFn({ type: "set_permission", target_user_id: userId, app_key: optKey, allowed: target });
+        }));
+      }
+      await loadAll();
+    } catch (e) {
+      setActionError(e.message || "Konnte nicht für alle gesetzt werden.");
+    } finally {
+      setTogglingCell(null);
     }
   }
 
@@ -836,55 +822,6 @@ function SettingsApp({ session }) {
 
         {activeTab === "benutzer" && (
         <>
-        <div className="mb-4 p-4 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-          <div className="text-sm font-semibold mb-3">Recht für mehrere Mitglieder auf einmal setzen</div>
-          <div className="text-xs font-semibold mb-1.5" style={{ color: INK_SOFT }}>Für welche Kategorien?</div>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {BULK_CATEGORY_OPTIONS.map((c) => {
-              const active = bulkCategories.includes(c.key);
-              return (
-                <button
-                  key={c.key}
-                  onClick={() => setBulkCategories((list) => (active ? list.filter((k) => k !== c.key) : [...list, c.key]))}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: active ? BLUE : "transparent", color: active ? "#fff" : INK_SOFT, border: `1.5px solid ${active ? BLUE : BORDER_SOFT}` }}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="text-xs font-semibold mb-1.5" style={{ color: INK_SOFT }}>Welches Recht?</div>
-          <select
-            value={bulkRightKey}
-            onChange={(e) => setBulkRightKey(e.target.value)}
-            className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border"
-            style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
-          >
-            <option value="">Bitte wählen…</option>
-            {BULK_RIGHT_OPTIONS.map((r) => (
-              <option key={r.key} value={r.key}>{r.label}</option>
-            ))}
-          </select>
-          <div className="flex items-center gap-4 mb-3">
-            <label className="flex items-center gap-1.5 text-xs font-semibold">
-              <input type="radio" checked={bulkAllowed === true} onChange={() => setBulkAllowed(true)} /> Erlauben
-            </label>
-            <label className="flex items-center gap-1.5 text-xs font-semibold">
-              <input type="radio" checked={bulkAllowed === false} onChange={() => setBulkAllowed(false)} /> Sperren
-            </label>
-          </div>
-          <button
-            onClick={handleBulkApply}
-            disabled={bulkApplying || bulkCategories.length === 0 || !bulkRightKey}
-            className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
-            style={{ backgroundColor: BLUE, opacity: bulkApplying || bulkCategories.length === 0 || !bulkRightKey ? 0.6 : 1 }}
-          >
-            {bulkApplying && <Loader2 size={14} className="animate-spin" />} {bulkApplying ? "Wird angewendet…" : "Anwenden"}
-          </button>
-          {bulkResult && <p className="text-xs mt-2" style={{ color: INK_SOFT }}>{bulkResult}</p>}
-        </div>
-
         <div className="mb-4 flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
@@ -905,7 +842,28 @@ function SettingsApp({ session }) {
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 mb-3 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
+        <div className="flex items-center gap-1.5 mb-3 p-1 rounded-full w-fit sticky z-20" style={{ backgroundColor: "#E4E1D3", top: "0.5rem" }}>
+          <button
+            onClick={() => setRightsView("typ")}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={rightsView === "typ" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Typ
+          </button>
+          <button
+            onClick={() => setRightsView("rollen")}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={rightsView === "rollen" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Rollen
+          </button>
+          <button
+            onClick={() => setRightsView("gruppen")}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={rightsView === "gruppen" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            Gruppen
+          </button>
           <button
             onClick={() => setRightsView("apps")}
             className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
@@ -920,30 +878,26 @@ function SettingsApp({ session }) {
           >
             Nutzung in einer App
           </button>
-          <button
-            onClick={() => setRightsView("rollen")}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
-            style={rightsView === "rollen" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
-          >
-            Rollen
-          </button>
         </div>
         {rightsView === "rollen" && (
           <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Admin darf Inhalte in allen Apps bearbeiten. Moderator gilt nur für die jeweilige App.</p>
         )}
-        <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Name antippen öffnet das Profil (Adresse, Rolle, Passwort). Häkchen wirken sofort.</p>
-        <div className="overflow-x-auto rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+        {rightsView === "gruppen" && bereiche.length === 0 && (
+          <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Noch keine Gruppen angelegt.</p>
+        )}
+        <p className="text-xs mb-2" style={{ color: INK_SOFT }}>Name antippen öffnet das Profil (Passwort, Account löschen). Häkchen wirken sofort, das Kästchen im Spaltenkopf setzt/entfernt für alle auf einmal.</p>
+        <div className="overflow-x-auto overflow-y-visible rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
           <table className="text-xs border-collapse" style={{ minWidth: 760 }}>
             <thead>
               {(rightsView === "nutzung" || rightsView === "rollen") && (
                 <tr>
-                  <th className="sticky left-0" style={{ backgroundColor: "#fff" }}></th>
+                  <th className="sticky left-0 z-20" style={{ backgroundColor: "#fff", top: "3.25rem" }}></th>
                   {groupOptionsByApp(rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((g, i) => (
                     <th
                       key={`${g.app}-${i}`}
                       colSpan={g.count}
-                      className="px-1.5 pt-2 pb-1 text-center text-[10px] font-bold uppercase tracking-wide"
-                      style={{ color: BLUE }}
+                      className="px-1.5 pt-2 pb-1 text-center text-[10px] font-bold uppercase tracking-wide sticky z-10"
+                      style={{ color: BLUE, backgroundColor: "#fff", top: "3.25rem" }}
                     >
                       {g.app}
                     </th>
@@ -951,9 +905,29 @@ function SettingsApp({ session }) {
                 </tr>
               )}
               <tr>
-                <th className="text-left px-3 py-2.5 sticky left-0" style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Mitglied</th>
-                {(rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((opt) => (
-                  <th key={opt.key} title={opt.label} className="px-1.5 py-2.5 text-center font-semibold whitespace-nowrap" style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}` }}>
+                <th
+                  className="text-left px-3 py-2.5 sticky left-0 z-20"
+                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "5.5rem" : "3.25rem" }}
+                >
+                  Mitglied
+                </th>
+                {(rightsView === "typ" ? TYP_OPTIONS : rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : rightsView === "rollen" ? ROLE_RIGHT_OPTIONS : bereiche.map((b) => ({ key: b.key, label: b.label }))).map((opt) => (
+                  <th
+                    key={opt.key}
+                    title={opt.label}
+                    className="px-1.5 py-2 text-center font-semibold whitespace-nowrap sticky z-10"
+                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "5.5rem" : "3.25rem" }}
+                  >
+                    {rightsView !== "typ" && (
+                      <input
+                        type="checkbox"
+                        className="block mx-auto mb-1"
+                        checked={isColumnAllChecked(opt.key)}
+                        disabled={togglingCell === `bulk:${rightsView}:${opt.key}`}
+                        onChange={() => handleBulkToggleColumn(opt.key)}
+                        title="Für alle setzen/entfernen"
+                      />
+                    )}
                     {shortRightLabel(opt)}
                   </th>
                 ))}
@@ -980,20 +954,55 @@ function SettingsApp({ session }) {
                         </div>
                       </button>
                     </td>
-                    {(rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((opt) => (
-                      <td key={opt.key} className="text-center px-1.5 py-2">
-                        {u ? (
-                          <input
-                            type="checkbox"
-                            checked={rightsView === "rollen" ? isRoleAllowed(u.id, opt.key) : isRightAllowed(u.id, opt.key)}
-                            disabled={togglingCell === (rightsView === "rollen" ? `role:${u.id}:${opt.key}` : `${u.id}:${opt.key}`)}
-                            onChange={() => (rightsView === "rollen" ? handleToggleRoleCell(u.id, opt.key) : handleToggleMatrixCell(u.id, opt.key))}
-                          />
+                    {rightsView === "typ" ? (
+                      <td className="text-center px-1.5 py-2">
+                        {m ? (
+                          <select
+                            value={m.mitgliedstyp || "mitglied"}
+                            disabled={savingAction}
+                            onChange={(e) => handleSetMitgliedstyp(m.id, e.target.value)}
+                            className="text-xs rounded px-1.5 py-1 border"
+                            style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                          >
+                            <option value="mitglied">Genossenschaftsmitglied</option>
+                            <option value="bewohner">Bewohner</option>
+                            <option value="gast">Gast</option>
+                          </select>
                         ) : (
                           <span style={{ color: BORDER_SOFT }}>–</span>
                         )}
                       </td>
-                    ))}
+                    ) : rightsView === "gruppen" ? (
+                      bereiche.map((b) => (
+                        <td key={b.key} className="text-center px-1.5 py-2">
+                          {m ? (
+                            <input
+                              type="checkbox"
+                              checked={groupsForMember(m.id).includes(b.key)}
+                              disabled={savingAction}
+                              onChange={() => handleToggleGroup(m.id, b.key, !groupsForMember(m.id).includes(b.key))}
+                            />
+                          ) : (
+                            <span style={{ color: BORDER_SOFT }}>–</span>
+                          )}
+                        </td>
+                      ))
+                    ) : (
+                      (rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((opt) => (
+                        <td key={opt.key} className="text-center px-1.5 py-2">
+                          {u ? (
+                            <input
+                              type="checkbox"
+                              checked={rightsView === "rollen" ? isRoleAllowed(u.id, opt.key) : isRightAllowed(u.id, opt.key)}
+                              disabled={togglingCell === (rightsView === "rollen" ? `role:${u.id}:${opt.key}` : `${u.id}:${opt.key}`)}
+                              onChange={() => (rightsView === "rollen" ? handleToggleRoleCell(u.id, opt.key) : handleToggleMatrixCell(u.id, opt.key))}
+                            />
+                          ) : (
+                            <span style={{ color: BORDER_SOFT }}>–</span>
+                          )}
+                        </td>
+                      ))
+                    )}
                   </tr>
                 );
               })}
@@ -1078,93 +1087,8 @@ function SettingsApp({ session }) {
               <div className="text-xs" style={{ color: INK_SOFT }}>{selectedAuthUser?.email || "Kein eigener Login"}</div>
             </div>
 
-            {selectedMember ? (
-              <>
-                <div className="mb-4">
-                  <label className="text-xs font-medium block mb-1">Mitgliedstyp</label>
-                  <select
-                    value={selectedMember.mitgliedstyp || "mitglied"}
-                    onChange={(e) => handleSetMitgliedstyp(selectedMember.id, e.target.value)}
-                    disabled={savingAction}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm border"
-                    style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
-                  >
-                    <option value="mitglied">Genossenschaftsmitglied</option>
-                    <option value="bewohner">Bewohner</option>
-                    <option value="gast">Gast</option>
-                  </select>
-                </div>
-
-                {bereiche.length > 0 && (
-                  <div className="mb-4">
-                    <label className="text-xs font-medium block mb-1.5">Gruppen</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[...bereiche].sort((a, b) => a.label.localeCompare(b.label, "de")).map((b) => {
-                        const active = groupsForMember(selectedMember.id).includes(b.key);
-                        return (
-                          <button
-                            key={b.key}
-                            type="button"
-                            disabled={savingAction}
-                            onClick={() => handleToggleGroup(selectedMember.id, b.key, !active)}
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                            style={{ backgroundColor: active ? b.color : "transparent", color: active ? "#fff" : INK_SOFT, border: `1.5px solid ${active ? b.color : BORDER_SOFT}` }}
-                          >
-                            {b.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Kein Mitglieder-Profil vorhanden (Mitgliedstyp/Gruppen erst verfügbar, sobald eins angelegt ist).</p>
-            )}
-
             {selectedAuthUser ? (
             <>
-            <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
-              <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Rollen</div>
-              <label className="flex items-center gap-2 text-sm mb-2">
-                <input
-                  type="checkbox"
-                  disabled={savingAction}
-                  checked={pendingIsAdmin}
-                  onChange={(e) => setPendingIsAdmin(e.target.checked)}
-                />
-                Admin (global, in jeder App)
-              </label>
-              <div className="text-xs mb-1.5" style={{ color: INK_SOFT }}>Moderator für einzelne Apps:</div>
-              <div className="flex flex-col gap-1.5 mb-3">
-                {APP_LIST.map((a) => {
-                  const isMod = pendingMods.includes(a.key);
-                  return (
-                    <label key={a.key} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        disabled={savingAction}
-                        checked={isMod}
-                        onChange={(e) => setPendingMods((list) => (e.target.checked ? [...list, a.key] : list.filter((k) => k !== a.key)))}
-                      />
-                      {a.label}
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={handleApplyRoles}
-                  disabled={savingAction}
-                  className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
-                  style={{ backgroundColor: BLUE, opacity: savingAction ? 0.7 : 1 }}
-                >
-                  <Check size={14} /> Setzen
-                </button>
-              </div>
-            </div>
-
-
             <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "#E9E6D9" }}>
               <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Neues Passwort setzen</div>
               <div className="flex gap-2">
@@ -1189,7 +1113,7 @@ function SettingsApp({ session }) {
             </div>
             </>
             ) : (
-              <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Kein eigener Login vorhanden – Rollen, App-Zugriff und Passwort gelten nur für Accounts mit Login.</p>
+              <p className="text-xs mb-4" style={{ color: INK_SOFT }}>Kein eigener Login vorhanden – App-Zugriff und Passwort gelten nur für Accounts mit Login.</p>
             )}
 
             {actionError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {actionError}</div>}

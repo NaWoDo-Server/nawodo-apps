@@ -827,7 +827,7 @@ function MitgliederApp({ session }) {
               </div>
             </div>
 
-            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap" style={{ backgroundColor: "#E4E1D3" }}>
+            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap sticky z-20" style={{ backgroundColor: "#E4E1D3", top: "0.5rem" }}>
               {[
                 ...(isElevatedForMitglieder || canFilterGenossenschaft ? [["mitglieder", "Genossenschaftsmitglieder"]] : []),
                 ...(isElevatedForMitglieder || canFilterGast ? [["gast", "Gäste"]] : []),

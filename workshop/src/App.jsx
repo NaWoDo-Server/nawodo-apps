@@ -902,6 +902,7 @@ function WorkshopCard({
 }) {
   const [newFoodText, setNewFoodText] = useState("");
   const yesCount = attendanceList.filter((a) => a.attending).length;
+  const noCount = attendanceList.filter((a) => a.attending === false).length;
   const yesNames = attendanceList.filter((a) => a.attending).map((a) => a.user_name);
 
   return (
@@ -993,14 +994,14 @@ function WorkshopCard({
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold"
             style={{ backgroundColor: myAttendanceRow?.attending === true ? "#2E7D4F" : "#2E7D4F1A", color: myAttendanceRow?.attending === true ? "#fff" : "#2E7D4F" }}
           >
-            <Check size={14} /> Ich komme
+            <Check size={14} /> Ich komme ({yesCount})
           </button>
           <button
             onClick={() => onSetAttendance(false)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold"
             style={{ backgroundColor: myAttendanceRow?.attending === false ? "#A13D3D" : "#A13D3D1A", color: myAttendanceRow?.attending === false ? "#fff" : "#A13D3D" }}
           >
-            <X size={14} /> Ich komme nicht
+            <X size={14} /> Ich komme nicht ({noCount})
           </button>
         </div>
         {yesNames.length > 0 && (

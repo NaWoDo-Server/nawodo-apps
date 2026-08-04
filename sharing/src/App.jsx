@@ -186,7 +186,7 @@ function Hofteiler({ session }) {
   const [dialogCategoryId, setDialogCategoryId] = useState(null);
   const [dialogResourceId, setDialogResourceId] = useState(null);
   const [editingBookingId, setEditingBookingId] = useState(null);
-  const [mobileGroupOpen, setMobileGroupOpen] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   const [newResName, setNewResName] = useState("");
   const [newResIcon, setNewResIcon] = useState("zap");
@@ -652,32 +652,39 @@ function Hofteiler({ session }) {
 
       {!isDesktop && (
       <>
-      <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {(primaryCategoryIds ? primaryCategoryIds.map((id) => categories.find((c) => c.id === id)).filter(Boolean) : categories).map((c) => {
-          const Icon = ICONS[c.icon] || Package;
-          const active = (activeCategoryIds || []).includes(c.id);
-          return (
-            <button key={c.id} onClick={() => toggleCategory(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0" style={{ backgroundColor: active ? c.color : `${c.color}1A`, color: active ? "#fff" : c.color, border: `1.5px solid ${active ? c.color : `${c.color}55`}` }}>
-              {active ? <Check size={12} /> : <Icon size={12} />} {c.name}
-            </button>
-          );
-        })}
-        {primaryCategoryIds && groupCategoryIds && groupCategoryIds.length > 0 && (
-          <button onClick={() => setMobileGroupOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0" style={{ backgroundColor: BORDER, color: INK_SOFT, border: `1.5px solid ${BORDER_SOFT}` }}>
-            {mobileGroupOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Sharing
-          </button>
-        )}
-        {primaryCategoryIds && mobileGroupOpen && categories.filter((c) => (groupCategoryIds || []).includes(c.id)).map((c) => {
-          const Icon = ICONS[c.icon] || Package;
-          const active = (activeCategoryIds || []).includes(c.id);
-          return (
-            <button key={c.id} onClick={() => toggleCategory(c.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0" style={{ backgroundColor: active ? c.color : `${c.color}1A`, color: active ? "#fff" : c.color, border: `1.5px solid ${active ? c.color : `${c.color}55`}` }}>
-              {active ? <Check size={12} /> : <Icon size={12} />} {c.name}
-            </button>
-          );
-        })}
+      {/* Mobiler Aufklapp-Pfeil fuer die Ansichten-Navigation (welche Kategorien im Kalender gezeigt werden) */}
+      <button
+        onClick={() => setShowMobileNav((v) => !v)}
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-50 w-7 h-10 rounded-r-full flex items-center justify-center shadow"
+        style={{ backgroundColor: INK, color: "#fff" }}
+      >
+        {showMobileNav ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+      </button>
+      {showMobileNav && (
+        <div
+          className="fixed inset-0 z-40"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+          onClick={() => setShowMobileNav(false)}
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[80vw] overflow-y-auto p-4 transition-transform duration-200 ${showMobileNav ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ backgroundColor: PAPER }}
+      >
+        <div className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Ansichten</div>
+        <CategorySidebar
+          categories={categories}
+          activeCategoryIds={activeCategoryIds}
+          onToggle={toggleCategory}
+          onAll={() => setActiveCategoryIds(categories.map((c) => c.id))}
+          onNone={() => setActiveCategoryIds([])}
+          primaryCategoryIds={primaryCategoryIds}
+          groupLabel="Sharing"
+          groupCategoryIds={groupCategoryIds}
+        />
       </div>
-      <div className="px-5 mt-3">
+
+      <div className="px-5 mt-1 mb-3">
         <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#D6A428" }}><Plus size={14} /> Buchen</button>
       </div>
       </>

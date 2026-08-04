@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Lock, FileText, Download, Trash2, Pencil,
-  Users, UserPlus, ShieldCheck, ChevronDown, ChevronRight, Share2, Bell, Siren,
+  Users, UserPlus, ShieldCheck, ChevronDown, ChevronRight, Bell, Siren,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET, VORSORGE_BUCKET } from "./supabaseClient";
 
@@ -339,7 +339,7 @@ function NotfallpassReadonly({ record }) {
   );
 }
 
-function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, onShare, shareCount, canManage }) {
+function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, shareCount, canManage }) {
   return (
     <div className="p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
       <div className="flex items-start justify-between gap-2">
@@ -361,9 +361,6 @@ function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, onShare, 
           </button>
           {canManage && (
             <>
-              <button onClick={onShare} title="Gezielt an eine Person freigeben" className="h-8 pl-2 pr-3 rounded-full flex items-center gap-1" style={{ backgroundColor: "#E4E1D3" }}>
-                <Share2 size={13} style={{ color: INK_SOFT }} /> <span className="text-[11px] font-semibold" style={{ color: INK_SOFT }}>Teilen</span>
-              </button>
               <button onClick={onEdit} title="Bearbeiten" className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Pencil size={13} style={{ color: INK_SOFT }} /></button>
               <button onClick={onDelete} title="Löschen" className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Trash2 size={13} style={{ color: "#A13D3D" }} /></button>
             </>
@@ -397,6 +394,7 @@ function VorsorgeApp({ session }) {
   const [notfallpassList, setNotfallpassList] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [members, setMembers] = useState([]);
+  const [notfallpassShares, setNotfallpassShares] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
   const [expandedOwners, setExpandedOwners] = useState(() => new Set());
@@ -404,15 +402,16 @@ function VorsorgeApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    let docs, sh, dsh, np, us, mb;
+    let docs, sh, dsh, np, us, mb, nps;
     try {
-      [docs, sh, dsh, np, us, mb] = await Promise.all([
+      [docs, sh, dsh, np, us, mb, nps] = await Promise.all([
         supabase.from("vorsorge_documents").select("*").order("created_at", { ascending: false }),
         supabase.from("vorsorge_shares").select("*"),
         supabase.from("vorsorge_document_shares").select("*"),
         supabase.from("vorsorge_notfallpass").select("*"),
         supabase.rpc("list_all_users"),
         supabase.from("members").select("user_id, vorname, nachname"),
+        supabase.from("vorsorge_notfallpass_shares").select("*"),
       ]);
     } catch (e) {
       console.error("Vorsorge loadAll fehlgeschlagen (Netzwerk/Exception):", e);
@@ -426,6 +425,7 @@ function VorsorgeApp({ session }) {
       ["Dokument-Freigaben", dsh.error],
       ["Notfallpass", np.error],
       ["Mitgliederliste", us.error],
+      ["Notfallpass-Freigaben", nps?.error],
     ].filter(([, err]) => !!err);
     if (errors.length > 0) {
       console.error("Vorsorge loadAll Fehler:", errors);
@@ -440,6 +440,7 @@ function VorsorgeApp({ session }) {
     setNotfallpassList(np.data || []);
     setAllUsers(us.data || []);
     setMembers(mb?.data || []);
+    setNotfallpassShares(nps?.data || []);
     setLoading(false);
   }
 
@@ -479,34 +480,33 @@ function VorsorgeApp({ session }) {
     return docShares.filter((ds) => ds.document_id === documentId);
   }
 
-  // Leute, die MICH als Vertrauensperson eingetragen haben (voller Zugriff auf alles),
-  // ODER mir einzelne Dokumente gezielt freigegeben haben.
-  const trustingMe = useMemo(() => shares.filter((s) => s.trusted_user_id === user.id), [shares, user.id]);
+  // Leute, die mir einzelne Dokumente und/oder den Notfallpass gezielt
+  // freigegeben haben (Zugriff wird ausschliesslich ueber die Freigaben-Matrix
+  // gesteuert, nicht mehr automatisch durch "Vertrauensperson" allein).
   const myDocShares = useMemo(() => docShares.filter((ds) => ds.trusted_user_id === user.id), [docShares, user.id]);
+  const myNotfallpassShares = useMemo(() => notfallpassShares.filter((s) => s.trusted_user_id === user.id), [notfallpassShares, user.id]);
 
-  // ownerId -> { full: boolean, docIds: Set } - "full" heisst komplette Freigabe,
-  // sonst nur die in docIds gelisteten einzelnen Dokumente.
+  // ownerId -> { docIds: Set, notfallpass: boolean }
   const sharedWithMeGroups = useMemo(() => {
     const groups = {};
-    trustingMe.forEach((s) => {
-      groups[s.owner_user_id] = groups[s.owner_user_id] || { full: false, docIds: new Set() };
-      groups[s.owner_user_id].full = true;
-    });
     myDocShares.forEach((ds) => {
       const doc = documents.find((d) => d.id === ds.document_id);
       if (!doc) return;
-      groups[doc.owner_user_id] = groups[doc.owner_user_id] || { full: false, docIds: new Set() };
+      groups[doc.owner_user_id] = groups[doc.owner_user_id] || { docIds: new Set(), notfallpass: false };
       groups[doc.owner_user_id].docIds.add(doc.id);
     });
+    myNotfallpassShares.forEach((s) => {
+      groups[s.owner_user_id] = groups[s.owner_user_id] || { docIds: new Set(), notfallpass: false };
+      groups[s.owner_user_id].notfallpass = true;
+    });
     return groups;
-  }, [trustingMe, myDocShares, documents]);
+  }, [myDocShares, myNotfallpassShares, documents]);
 
   const sharedWithMeOwnerIds = useMemo(() => Object.keys(sharedWithMeGroups), [sharedWithMeGroups]);
 
   function docsForSharedOwner(ownerId) {
     const g = sharedWithMeGroups[ownerId];
     if (!g) return [];
-    if (g.full) return documents.filter((d) => d.owner_user_id === ownerId);
     return documents.filter((d) => g.docIds.has(d.id));
   }
 
@@ -683,54 +683,66 @@ function VorsorgeApp({ session }) {
     }
   }
 
-  async function handleRemoveTrusted(shareId) {
-    if (!window.confirm("Zugriff für diese Person wirklich entfernen?")) return;
+  async function handleRemoveTrusted(shareId, trustedUserId) {
+    if (!window.confirm("Person aus dem Kreis entfernen? Damit verliert sie auch den Zugriff auf alle bisher einzeln freigegebenen Dokumente und den Notfallpass.")) return;
     try {
       const { error } = await supabase.from("vorsorge_shares").delete().eq("id", shareId);
       if (error) throw error;
+      // Zugehoerige Einzel-Freigaben fuer diese Person ebenfalls entfernen, damit
+      // niemand ausserhalb des sichtbaren Kreises weiterhin Zugriff behaelt.
+      const myDocIds = documents.filter((d) => d.owner_user_id === user.id).map((d) => d.id);
+      if (myDocIds.length > 0) {
+        await supabase.from("vorsorge_document_shares").delete().eq("trusted_user_id", trustedUserId).in("document_id", myDocIds);
+      }
+      await supabase.from("vorsorge_notfallpass_shares").delete().eq("owner_user_id", user.id).eq("trusted_user_id", trustedUserId);
       await loadAll();
     } catch (e) {
       alert(e.message || "Konnte nicht entfernt werden.");
     }
   }
 
-  // --- Einzelne Dokumente gezielt an eine Person freigeben (zusaetzlich zur vollen
-  // Freigabe oben - z.B. nur die Bankvollmacht an eine bestimmte Person, ohne ihr
-  // Zugriff auf alles zu geben). ---
-  const [sharingDoc, setSharingDoc] = useState(null);
-  const [addDocShareUserId, setAddDocShareUserId] = useState("");
-  const [docShareError, setDocShareError] = useState("");
-  const [savingDocShare, setSavingDocShare] = useState(false);
+  // --- Freigaben-Matrix: pro Vertrauensperson gezielt festlegen, welche Dokumente
+  // und/oder der Notfallpass sichtbar sind. Ersetzt die fruehere automatische
+  // Vollfreigabe fuer alle Vertrauenspersonen. ---
+  const [togglingShareCell, setTogglingShareCell] = useState(null);
 
-  function openShareDoc(doc) {
-    setSharingDoc(doc);
-    setAddDocShareUserId("");
-    setDocShareError("");
-  }
-
-  async function handleAddDocShare() {
-    if (!sharingDoc || !addDocShareUserId) return;
-    setDocShareError("");
-    setSavingDocShare(true);
+  async function handleToggleDocShare(documentId, trustedUserId) {
+    const cellKey = `doc:${documentId}:${trustedUserId}`;
+    setTogglingShareCell(cellKey);
     try {
-      const { error } = await supabase.from("vorsorge_document_shares").insert({ document_id: sharingDoc.id, trusted_user_id: addDocShareUserId });
-      if (error) throw error;
-      setAddDocShareUserId("");
+      const existing = docShares.find((ds) => ds.document_id === documentId && ds.trusted_user_id === trustedUserId);
+      if (existing) {
+        const { error } = await supabase.from("vorsorge_document_shares").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("vorsorge_document_shares").insert({ document_id: documentId, trusted_user_id: trustedUserId });
+        if (error) throw error;
+      }
       await loadAll();
     } catch (e) {
-      setDocShareError(e.message || "Konnte nicht freigegeben werden.");
+      alert(e.message || "Konnte nicht geändert werden.");
     } finally {
-      setSavingDocShare(false);
+      setTogglingShareCell(null);
     }
   }
 
-  async function handleRemoveDocShare(shareId) {
+  async function handleToggleNotfallpassShare(trustedUserId) {
+    const cellKey = `np:${trustedUserId}`;
+    setTogglingShareCell(cellKey);
     try {
-      const { error } = await supabase.from("vorsorge_document_shares").delete().eq("id", shareId);
-      if (error) throw error;
+      const existing = notfallpassShares.find((s) => s.owner_user_id === user.id && s.trusted_user_id === trustedUserId);
+      if (existing) {
+        const { error } = await supabase.from("vorsorge_notfallpass_shares").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("vorsorge_notfallpass_shares").insert({ owner_user_id: user.id, trusted_user_id: trustedUserId });
+        if (error) throw error;
+      }
       await loadAll();
     } catch (e) {
-      alert(e.message || "Konnte nicht entfernt werden.");
+      alert(e.message || "Konnte nicht geändert werden.");
+    } finally {
+      setTogglingShareCell(null);
     }
   }
 
@@ -895,7 +907,7 @@ function VorsorgeApp({ session }) {
               </button>
             </div>
             <p className="text-xs mb-3" style={{ color: INK_SOFT }}>
-              Über den "Teilen"-Button bei einem Dokument gibst du es gezielt nur einer einzelnen Person frei – unabhängig von deinen Vertrauenspersonen weiter unten, die automatisch alles sehen.
+              Lade hier deine Dokumente hoch. Wem du sie zeigst, legst du weiter unten in der Freigaben-Tabelle fest.
             </p>
 
             {myDocuments.length === 0 ? (
@@ -906,7 +918,7 @@ function VorsorgeApp({ session }) {
             ) : (
               <div className="flex flex-col gap-2 mb-6">
                 {myDocuments.map((doc) => (
-                  <DocumentRow key={doc.id} doc={doc} onDownload={() => handleDownload(doc)} downloading={downloadingId === doc.id} onEdit={() => openEdit(doc)} onDelete={() => handleDeleteDoc(doc)} onShare={() => openShareDoc(doc)} shareCount={docSharesFor(doc.id).length} canManage />
+                  <DocumentRow key={doc.id} doc={doc} onDownload={() => handleDownload(doc)} downloading={downloadingId === doc.id} onEdit={() => openEdit(doc)} onDelete={() => handleDeleteDoc(doc)} shareCount={docSharesFor(doc.id).length} canManage />
                 ))}
               </div>
             )}
@@ -917,7 +929,7 @@ function VorsorgeApp({ session }) {
                 <UserPlus size={14} /> Hinzufügen
               </button>
             </div>
-            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Diese Personen können jederzeit alle deine Dokumente einsehen und herunterladen.</p>
+            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Lege hier den Kreis der Personen fest, denen du in der Tabelle darunter gezielt Dokumente und/oder den Notfallpass zeigen kannst. Automatisch sieht hier niemand etwas.</p>
             {myTrustedPeople.length === 0 ? (
               <p className="text-sm mb-6" style={{ color: INK_SOFT }}>Noch niemand eingetragen.</p>
             ) : (
@@ -925,10 +937,59 @@ function VorsorgeApp({ session }) {
                 {myTrustedPeople.map((s) => (
                   <div key={s.id} className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
                     <div className="flex items-center gap-2.5 text-sm font-semibold"><Users size={15} style={{ color: INK_SOFT }} /> {nameFor(s.trusted_user_id)}</div>
-                    <button onClick={() => handleRemoveTrusted(s.id)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ color: "#A13D3D" }}>Entfernen</button>
+                    <button onClick={() => handleRemoveTrusted(s.id, s.trusted_user_id)} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ color: "#A13D3D" }}>Entfernen</button>
                   </div>
                 ))}
               </div>
+            )}
+
+            <h2 className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Freigaben</h2>
+            {myTrustedPeople.length === 0 ? (
+              <p className="text-sm mb-6" style={{ color: INK_SOFT }}>Füge zuerst oben eine Vertrauensperson hinzu, um ihr Dokumente oder den Notfallpass zuzuweisen.</p>
+            ) : (
+              <>
+                <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Häkchen setzen, um ein Dokument oder den Notfallpass für eine Person freizugeben. Wirkt sofort.</p>
+                <div className="overflow-x-auto rounded-xl mb-6" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                  <table className="text-xs border-collapse" style={{ minWidth: 420 }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left px-3 py-2.5 sticky left-0" style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Vertrauensperson</th>
+                        {myDocuments.map((doc) => (
+                          <th key={doc.id} title={doc.title} className="px-2 py-2.5 text-center font-semibold whitespace-nowrap max-w-[90px] truncate" style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}` }}>
+                            {doc.title}
+                          </th>
+                        ))}
+                        <th className="px-2 py-2.5 text-center font-semibold whitespace-nowrap" style={{ color: "#C0453F", borderBottom: `1.5px solid ${BORDER_SOFT}` }}>Notfallpass</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {myTrustedPeople.map((s) => (
+                        <tr key={s.id} style={{ borderBottom: `1px solid ${BORDER_SOFT}` }}>
+                          <td className="px-3 py-2 sticky left-0 font-semibold truncate" style={{ backgroundColor: "#fff" }}>{nameFor(s.trusted_user_id)}</td>
+                          {myDocuments.map((doc) => (
+                            <td key={doc.id} className="text-center px-2 py-2">
+                              <input
+                                type="checkbox"
+                                checked={docSharesFor(doc.id).some((ds) => ds.trusted_user_id === s.trusted_user_id)}
+                                disabled={togglingShareCell === `doc:${doc.id}:${s.trusted_user_id}`}
+                                onChange={() => handleToggleDocShare(doc.id, s.trusted_user_id)}
+                              />
+                            </td>
+                          ))}
+                          <td className="text-center px-2 py-2">
+                            <input
+                              type="checkbox"
+                              checked={notfallpassShares.some((ns) => ns.owner_user_id === user.id && ns.trusted_user_id === s.trusted_user_id)}
+                              disabled={togglingShareCell === `np:${s.trusted_user_id}`}
+                              onChange={() => handleToggleNotfallpassShare(s.trusted_user_id)}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </>
         )}
@@ -945,8 +1006,7 @@ function VorsorgeApp({ session }) {
                 {sharedWithMeOwnerIds.map((ownerId) => {
                   const docs = docsForSharedOwner(ownerId);
                   const expanded = expandedOwners.has(ownerId);
-                  const isFull = sharedWithMeGroups[ownerId]?.full;
-                  const ownerNp = isFull ? notfallpassFor(ownerId) : null;
+                  const ownerNp = sharedWithMeGroups[ownerId]?.notfallpass ? notfallpassFor(ownerId) : null;
                   return (
                     <div key={ownerId} className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
                       <button onClick={() => toggleOwnerExpanded(ownerId)} className="w-full flex items-center justify-between gap-2 px-3.5 py-3 text-left">
@@ -1108,40 +1168,6 @@ function VorsorgeApp({ session }) {
             {editError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{editError}</p>}
             <button onClick={handleSaveEdit} disabled={savingEdit} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingEdit ? 0.7 : 1 }}>
               {savingEdit && <Loader2 size={15} className="animate-spin" />} {savingEdit ? "Speichern…" : "Speichern"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {sharingDoc && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setSharingDoc(null); } }}>
-          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Dokument freigeben</h2><button onClick={() => setSharingDoc(null)}><X size={20} /></button></div>
-            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>"{sharingDoc.title}" gezielt an einzelne Personen freigeben - unabhängig von deinen Vertrauenspersonen, die ohnehin bereits alles sehen.</p>
-
-            {docSharesFor(sharingDoc.id).length === 0 ? (
-              <p className="text-sm mb-3" style={{ color: INK_SOFT }}>Noch niemand einzeln freigeschaltet.</p>
-            ) : (
-              <div className="flex flex-col gap-2 mb-3">
-                {docSharesFor(sharingDoc.id).map((ds) => (
-                  <div key={ds.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ backgroundColor: "#fff" }}>
-                    <div className="flex items-center gap-2 text-sm font-semibold"><Share2 size={13} style={{ color: INK_SOFT }} /> {nameFor(ds.trusted_user_id)}</div>
-                    <button onClick={() => handleRemoveDocShare(ds.id)} className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: "#A13D3D" }}>Entfernen</button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <label className="text-xs font-medium block mb-1">Person hinzufügen</label>
-            <select value={addDocShareUserId} onChange={(e) => setAddDocShareUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
-              <option value="">Bitte wählen…</option>
-              {allUsers
-                .filter((u) => u.id !== user.id && !trustedByMeIds.has(u.id) && !docSharesFor(sharingDoc.id).some((ds) => ds.trusted_user_id === u.id))
-                .map((u) => <option key={u.id} value={u.id}>{fullNameFor(u.id)}</option>)}
-            </select>
-            {docShareError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{docShareError}</p>}
-            <button onClick={handleAddDocShare} disabled={savingDocShare || !addDocShareUserId} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingDocShare || !addDocShareUserId ? 0.6 : 1 }}>
-              {savingDocShare && <Loader2 size={15} className="animate-spin" />} {savingDocShare ? "Speichern…" : "Freigeben"}
             </button>
           </div>
         </div>

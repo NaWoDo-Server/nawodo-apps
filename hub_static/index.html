@@ -379,23 +379,21 @@
     .icon-wrap { position: relative; }
     .lock-badge {
       position: absolute;
-      bottom: -6px;
-      right: -6px;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: #2B2B26;
+      bottom: -4px;
+      right: -4px;
+      width: 22px;
+      height: 22px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3), 0 0 0 2.5px #F1F0EA;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
     }
-    .lock-badge svg { width: 12px; height: 12px; }
+    .lock-badge svg { width: 20px; height: 20px; }
 
     /* --- Desktop: iPad-artiges Layout, Widgets links, App-Grid rechts --- */
     @media (min-width: 860px) {
-      .lock-badge { width: 30px; height: 30px; bottom: -7px; right: -7px; }
-      .lock-badge svg { width: 15px; height: 15px; }
+      .lock-badge { width: 28px; height: 28px; bottom: -5px; right: -5px; }
+      .lock-badge svg { width: 26px; height: 26px; }
       .wrap {
         width: 66.6667%;
         max-width: none;
@@ -596,8 +594,8 @@
                 </div>
                 <div class="lock-badge">
                   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="5" y="11" width="14" height="10" rx="2" fill="#fff"/>
-                    <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+                    <rect x="5" y="11" width="14" height="10" rx="2" fill="#2B2B26"/>
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="#2B2B26" stroke-width="2.2" stroke-linecap="round" fill="none"/>
                   </svg>
                 </div>
               </div>

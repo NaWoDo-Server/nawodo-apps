@@ -8,34 +8,54 @@
 -- ganz normal in der Mitglieder-App auf und als Name auf allen Buchungen/Eintraegen, koennen
 -- sich aber selbst nirgends einloggen.
 --
+-- members.created_by ist Pflichtfeld (wer hat das Mitglied angelegt) - dafuer wird automatisch
+-- ein bestehender Superadmin-Account herangezogen (nur als "Ersteller"-Referenz, taucht nirgends
+-- sichtbar auf).
+--
+-- workshop_attendance.user_id ist ebenfalls Pflichtfeld und muss ein echter Login-Account sein -
+-- da die Testuser keinen haben, wird auf simulierte Zu-/Absagen verzichtet. Themen, Agenda und
+-- Essensliste der Workshops werden trotzdem befuellt.
+--
 -- Betrifft: Sharing/Termine-Buchungen, Fahrtenbuch, Termine-Kalender, 2 neue Workshops
--- (mit Themen/Agenda/Zu-Absagen/Essensliste, aber ohne Anhaenge). Ruehrt NICHT an: echte
--- Mitglieder, Gruppen, Pinnwand, FAQ, Vorsorge, Bulldozer.
+-- (mit Themen/Agenda/Essensliste, aber ohne Zu-/Absagen und ohne Anhaenge). Ruehrt NICHT an:
+-- echte Mitglieder, Gruppen, Pinnwand, FAQ, Vorsorge, Bulldozer.
 --
 -- Falls Ressourcen/Kategorien bei euch umbenannt wurden, finden die Namens-basierten
 -- Zuordnungen (z.B. "GMR", "Car Sharing") einfach nichts und ueberspringen den jeweiligen
 -- Teil - kein Fehler, nur weniger generierte Daten als gedacht.
 --
 -- Spaeter wieder loeschen: siehe migration_remove_testdata.sql (separat).
---
--- In Supabase Studio -> SQL Editor -> "New query" einfuegen und "Run" klicken.
--- (Oder per SSH: docker exec -i supabase-db psql -U postgres < migration_seed_testdata.sql)
 
 begin;
 
 -- 1) 10 fiktive Test-Mitglieder ------------------------------------------------------
-insert into members (vorname, nachname, strasse, hausnummer, plz, wohnort, telefon, handy, geburtstag, email, is_child, mitgliedstyp)
-values
-  ('Testuser1',  'Ahrens',     'Kölner Straße',         '12', '41540', 'Dormagen', '02133 100001', '0170 1000001', '1985-03-14', 'testuser1@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser2',  'Bergmann',   'Further Straße',        '7',  '41540', 'Dormagen', '02133 100002', '0170 1000002', '1990-07-22', 'testuser2@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser3',  'Cordes',     'Nievenheimer Straße',   '23', '41540', 'Dormagen', '02133 100003', '0170 1000003', '1978-11-02', 'testuser3@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser4',  'Dietrich',   'Chempark Allee',        '5',  '41540', 'Dormagen', '02133 100004', '0170 1000004', '1995-01-30', 'testuser4@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser5',  'Ehlers',     'Rheinstraße',           '18', '41540', 'Dormagen', '02133 100005', '0170 1000005', '1982-09-09', 'testuser5@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser6',  'Frank',      'Sankt-Michael-Straße',  '3',  '41540', 'Dormagen', '02133 100006', '0170 1000006', '1988-05-17', 'testuser6@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser7',  'Gerlach',    'Bahnhofstraße',         '41', '41540', 'Dormagen', '02133 100007', '0170 1000007', '1973-12-24', 'testuser7@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser8',  'Hartmann',   'Zonser Straße',         '9',  '41540', 'Dormagen', '02133 100008', '0170 1000008', '1992-06-06', 'testuser8@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser9',  'Imhoff',     'Delrather Straße',      '27', '41540', 'Dormagen', '02133 100009', '0170 1000009', '1980-02-19', 'testuser9@nawodo-test.local',  false, 'mitglied'),
-  ('Testuser10', 'Jansen',     'Hackenbroicher Straße', '14', '41540', 'Dormagen', '02133 100010', '0170 1000010', '1997-10-11', 'testuser10@nawodo-test.local', false, 'mitglied');
+do $$
+declare
+  admin_id uuid;
+begin
+  select id into admin_id from auth.users
+  where coalesce((raw_user_meta_data->>'is_superadmin')::boolean, false) = true
+  order by created_at limit 1;
+
+  if admin_id is null then
+    select id into admin_id from auth.users
+    where coalesce((raw_user_meta_data->>'is_admin')::boolean, false) = true
+    order by created_at limit 1;
+  end if;
+
+  insert into members (vorname, nachname, strasse, hausnummer, plz, wohnort, telefon, handy, geburtstag, email, is_child, mitgliedstyp, created_by)
+  values
+    ('Testuser1',  'Ahrens',     'Kölner Straße',         '12', '41540', 'Dormagen', '02133 100001', '0170 1000001', '1985-03-14', 'testuser1@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser2',  'Bergmann',   'Further Straße',        '7',  '41540', 'Dormagen', '02133 100002', '0170 1000002', '1990-07-22', 'testuser2@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser3',  'Cordes',     'Nievenheimer Straße',   '23', '41540', 'Dormagen', '02133 100003', '0170 1000003', '1978-11-02', 'testuser3@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser4',  'Dietrich',   'Chempark Allee',        '5',  '41540', 'Dormagen', '02133 100004', '0170 1000004', '1995-01-30', 'testuser4@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser5',  'Ehlers',     'Rheinstraße',           '18', '41540', 'Dormagen', '02133 100005', '0170 1000005', '1982-09-09', 'testuser5@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser6',  'Frank',      'Sankt-Michael-Straße',  '3',  '41540', 'Dormagen', '02133 100006', '0170 1000006', '1988-05-17', 'testuser6@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser7',  'Gerlach',    'Bahnhofstraße',         '41', '41540', 'Dormagen', '02133 100007', '0170 1000007', '1973-12-24', 'testuser7@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser8',  'Hartmann',   'Zonser Straße',         '9',  '41540', 'Dormagen', '02133 100008', '0170 1000008', '1992-06-06', 'testuser8@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser9',  'Imhoff',     'Delrather Straße',      '27', '41540', 'Dormagen', '02133 100009', '0170 1000009', '1980-02-19', 'testuser9@nawodo-test.local',  false, 'mitglied', admin_id),
+    ('Testuser10', 'Jansen',     'Hackenbroicher Straße', '14', '41540', 'Dormagen', '02133 100010', '0170 1000010', '1997-10-11', 'testuser10@nawodo-test.local', false, 'mitglied', admin_id);
+end $$;
 
 -- 2) Buchungen jeglicher Art (Auto/Rad/Wallbox/Raum/Material), Aug-Okt 2026 ----------
 do $$
@@ -129,7 +149,7 @@ begin
   end loop;
 end $$;
 
--- 5) Zwei Workshops mit Themen/Agenda/Zu-Absagen/Essensliste (keine Anhaenge) --------
+-- 5) Zwei Workshops mit Themen/Agenda/Essensliste (keine Zu-/Absagen, keine Anhaenge) --------
 do $$
 declare
   w1 uuid;
@@ -156,17 +176,6 @@ begin
     'Treffen im GMR, Werkzeug ist vorhanden.',
     'Testuser7'
   ) returning id into w2;
-
-  insert into workshop_attendance (workshop_id, user_name, attending) values
-    (w1, 'Testuser1', true),
-    (w1, 'Testuser2', true),
-    (w1, 'Testuser4', false),
-    (w1, 'Testuser5', true),
-    (w1, 'Testuser8', true),
-    (w2, 'Testuser1', true),
-    (w2, 'Testuser6', true),
-    (w2, 'Testuser9', false),
-    (w2, 'Testuser10', true);
 
   insert into workshop_food_items (workshop_id, item, created_by_name) values
     (w1, 'Kartoffelsalat', 'Testuser2'),

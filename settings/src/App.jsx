@@ -106,8 +106,10 @@ function SettingsApp({ session }) {
   const [pendingMods, setPendingMods] = useState([]);
   const [pendingDenied, setPendingDenied] = useState([]);
   const [pendingFaqProjekt, setPendingFaqProjekt] = useState(false);
+  const [pendingMitgliederGenossenschaft, setPendingMitgliederGenossenschaft] = useState(false);
   const [pendingMitgliederGaeste, setPendingMitgliederGaeste] = useState(false);
   const [pendingMitgliederBewohner, setPendingMitgliederBewohner] = useState(false);
+  const [pendingMitgliederKinder, setPendingMitgliederKinder] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -162,11 +164,17 @@ function SettingsApp({ session }) {
   function faqProjektAllowedFor(userId) {
     return memberPermissions.some((r) => r.user_id === userId && r.app_key === "faq_projekt" && r.allowed === true);
   }
+  function mitgliederGenossenschaftAllowedFor(userId) {
+    return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_genossenschaft" && r.allowed === true);
+  }
   function mitgliederGaesteAllowedFor(userId) {
     return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_gaeste" && r.allowed === true);
   }
   function mitgliederBewohnerAllowedFor(userId) {
     return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_bewohner" && r.allowed === true);
+  }
+  function mitgliederKinderAllowedFor(userId) {
+    return memberPermissions.some((r) => r.user_id === userId && r.app_key === "mitglieder_kinder" && r.allowed === true);
   }
   function groupsForMember(memberId) {
     return memberBereiche.filter((r) => r.member_id === memberId).map((r) => r.bereich_key);
@@ -235,8 +243,10 @@ function SettingsApp({ session }) {
     setPendingMods(modAppsFor(u.id));
     setPendingDenied(deniedAppsFor(u.id));
     setPendingFaqProjekt(faqProjektAllowedFor(u.id));
+    setPendingMitgliederGenossenschaft(mitgliederGenossenschaftAllowedFor(u.id));
     setPendingMitgliederGaeste(mitgliederGaesteAllowedFor(u.id));
     setPendingMitgliederBewohner(mitgliederBewohnerAllowedFor(u.id));
+    setPendingMitgliederKinder(mitgliederKinderAllowedFor(u.id));
   }
 
   async function handleApplyRoles() {
@@ -288,6 +298,14 @@ function SettingsApp({ session }) {
       const currentMitgliederBewohner = mitgliederBewohnerAllowedFor(selectedAuthUser.id);
       if (currentMitgliederBewohner !== pendingMitgliederBewohner) {
         await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_bewohner", allowed: pendingMitgliederBewohner });
+      }
+      const currentMitgliederGenossenschaft = mitgliederGenossenschaftAllowedFor(selectedAuthUser.id);
+      if (currentMitgliederGenossenschaft !== pendingMitgliederGenossenschaft) {
+        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_genossenschaft", allowed: pendingMitgliederGenossenschaft });
+      }
+      const currentMitgliederKinder = mitgliederKinderAllowedFor(selectedAuthUser.id);
+      if (currentMitgliederKinder !== pendingMitgliederKinder) {
+        await callAdminFn({ type: "set_permission", target_user_id: selectedAuthUser.id, app_key: "mitglieder_kinder", allowed: pendingMitgliederKinder });
       }
       await loadAll();
     } catch (e) {
@@ -687,6 +705,15 @@ function SettingsApp({ session }) {
                             <input
                               type="checkbox"
                               disabled={savingAction || denied}
+                              checked={pendingMitgliederGenossenschaft}
+                              onChange={(e) => setPendingMitgliederGenossenschaft(e.target.checked)}
+                            />
+                            ↳ Filter: Genossenschaftsmitglieder
+                          </label>
+                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
+                            <input
+                              type="checkbox"
+                              disabled={savingAction || denied}
                               checked={pendingMitgliederGaeste}
                               onChange={(e) => setPendingMitgliederGaeste(e.target.checked)}
                             />
@@ -700,6 +727,15 @@ function SettingsApp({ session }) {
                               onChange={(e) => setPendingMitgliederBewohner(e.target.checked)}
                             />
                             ↳ Filter: Bewohner
+                          </label>
+                          <label className="flex items-center gap-2 text-sm ml-5" style={{ color: INK_SOFT }}>
+                            <input
+                              type="checkbox"
+                              disabled={savingAction || denied}
+                              checked={pendingMitgliederKinder}
+                              onChange={(e) => setPendingMitgliederKinder(e.target.checked)}
+                            />
+                            ↳ Filter: Kinder
                           </label>
                         </>
                       )}

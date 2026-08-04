@@ -219,11 +219,14 @@ function MitgliederApp({ session }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeBereich, setActiveBereich] = useState(null);
-  const [typeFilter, setTypeFilter] = useState("mitglieder"); // "mitglieder" | "gast" | "bewohner" | "kinder" | "alle"
-  // Die Filter-Tabs "Gaeste" und "Bewohner" sind Opt-in: nur sichtbar, wenn der Superadmin
-  // sie fuer dieses Mitglied ueber die Settings-App freigeschaltet hat (member_permissions).
+  const [typeFilter, setTypeFilter] = useState("alle"); // "mitglieder" | "gast" | "bewohner" | "kinder" | "alle"
+  // Alle vier Kategorien sind Opt-in: nur sichtbar, wenn der Superadmin sie fuer dieses
+  // Mitglied ueber die Settings-App freigeschaltet hat (member_permissions). "Alle" zeigt
+  // dann nur die Vereinigung der freigeschalteten Kategorien, nicht wirklich alle.
+  const [canFilterGenossenschaft, setCanFilterGenossenschaft] = useState(false);
   const [canFilterGast, setCanFilterGast] = useState(false);
   const [canFilterBewohner, setCanFilterBewohner] = useState(false);
+  const [canFilterKinder, setCanFilterKinder] = useState(false);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [profileMember, setProfileMember] = useState(null);
@@ -274,15 +277,18 @@ function MitgliederApp({ session }) {
       supabase.from("member_bereiche").select("*"),
       supabase.from("bereiche").select("*"),
       supabase.from("app_moderators").select("*"),
-      supabase.from("member_permissions").select("app_key,allowed").eq("user_id", user.id).in("app_key", ["mitglieder_gaeste", "mitglieder_bewohner"]),
+      supabase.from("member_permissions").select("app_key,allowed").eq("user_id", user.id).in("app_key", ["mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"]),
     ]);
     setMembers(m.data || []);
     setAllUsers(bu.data || []);
     setBereicheAssign(ba.data || []);
     setBereiche(gr.data || []);
     setAppModerators(mods.data || []);
-    setCanFilterGast((filterPerms.data || []).some((r) => r.app_key === "mitglieder_gaeste" && r.allowed === true));
-    setCanFilterBewohner((filterPerms.data || []).some((r) => r.app_key === "mitglieder_bewohner" && r.allowed === true));
+    const fp = filterPerms.data || [];
+    setCanFilterGenossenschaft(fp.some((r) => r.app_key === "mitglieder_genossenschaft" && r.allowed === true));
+    setCanFilterGast(fp.some((r) => r.app_key === "mitglieder_gaeste" && r.allowed === true));
+    setCanFilterBewohner(fp.some((r) => r.app_key === "mitglieder_bewohner" && r.allowed === true));
+    setCanFilterKinder(fp.some((r) => r.app_key === "mitglieder_kinder" && r.allowed === true));
     setLoading(false);
   }
 
@@ -421,8 +427,21 @@ function MitgliederApp({ session }) {
 
 
   const q = search.trim().toLowerCase();
+  // Erste Stufe: nur Kategorien zeigen, fuer die diese/r Betrachter:in freigeschaltet ist
+  // (Moderatoren/Admins/Superadmin sehen immer alles). Die eigene Karte ist davon ausgenommen,
+  // damit man sich immer selbst findet und bearbeiten kann.
+  function categoryAllowed(m) {
+    if (isElevatedForMitglieder) return true;
+    if (m.user_id && m.user_id === user.id) return true;
+    if (m.is_child) return canFilterKinder;
+    if (m.mitgliedstyp === "gast") return canFilterGast;
+    if (m.mitgliedstyp === "bewohner") return canFilterBewohner;
+    return canFilterGenossenschaft;
+  }
+
   const visibleMembers = useMemo(() => {
     return roster
+      .filter(categoryAllowed)
       .filter((m) => {
         if (typeFilter === "alle") return true;
         if (typeFilter === "kinder") return m.is_child;
@@ -432,7 +451,7 @@ function MitgliederApp({ session }) {
       })
       .filter((m) => !activeBereich || (m.id && bereicheForMember(m.id).includes(activeBereich)))
       .filter((m) => !q || `${m.vorname} ${m.nachname} ${formatAddress(m)} ${m.wohneinheit || ""} ${m.email || ""}`.toLowerCase().includes(q));
-  }, [roster, activeBereich, q, bereicheAssign, typeFilter]);
+  }, [roster, activeBereich, q, bereicheAssign, typeFilter, isElevatedForMitglieder, canFilterGenossenschaft, canFilterGast, canFilterBewohner, canFilterKinder, user.id]);
 
   function resetForm() {
     setFormIsChild(false);
@@ -716,10 +735,10 @@ function MitgliederApp({ session }) {
 
             <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap" style={{ backgroundColor: "#E4E1D3" }}>
               {[
-                ["mitglieder", "Genossenschaftsmitglieder"],
+                ...(isElevatedForMitglieder || canFilterGenossenschaft ? [["mitglieder", "Genossenschaftsmitglieder"]] : []),
                 ...(isElevatedForMitglieder || canFilterGast ? [["gast", "Gäste"]] : []),
                 ...(isElevatedForMitglieder || canFilterBewohner ? [["bewohner", "Bewohner"]] : []),
-                ["kinder", "Kinder"],
+                ...(isElevatedForMitglieder || canFilterKinder ? [["kinder", "Kinder"]] : []),
                 ["alle", "Alle"],
               ].map(([key, label]) => (
                 <button

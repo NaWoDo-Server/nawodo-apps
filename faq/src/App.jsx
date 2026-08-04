@@ -195,6 +195,10 @@ function FaqApp({ session }) {
   // analog zu member_permissions fuer ganze Apps, nur mit umgekehrtem Standard:
   // fehlende Zeile = NICHT sichtbar (Opt-in statt Opt-out).
   const [projektVisible, setProjektVisible] = useState(false);
+  // Zusaetzlich zur Sichtbarkeit pro Mitglied kann der Superadmin jeden der beiden
+  // Reiter global an- und ausschalten (Settings -> Apps). Fehlt ein Eintrag, ist
+  // der Reiter an.
+  const [faqTabEnabled, setFaqTabEnabled] = useState({ projekt: true, app: true });
 
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -216,12 +220,19 @@ function FaqApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [{ data }, { data: perm }] = await Promise.all([
+    const [{ data }, { data: perm }, { data: tabSettings }] = await Promise.all([
       supabase.from("faq_entries").select("*").order("section").order("sort_order"),
       supabase.from("member_permissions").select("allowed").eq("user_id", user.id).eq("app_key", "faq_projekt").maybeSingle(),
+      supabase.from("app_settings").select("key,value").in("key", ["faq_tab_enabled_projekt", "faq_tab_enabled_app"]),
     ]);
     setEntries(data || []);
     setProjektVisible(perm?.allowed === true);
+    const tabMap = { projekt: true, app: true };
+    (tabSettings || []).forEach((row) => {
+      if (row.key === "faq_tab_enabled_projekt") tabMap.projekt = row.value !== false;
+      if (row.key === "faq_tab_enabled_app") tabMap.app = row.value !== false;
+    });
+    setFaqTabEnabled(tabMap);
     setLoading(false);
   }
 
@@ -386,7 +397,7 @@ function FaqApp({ session }) {
           </div>
         </div>
 
-        {SECTIONS.filter((sec) => sec.key !== "projekt" || projektVisible).map((sec) => {
+        {SECTIONS.filter((sec) => faqTabEnabled[sec.key] !== false && (sec.key !== "projekt" || projektVisible)).map((sec) => {
           const items = filtered.filter((e) => e.section === sec.key);
           if (q && items.length === 0) return null;
           const expanded = q ? true : sectionOpen[sec.key];

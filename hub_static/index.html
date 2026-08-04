@@ -472,7 +472,7 @@
             </div>
           </div>
 
-          <a class="widget" href="https://www.nawodo.de/tagebuch/" target="_blank" rel="noopener">
+          <a class="widget" href="https://www.nawodo.de/tagebuch/" target="_blank" rel="noopener" id="diaryWidget">
             <div class="widget-label">Tagebuch · Neuester Eintrag</div>
             <!-- Manuell pflegen: Titel + Datum des neuesten Eintrags von nawodo.de/tagebuch -->
             <div class="diary-title">Besucher im Vorgarten</div>
@@ -735,10 +735,38 @@
           var isSuperAdmin = user.user_metadata && user.user_metadata.is_superadmin === true;
           settingsTile.classList.toggle("hidden", !isSuperAdmin);
         }
-        loadTodayWidget(client);
-        loadBirthdayWidget(client);
+        initWidgets(client);
         applyAppPermissions(client, session);
         applyGlobalAppEnabled(client, session);
+      }
+
+      var WIDGET_KEYS = ["wetter", "tagebuch", "geburtstage", "kalenderansicht"];
+      var WIDGET_EL_IDS = { wetter: "weatherWidget", tagebuch: "diaryWidget", geburtstage: "birthdayWidget", kalenderansicht: "todayWidget" };
+
+      function initWidgets(client) {
+        // Superadmin kann jedes der 4 Startseiten-Widgets global aus- und wieder
+        // einschalten (Settings -> Apps -> Startseite-Widgets). Fehlt ein Eintrag,
+        // ist das Widget an.
+        var keys = WIDGET_KEYS.map(function (k) { return "widget_enabled_" + k; });
+        client.from("app_settings").select("key,value").in("key", keys).then(function (res) {
+          var rows = (res.data) || [];
+          var enabled = { wetter: true, tagebuch: true, geburtstage: true, kalenderansicht: true };
+          rows.forEach(function (row) {
+            var k = row.key.replace("widget_enabled_", "");
+            if (enabled.hasOwnProperty(k)) enabled[k] = row.value !== false;
+          });
+          WIDGET_KEYS.forEach(function (k) {
+            if (enabled[k]) return;
+            var el = document.getElementById(WIDGET_EL_IDS[k]);
+            if (el) el.classList.add("hidden");
+          });
+          if (enabled.kalenderansicht) loadTodayWidget(client);
+          if (enabled.geburtstage) loadBirthdayWidget(client);
+        }).catch(function () {
+          // Bei Fehler (z.B. Tabelle nicht erreichbar) alles wie gewohnt anzeigen.
+          loadTodayWidget(client);
+          loadBirthdayWidget(client);
+        });
       }
 
       client.auth.getSession().then(function (res) {

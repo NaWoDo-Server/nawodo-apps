@@ -40,6 +40,18 @@ const BULK_CATEGORY_OPTIONS = [
   { key: "kind", label: "Kinder" },
 ];
 
+const WIDGET_LIST = [
+  { key: "wetter", label: "Wetter" },
+  { key: "tagebuch", label: "Tagebuch" },
+  { key: "geburtstage", label: "Geburtstage" },
+  { key: "kalenderansicht", label: "Kalenderansicht" },
+];
+
+const FAQ_TAB_LIST = [
+  { key: "app", label: "Rund um die App" },
+  { key: "projekt", label: "Rund ums Wohnprojekt" },
+];
+
 export default function App() {
   if (configMissing) {
     return (
@@ -135,6 +147,10 @@ function SettingsApp({ session }) {
   // Apps-Tab: globale Ein/Aus-Schalter pro App (app_settings.app_enabled_<key>)
   const [appEnabledMap, setAppEnabledMap] = useState({});
   const [savingAppToggle, setSavingAppToggle] = useState(null);
+  const [widgetEnabledMap, setWidgetEnabledMap] = useState({});
+  const [savingWidgetToggle, setSavingWidgetToggle] = useState(null);
+  const [faqTabEnabledMap, setFaqTabEnabledMap] = useState({});
+  const [savingFaqTabToggle, setSavingFaqTabToggle] = useState(null);
 
   // Benutzer-Tab: Bulk-Rechtevergabe nach Kategorie
   const [bulkCategories, setBulkCategories] = useState([]);
@@ -175,7 +191,11 @@ function SettingsApp({ session }) {
       supabase.from("member_permissions").select("*"),
       supabase.from("bereiche").select("*"),
       supabase.from("member_bereiche").select("*"),
-      supabase.from("app_settings").select("key,value").in("key", APP_LIST.map((a) => `app_enabled_${a.key}`)),
+      supabase.from("app_settings").select("key,value").in("key", [
+        ...APP_LIST.map((a) => `app_enabled_${a.key}`),
+        ...WIDGET_LIST.map((w) => `widget_enabled_${w.key}`),
+        ...FAQ_TAB_LIST.map((t) => `faq_tab_enabled_${t.key}`),
+      ]),
     ]);
     setAllUsers(u.data || []);
     setMembers(m.data || []);
@@ -185,11 +205,22 @@ function SettingsApp({ session }) {
     setMemberBereiche(mb.data || []);
     const enabledMap = {};
     APP_LIST.forEach((a) => { enabledMap[a.key] = true; });
+    const widgetMap = {};
+    WIDGET_LIST.forEach((w) => { widgetMap[w.key] = true; });
+    const faqTabMap = {};
+    FAQ_TAB_LIST.forEach((t) => { faqTabMap[t.key] = true; });
     (appSet.data || []).forEach((row) => {
-      const key = row.key.replace("app_enabled_", "");
-      enabledMap[key] = row.value !== false;
+      if (row.key.startsWith("app_enabled_")) {
+        enabledMap[row.key.replace("app_enabled_", "")] = row.value !== false;
+      } else if (row.key.startsWith("widget_enabled_")) {
+        widgetMap[row.key.replace("widget_enabled_", "")] = row.value !== false;
+      } else if (row.key.startsWith("faq_tab_enabled_")) {
+        faqTabMap[row.key.replace("faq_tab_enabled_", "")] = row.value !== false;
+      }
     });
     setAppEnabledMap(enabledMap);
+    setWidgetEnabledMap(widgetMap);
+    setFaqTabEnabledMap(faqTabMap);
     setLoading(false);
   }
 
@@ -206,6 +237,38 @@ function SettingsApp({ session }) {
       setActionError(e.message || "Konnte nicht gespeichert werden.");
     } finally {
       setSavingAppToggle(null);
+    }
+  }
+
+  async function handleToggleWidgetEnabled(widgetKey, nextEnabled) {
+    setSavingWidgetToggle(widgetKey);
+    setActionError("");
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert({ key: `widget_enabled_${widgetKey}`, value: nextEnabled, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setWidgetEnabledMap((prev) => ({ ...prev, [widgetKey]: nextEnabled }));
+    } catch (e) {
+      setActionError(e.message || "Konnte nicht gespeichert werden.");
+    } finally {
+      setSavingWidgetToggle(null);
+    }
+  }
+
+  async function handleToggleFaqTab(tabKey, nextEnabled) {
+    setSavingFaqTabToggle(tabKey);
+    setActionError("");
+    try {
+      const { error } = await supabase
+        .from("app_settings")
+        .upsert({ key: `faq_tab_enabled_${tabKey}`, value: nextEnabled, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setFaqTabEnabledMap((prev) => ({ ...prev, [tabKey]: nextEnabled }));
+    } catch (e) {
+      setActionError(e.message || "Konnte nicht gespeichert werden.");
+    } finally {
+      setSavingFaqTabToggle(null);
     }
   }
 
@@ -743,6 +806,44 @@ function SettingsApp({ session }) {
                 <div className="text-sm font-semibold">{a.label}</div>
                 <button
                   onClick={() => handleToggleAppEnabled(a.key, !enabled)}
+                  disabled={saving}
+                  className="w-12 h-7 rounded-full relative flex-shrink-0"
+                  style={{ backgroundColor: enabled ? BLUE : "#D8D5C7", opacity: saving ? 0.6 : 1, transition: "background-color 0.15s" }}
+                >
+                  <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+                </button>
+              </div>
+            );
+          })}
+
+          <div className="text-xs font-bold uppercase tracking-wide mt-3 mb-1" style={{ color: INK_SOFT }}>FAQ-Bereiche</div>
+          {FAQ_TAB_LIST.map((t) => {
+            const enabled = faqTabEnabledMap[t.key] !== false;
+            const saving = savingFaqTabToggle === t.key;
+            return (
+              <div key={t.key} className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                <div className="text-sm font-semibold">{t.label}</div>
+                <button
+                  onClick={() => handleToggleFaqTab(t.key, !enabled)}
+                  disabled={saving}
+                  className="w-12 h-7 rounded-full relative flex-shrink-0"
+                  style={{ backgroundColor: enabled ? BLUE : "#D8D5C7", opacity: saving ? 0.6 : 1, transition: "background-color 0.15s" }}
+                >
+                  <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+                </button>
+              </div>
+            );
+          })}
+
+          <div className="text-xs font-bold uppercase tracking-wide mt-3 mb-1" style={{ color: INK_SOFT }}>Startseite-Widgets</div>
+          {WIDGET_LIST.map((w) => {
+            const enabled = widgetEnabledMap[w.key] !== false;
+            const saving = savingWidgetToggle === w.key;
+            return (
+              <div key={w.key} className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                <div className="text-sm font-semibold">{w.label}</div>
+                <button
+                  onClick={() => handleToggleWidgetEnabled(w.key, !enabled)}
                   disabled={saving}
                   className="w-12 h-7 rounded-full relative flex-shrink-0"
                   style={{ backgroundColor: enabled ? BLUE : "#D8D5C7", opacity: saving ? 0.6 : 1, transition: "background-color 0.15s" }}

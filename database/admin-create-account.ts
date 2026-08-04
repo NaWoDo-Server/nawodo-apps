@@ -8,10 +8,13 @@
 // POST { type: "toggle_admin", target_user_id, is_admin } -> globalen Admin-Status setzen/entfernen
 // POST { type: "set_password", target_user_id, password } -> neues Passwort fuer bestehenden Account setzen
 // POST { type: "set_permission", target_user_id, app_key, allowed } -> App-Zugriff einzeln erlauben/sperren
+// POST { type: "set_email", target_user_id, email } -> Login-Email direkt (ohne Bestaetigungsmail) aendern.
+//   Sonderfall bei der Berechtigung: das darf zusaetzlich zum Superadmin auch die Person selbst
+//   (target_user_id === eigene ID) - alle anderen Aktionen bleiben exklusiv fuer den Superadmin.
 // DELETE { user_id } -> Account (+ Profil) löschen
-// Alle Aufrufe erwarten den Access-Token des aufrufenden Superadmins im Authorization-Header.
+// Alle Aufrufe erwarten den Access-Token des aufrufenden Nutzers im Authorization-Header.
 
-const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer"];
+const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer", "vorsorge"];
 // Feingranulare Unter-Rechte (kein eigener App-Zugriff, sondern ein Bereich innerhalb
 // einer App). Anders als bei APP_KEYS gilt hier: fehlende Zeile = NICHT erlaubt (Opt-in).
 const OPT_IN_PERMISSION_KEYS = ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"];
@@ -41,39 +44,38 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Aufrufer verifizieren + Berechtigung mit dessen EIGENEM Token pruefen (nicht dem
-  // Service-Key, damit hier wirklich nur echte, gueltige Sitzungen akzeptiert werden).
-  // Accounts/Kinder anlegen und Accounts loeschen ist bewusst enger gefasst als der normale
-  // Admin-Status: nur wer "is_superadmin" gesetzt hat, darf das (aktuell nur ein Account).
-  async function verifySuperAdmin(): Promise<{ error: Response } | { me: any }> {
+  // Aufrufer verifizieren (nicht dem Service-Key, damit hier wirklich nur echte,
+  // gueltige Sitzungen akzeptiert werden). Ob der Aufrufer zusaetzlich Superadmin sein
+  // muss, wird WEITER UNTEN pro Aktion entschieden - "set_email" darf z.B. auch die
+  // betroffene Person selbst ausloesen, alles andere bleibt exklusiv fuer den Superadmin.
+  async function verifyCaller(): Promise<{ error: Response } | { me: any }> {
     const authHeader = req.headers.get("Authorization") || "";
     const callerToken = authHeader.replace(/^Bearer\s+/i, "");
     if (!callerToken) return { error: jsonResponse({ error: "Nicht angemeldet." }, 401) };
 
-    console.log("verifySuperAdmin: SUPABASE_URL=", SUPABASE_URL, "hasServiceKey=", !!SERVICE_ROLE_KEY, "tokenLen=", callerToken.length);
+    console.log("verifyCaller: SUPABASE_URL=", SUPABASE_URL, "hasServiceKey=", !!SERVICE_ROLE_KEY, "tokenLen=", callerToken.length);
     let meResp: Response;
     try {
       meResp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
         headers: { apikey: SERVICE_ROLE_KEY ?? "", Authorization: `Bearer ${callerToken}` },
       });
     } catch (e) {
-      console.error("verifySuperAdmin: fetch threw", String(e));
+      console.error("verifyCaller: fetch threw", String(e));
       return { error: jsonResponse({ error: "Anmeldung ungültig (Netzwerkfehler beim Auth-Check)." }, 401) };
     }
     if (!meResp.ok) {
       const errText = await meResp.text().catch(() => "");
-      console.error("verifySuperAdmin: /auth/v1/user not ok", meResp.status, errText);
+      console.error("verifyCaller: /auth/v1/user not ok", meResp.status, errText);
       return { error: jsonResponse({ error: "Anmeldung ungültig." }, 401) };
     }
     const me = await meResp.json();
-    const isSuperAdmin = me?.user_metadata?.is_superadmin === true;
-    if (!isSuperAdmin) return { error: jsonResponse({ error: "Dafür fehlt die Berechtigung." }, 403) };
     return { me };
   }
 
-  const authResult = await verifySuperAdmin();
+  const authResult = await verifyCaller();
   if ("error" in authResult) return authResult.error;
   const callerId = authResult.me.id;
+  const callerIsSuperAdmin = authResult.me?.user_metadata?.is_superadmin === true;
 
   if (req.method === "POST") {
     let body: any = {};
@@ -83,11 +85,48 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Ungültige Anfrage." }, 400);
     }
 
-    const type = ["child", "toggle_admin", "set_password", "set_permission"].includes(body.type)
+    const type = ["child", "toggle_admin", "set_password", "set_permission", "set_email"].includes(body.type)
       ? body.type
       : "account";
 
-    // --- Globalen Admin-Status setzen/entfernen (nur Superadmin, siehe verifySuperAdmin oben). ---
+    // --- Login-Email direkt aendern (ohne Bestaetigungsmail, da auf dieser Instanz kein
+    // Mailversand eingerichtet ist). Darf die betroffene Person selbst (z.B. wenn sie in
+    // der Mitglieder-App ihre Email aktualisiert) oder der Superadmin. ---
+    if (type === "set_email") {
+      const targetUserId = body.target_user_id;
+      if (!targetUserId) {
+        return jsonResponse({ error: "Keine target_user_id angegeben." }, 400);
+      }
+      if (targetUserId !== callerId && !callerIsSuperAdmin) {
+        return jsonResponse({ error: "Dafür fehlt die Berechtigung." }, 403);
+      }
+      const newEmail = (body.email || "").trim().toLowerCase();
+      if (!newEmail || !newEmail.includes("@")) {
+        return jsonResponse({ error: "Bitte eine gültige Email-Adresse angeben." }, 400);
+      }
+      const putResp = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
+        method: "PUT",
+        headers: restHeaders,
+        body: JSON.stringify({ email: newEmail, email_confirm: true }),
+      });
+      const updated = await putResp.json();
+      if (!putResp.ok) {
+        return jsonResponse(
+          { error: updated?.msg || updated?.message || "Login-Email konnte nicht geändert werden." },
+          putResp.status
+        );
+      }
+      return jsonResponse({ ok: true, email: newEmail }, 200);
+    }
+
+    // --- Alle Aktionen ab hier (inkl. Accounts/Kinder anlegen weiter unten) sind bewusst
+    // enger gefasst als der normale Admin-Status: nur wer "is_superadmin" gesetzt hat,
+    // darf das (aktuell nur ein Account). ---
+    if (!callerIsSuperAdmin) {
+      return jsonResponse({ error: "Dafür fehlt die Berechtigung." }, 403);
+    }
+
+    // --- Globalen Admin-Status setzen/entfernen (nur Superadmin, siehe oben). ---
     if (type === "toggle_admin") {
       const targetUserId = body.target_user_id;
       if (!targetUserId) {
@@ -345,6 +384,9 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "DELETE") {
+    if (!callerIsSuperAdmin) {
+      return jsonResponse({ error: "Dafür fehlt die Berechtigung." }, 403);
+    }
     let body: any = {};
     try {
       body = await req.json();

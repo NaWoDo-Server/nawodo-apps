@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Lock, FileText, Download, Trash2, Pencil,
-  Users, UserPlus, ShieldCheck,
+  Users, UserPlus, ShieldCheck, ChevronDown, ChevronRight, Share2,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET, VORSORGE_BUCKET } from "./supabaseClient";
 
@@ -210,7 +210,7 @@ function AuthGate() {
   return <VorsorgeApp session={session} />;
 }
 
-function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, canManage }) {
+function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, onShare, shareCount, canManage }) {
   return (
     <div className="p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
       <div className="flex items-start justify-between gap-2">
@@ -219,6 +219,9 @@ function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, canManage
           <div className="text-sm font-semibold truncate">{doc.title}</div>
           <div className="text-xs truncate" style={{ color: INK_SOFT }}>{doc.file_name} · {fmtDateTime(doc.created_at)}</div>
           {doc.note && <div className="text-xs mt-1 whitespace-pre-wrap" style={{ color: INK_SOFT }}>{doc.note}</div>}
+          {canManage && shareCount > 0 && (
+            <div className="text-xs mt-1" style={{ color: GREEN }}>Einzeln freigegeben an {shareCount} {shareCount === 1 ? "Person" : "Personen"}</div>
+          )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button onClick={onDownload} disabled={downloading} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>
@@ -226,6 +229,7 @@ function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, canManage
           </button>
           {canManage && (
             <>
+              <button onClick={onShare} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Share2 size={13} style={{ color: INK_SOFT }} /></button>
               <button onClick={onEdit} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Pencil size={13} style={{ color: INK_SOFT }} /></button>
               <button onClick={onDelete} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}><Trash2 size={13} style={{ color: "#A13D3D" }} /></button>
             </>
@@ -255,20 +259,24 @@ function VorsorgeApp({ session }) {
   const [activeTab, setActiveTab] = useState("meine"); // "meine" | "freigegeben" | "alle"
   const [documents, setDocuments] = useState([]);
   const [shares, setShares] = useState([]);
+  const [docShares, setDocShares] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [expandedOwners, setExpandedOwners] = useState(() => new Set());
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [docs, sh, us] = await Promise.all([
+    const [docs, sh, dsh, us] = await Promise.all([
       supabase.from("vorsorge_documents").select("*").order("created_at", { ascending: false }),
       supabase.from("vorsorge_shares").select("*"),
+      supabase.from("vorsorge_document_shares").select("*"),
       supabase.rpc("list_all_users"),
     ]);
     setDocuments(docs.data || []);
     setShares(sh.data || []);
+    setDocShares(dsh.data || []);
     setAllUsers(us.data || []);
     setLoading(false);
   }
@@ -279,6 +287,14 @@ function VorsorgeApp({ session }) {
     return u?.name || u?.email || "Unbekannt";
   }
 
+  function toggleOwnerExpanded(ownerId) {
+    setExpandedOwners((prev) => {
+      const next = new Set(prev);
+      if (next.has(ownerId)) next.delete(ownerId); else next.add(ownerId);
+      return next;
+    });
+  }
+
   const myDocuments = useMemo(
     () => documents.filter((d) => d.owner_user_id === user.id),
     [documents, user.id]
@@ -286,13 +302,40 @@ function VorsorgeApp({ session }) {
   const myTrustedPeople = useMemo(() => shares.filter((s) => s.owner_user_id === user.id), [shares, user.id]);
   const trustedByMeIds = useMemo(() => new Set(myTrustedPeople.map((s) => s.trusted_user_id)), [myTrustedPeople]);
 
-  // Leute, die MICH als Vertrauensperson eingetragen haben.
+  function docSharesFor(documentId) {
+    return docShares.filter((ds) => ds.document_id === documentId);
+  }
+
+  // Leute, die MICH als Vertrauensperson eingetragen haben (voller Zugriff auf alles),
+  // ODER mir einzelne Dokumente gezielt freigegeben haben.
   const trustingMe = useMemo(() => shares.filter((s) => s.trusted_user_id === user.id), [shares, user.id]);
-  const sharedWithMeByOwner = useMemo(() => {
-    const map = {};
-    trustingMe.forEach((s) => { map[s.owner_user_id] = documents.filter((d) => d.owner_user_id === s.owner_user_id); });
-    return map;
-  }, [trustingMe, documents]);
+  const myDocShares = useMemo(() => docShares.filter((ds) => ds.trusted_user_id === user.id), [docShares, user.id]);
+
+  // ownerId -> { full: boolean, docIds: Set } - "full" heisst komplette Freigabe,
+  // sonst nur die in docIds gelisteten einzelnen Dokumente.
+  const sharedWithMeGroups = useMemo(() => {
+    const groups = {};
+    trustingMe.forEach((s) => {
+      groups[s.owner_user_id] = groups[s.owner_user_id] || { full: false, docIds: new Set() };
+      groups[s.owner_user_id].full = true;
+    });
+    myDocShares.forEach((ds) => {
+      const doc = documents.find((d) => d.id === ds.document_id);
+      if (!doc) return;
+      groups[doc.owner_user_id] = groups[doc.owner_user_id] || { full: false, docIds: new Set() };
+      groups[doc.owner_user_id].docIds.add(doc.id);
+    });
+    return groups;
+  }, [trustingMe, myDocShares, documents]);
+
+  const sharedWithMeOwnerIds = useMemo(() => Object.keys(sharedWithMeGroups), [sharedWithMeGroups]);
+
+  function docsForSharedOwner(ownerId) {
+    const g = sharedWithMeGroups[ownerId];
+    if (!g) return [];
+    if (g.full) return documents.filter((d) => d.owner_user_id === ownerId);
+    return documents.filter((d) => g.docIds.has(d.id));
+  }
 
   // Fuer die Superadmin-Uebersicht: alle Besitzer mit mind. 1 Dokument oder mind.
   // 1 Vertrauensperson, unabhaengig davon ob ich selbst als Vertrauensperson
@@ -357,6 +400,7 @@ function VorsorgeApp({ session }) {
   const [editNote, setEditNote] = useState("");
   const [editCategory, setEditCategory] = useState("testament");
   const [editCustomCategory, setEditCustomCategory] = useState("");
+  const [editFile, setEditFile] = useState(null);
   const [editError, setEditError] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -366,6 +410,7 @@ function VorsorgeApp({ session }) {
     setEditNote(doc.note || "");
     setEditCategory(doc.category);
     setEditCustomCategory(doc.custom_category || "");
+    setEditFile(null);
     setEditError("");
   }
 
@@ -376,15 +421,28 @@ function VorsorgeApp({ session }) {
     if (editCategory === "eigene" && !editCustomCategory.trim()) return setEditError("Bitte einen Namen für die eigene Kategorie angeben.");
     setSavingEdit(true);
     try {
+      const oldPath = editingDoc.file_path;
+      let filePath = editingDoc.file_path;
+      let fileName = editingDoc.file_name;
+      if (editFile) {
+        filePath = await uploadDocumentFile(editFile, editingDoc.owner_user_id);
+        fileName = editFile.name;
+      }
       const { error } = await supabase.from("vorsorge_documents").update({
         title: editTitle.trim(),
         note: editNote.trim() || null,
         category: editCategory,
         custom_category: editCategory === "eigene" ? editCustomCategory.trim() : null,
+        file_path: filePath,
+        file_name: fileName,
         updated_at: new Date().toISOString(),
       }).eq("id", editingDoc.id);
       if (error) throw error;
+      if (editFile && filePath !== oldPath) {
+        await supabase.storage.from(VORSORGE_BUCKET).remove([oldPath]).catch(() => {});
+      }
       setEditingDoc(null);
+      setEditFile(null);
       await loadAll();
     } catch (e) {
       setEditError(e.message || "Konnte nicht gespeichert werden.");
@@ -443,6 +501,46 @@ function VorsorgeApp({ session }) {
     if (!window.confirm("Zugriff für diese Person wirklich entfernen?")) return;
     try {
       const { error } = await supabase.from("vorsorge_shares").delete().eq("id", shareId);
+      if (error) throw error;
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Konnte nicht entfernt werden.");
+    }
+  }
+
+  // --- Einzelne Dokumente gezielt an eine Person freigeben (zusaetzlich zur vollen
+  // Freigabe oben - z.B. nur die Bankvollmacht an eine bestimmte Person, ohne ihr
+  // Zugriff auf alles zu geben). ---
+  const [sharingDoc, setSharingDoc] = useState(null);
+  const [addDocShareUserId, setAddDocShareUserId] = useState("");
+  const [docShareError, setDocShareError] = useState("");
+  const [savingDocShare, setSavingDocShare] = useState(false);
+
+  function openShareDoc(doc) {
+    setSharingDoc(doc);
+    setAddDocShareUserId("");
+    setDocShareError("");
+  }
+
+  async function handleAddDocShare() {
+    if (!sharingDoc || !addDocShareUserId) return;
+    setDocShareError("");
+    setSavingDocShare(true);
+    try {
+      const { error } = await supabase.from("vorsorge_document_shares").insert({ document_id: sharingDoc.id, trusted_user_id: addDocShareUserId });
+      if (error) throw error;
+      setAddDocShareUserId("");
+      await loadAll();
+    } catch (e) {
+      setDocShareError(e.message || "Konnte nicht freigegeben werden.");
+    } finally {
+      setSavingDocShare(false);
+    }
+  }
+
+  async function handleRemoveDocShare(shareId) {
+    try {
+      const { error } = await supabase.from("vorsorge_document_shares").delete().eq("id", shareId);
       if (error) throw error;
       await loadAll();
     } catch (e) {
@@ -563,7 +661,7 @@ function VorsorgeApp({ session }) {
             ) : (
               <div className="flex flex-col gap-2 mb-6">
                 {myDocuments.map((doc) => (
-                  <DocumentRow key={doc.id} doc={doc} onDownload={() => handleDownload(doc)} downloading={downloadingId === doc.id} onEdit={() => openEdit(doc)} onDelete={() => handleDeleteDoc(doc)} canManage />
+                  <DocumentRow key={doc.id} doc={doc} onDownload={() => handleDownload(doc)} downloading={downloadingId === doc.id} onEdit={() => openEdit(doc)} onDelete={() => handleDeleteDoc(doc)} onShare={() => openShareDoc(doc)} shareCount={docSharesFor(doc.id).length} canManage />
                 ))}
               </div>
             )}
@@ -592,26 +690,42 @@ function VorsorgeApp({ session }) {
 
         {activeTab === "freigegeben" && (
           <>
-            {trustingMe.length === 0 ? (
+            {sharedWithMeOwnerIds.length === 0 ? (
               <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#fff" }}>
                 <ShieldCheck className="mx-auto mb-2" size={22} style={{ color: INK_SOFT }} />
-                <p className="text-sm" style={{ color: INK_SOFT }}>Bisher hat dich niemand als Vertrauensperson eingetragen.</p>
+                <p className="text-sm" style={{ color: INK_SOFT }}>Bisher hat dich niemand als Vertrauensperson eingetragen oder dir ein Dokument freigegeben.</p>
               </div>
             ) : (
-              trustingMe.map((s) => (
-                <div key={s.id} className="mb-6">
-                  <h2 className="text-sm font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>{nameFor(s.owner_user_id)}</h2>
-                  {(sharedWithMeByOwner[s.owner_user_id] || []).length === 0 ? (
-                    <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Dokumente hochgeladen.</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {sharedWithMeByOwner[s.owner_user_id].map((doc) => (
-                        <DocumentRow key={doc.id} doc={doc} onDownload={() => handleDownload(doc)} downloading={downloadingId === doc.id} canManage={false} />
-                      ))}
+              <div className="flex flex-col gap-2">
+                {sharedWithMeOwnerIds.map((ownerId) => {
+                  const docs = docsForSharedOwner(ownerId);
+                  const expanded = expandedOwners.has(ownerId);
+                  return (
+                    <div key={ownerId} className="rounded-xl overflow-hidden" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                      <button onClick={() => toggleOwnerExpanded(ownerId)} className="w-full flex items-center justify-between gap-2 px-3.5 py-3 text-left">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {expanded ? <ChevronDown size={14} style={{ color: INK }} className="flex-shrink-0" /> : <ChevronRight size={14} style={{ color: INK }} className="flex-shrink-0" />}
+                          <span className="text-sm font-semibold truncate">{nameFor(ownerId)}</span>
+                        </div>
+                        <span className="text-xs flex-shrink-0" style={{ color: INK_SOFT }}>{docs.length} Dokument{docs.length === 1 ? "" : "e"}</span>
+                      </button>
+                      {expanded && (
+                        <div className="px-3.5 pb-3.5">
+                          {docs.length === 0 ? (
+                            <p className="text-sm" style={{ color: INK_SOFT }}>Noch keine Dokumente hochgeladen.</p>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              {docs.map((doc) => (
+                                <DocumentRow key={doc.id} doc={doc} onDownload={() => handleDownload(doc)} downloading={downloadingId === doc.id} canManage={false} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))
+                  );
+                })}
+              </div>
             )}
           </>
         )}
@@ -705,9 +819,48 @@ function VorsorgeApp({ session }) {
             <label className="text-xs font-medium block mb-1">Notiz (optional)</label>
             <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)} rows={3} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border resize-none" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
+            <label className="text-xs font-medium block mb-1">Datei</label>
+            <p className="text-xs mb-1.5" style={{ color: INK_SOFT }}>Aktuell: {editingDoc.file_name}</p>
+            <input type="file" onChange={(e) => setEditFile(e.target.files[0] || null)} className="w-full text-sm mb-3" />
+            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Leer lassen, um die aktuelle Datei zu behalten.</p>
+
             {editError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{editError}</p>}
             <button onClick={handleSaveEdit} disabled={savingEdit} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingEdit ? 0.7 : 1 }}>
               {savingEdit && <Loader2 size={15} className="animate-spin" />} {savingEdit ? "Speichern…" : "Speichern"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sharingDoc && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setSharingDoc(null); } }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-lg">Dokument freigeben</h2><button onClick={() => setSharingDoc(null)}><X size={20} /></button></div>
+            <p className="text-xs mb-3" style={{ color: INK_SOFT }}>"{sharingDoc.title}" gezielt an einzelne Personen freigeben - unabhängig von deinen Vertrauenspersonen, die ohnehin bereits alles sehen.</p>
+
+            {docSharesFor(sharingDoc.id).length === 0 ? (
+              <p className="text-sm mb-3" style={{ color: INK_SOFT }}>Noch niemand einzeln freigeschaltet.</p>
+            ) : (
+              <div className="flex flex-col gap-2 mb-3">
+                {docSharesFor(sharingDoc.id).map((ds) => (
+                  <div key={ds.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ backgroundColor: "#fff" }}>
+                    <div className="flex items-center gap-2 text-sm font-semibold"><Share2 size={13} style={{ color: INK_SOFT }} /> {nameFor(ds.trusted_user_id)}</div>
+                    <button onClick={() => handleRemoveDocShare(ds.id)} className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: "#A13D3D" }}>Entfernen</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="text-xs font-medium block mb-1">Person hinzufügen</label>
+            <select value={addDocShareUserId} onChange={(e) => setAddDocShareUserId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+              <option value="">Bitte wählen…</option>
+              {allUsers
+                .filter((u) => u.id !== user.id && !trustedByMeIds.has(u.id) && !docSharesFor(sharingDoc.id).some((ds) => ds.trusted_user_id === u.id))
+                .map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+            </select>
+            {docShareError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{docShareError}</p>}
+            <button onClick={handleAddDocShare} disabled={savingDocShare || !addDocShareUserId} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingDocShare || !addDocShareUserId ? 0.6 : 1 }}>
+              {savingDocShare && <Loader2 size={15} className="animate-spin" />} {savingDocShare ? "Speichern…" : "Freigeben"}
             </button>
           </div>
         </div>

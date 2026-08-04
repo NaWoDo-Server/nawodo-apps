@@ -543,6 +543,22 @@ function MitgliederApp({ session }) {
     }
   }
 
+  // Die Login-Email (auth.users) und die hier gepflegte Kontakt-Email (members.email)
+  // sollen immer identisch sein. Aendert sich die Email eines Eintrags mit eigenem
+  // Login, wird zusaetzlich zur members-Zeile auch der Login ueber die Edge Function
+  // aktualisiert (direkt, ohne Bestaetigungsmail - auf dieser Instanz ist kein
+  // Mailversand eingerichtet). Das darf man fuer sich selbst, und der Superadmin fuer
+  // jeden.
+  async function syncLoginEmail(targetUserId, email) {
+    const resp = await fetch(`${window.__SUPABASE_URL__}/functions/v1/admin-create-account`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ type: "set_email", target_user_id: targetUserId, email }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data?.error || "Login-Email konnte nicht mit geändert werden.");
+  }
+
   async function handleSave() {
     setFormError("");
     if (!formVorname.trim()) return setFormError("Bitte einen Vornamen eintragen.");
@@ -552,6 +568,7 @@ function MitgliederApp({ session }) {
       let fotoUrl = editingMember ? editingMember.foto_url : null;
       if (formFotoFile) fotoUrl = await uploadFile(formFotoFile, "mitglied-foto");
 
+      const newEmail = formEmail.trim() || null;
       const payload = {
         nachname: formNachname.trim(),
         vorname: formVorname.trim(),
@@ -561,13 +578,16 @@ function MitgliederApp({ session }) {
         plz: formPlz.trim() || null,
         wohnort: formWohnort.trim() || null,
         wohneinheit: formWohneinheit.trim() || null,
-        email: formEmail.trim() || null,
+        email: newEmail,
         telefon: formTelefon.trim() || null,
         handy: formHandy.trim() || null,
         geburtstag: formGeburtstag || null,
         foto_url: fotoUrl,
       };
       let savedId = editingMember?.id || null;
+      // Fuer wen (falls vorhanden) muss ggf. die Login-Email mit synchronisiert werden.
+      const loginUserId = editingMember ? editingMember.user_id : (targetSelfUserId || user.id);
+      const emailChanged = editingMember ? (editingMember.email || null) !== newEmail : !!newEmail;
 
       if (editingMember) {
         const { error } = await supabase.from("members").update(payload).eq("id", editingMember.id);
@@ -580,6 +600,16 @@ function MitgliederApp({ session }) {
         const { data, error } = await supabase.from("members").insert(payload).select().single();
         if (error) throw error;
         savedId = data.id;
+      }
+
+      if (loginUserId && emailChanged && newEmail) {
+        try {
+          await syncLoginEmail(loginUserId, newEmail);
+        } catch (e) {
+          // Profil ist schon gespeichert - Formular trotzdem schliessen (siehe unten),
+          // nur zusaetzlich per alert() auf das Problem mit der Login-Email hinweisen.
+          alert(`Profil gespeichert, aber Login-Email konnte nicht mit geändert werden: ${e.message}`);
+        }
       }
 
       setShowForm(false);

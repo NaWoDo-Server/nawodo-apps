@@ -1247,7 +1247,12 @@ function OverviewTab({ templates, tasks, events, year }) {
         <div key={group.bereich} className="mb-4">
           <div className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: PINK }}>{group.bereich}</div>
           <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${BORDER_SOFT}` }}>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col />
+                <col style={{ width: "84px" }} />
+                <col style={{ width: "112px" }} />
+              </colgroup>
               <thead>
                 <tr style={{ backgroundColor: "#E4E1D3" }}>
                   <th className="text-left px-3 py-2 font-semibold">Aufgabe</th>

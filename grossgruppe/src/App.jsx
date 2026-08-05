@@ -691,7 +691,7 @@ function WorkshopApp({ session }) {
         <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
             <img src="/grossgruppe/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
-            <h1 className="font-bold text-lg lg:text-2xl">GroßGruppe</h1>
+            <h1 className="font-bold text-lg lg:text-2xl">Großgruppe</h1>
           </a>
           <div className="flex items-center gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>

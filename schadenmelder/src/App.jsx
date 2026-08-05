@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, AlertTriangle, Loader2, MapPin, Tag, Camera,
-  MessageSquare, Lock, Trash2, Pencil, ChevronRight, Check, Clock, Wrench,
+  MessageSquare, Lock, Trash2, Pencil, ChevronRight, ChevronUp, Check, Clock, Wrench,
   CheckCircle2, Ban, User as UserIcon, Calendar, HelpCircle,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
@@ -390,15 +390,40 @@ function SchadenApp({ session }) {
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {filtered.map((t) => (
-              <TicketCard
-                key={t.id}
-                t={t}
-                photoCount={photosFor(t.id).length}
-                commentCount={commentsFor(t.id).filter((c) => !c.is_internal || isElevated).length}
-                onOpen={() => setSelectedId(t.id)}
-              />
-            ))}
+            {filtered.map((t) => {
+              const meta = STATUS_META[t.status] || STATUS_META.gemeldet;
+              if (selectedId === t.id) {
+                return (
+                  <div key={t.id} className="rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `4px solid ${meta.color}` }}>
+                    <TicketDetail
+                      ticket={t}
+                      photos={photosFor(t.id)}
+                      comments={commentsFor(t.id)}
+                      events={eventsFor(t.id)}
+                      isElevated={isElevated}
+                      userId={user.id}
+                      canManage={isElevated || t.created_by === user.id}
+                      onClose={() => setSelectedId(null)}
+                      onUpdate={updateTicket}
+                      onAddComment={handleAddComment}
+                      onDeleteComment={handleDeleteComment}
+                      onUploadPhotos={handleUploadPhotos}
+                      onDeletePhoto={handleDeletePhoto}
+                      onDeleteTicket={handleDeleteTicket}
+                    />
+                  </div>
+                );
+              }
+              return (
+                <TicketCard
+                  key={t.id}
+                  t={t}
+                  photoCount={photosFor(t.id).length}
+                  commentCount={commentsFor(t.id).filter((c) => !c.is_internal || isElevated).length}
+                  onOpen={() => setSelectedId(t.id)}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -432,26 +457,6 @@ function SchadenApp({ session }) {
             await loadAll();
             setSelectedId(ticket.id);
           }}
-        />
-      )}
-
-      {selected && (
-        <TicketDetail
-          key={selected.id}
-          ticket={selected}
-          photos={photosFor(selected.id)}
-          comments={commentsFor(selected.id)}
-          events={eventsFor(selected.id)}
-          isElevated={isElevated}
-          userId={user.id}
-          canManage={isElevated || selected.created_by === user.id}
-          onClose={() => setSelectedId(null)}
-          onUpdate={updateTicket}
-          onAddComment={handleAddComment}
-          onDeleteComment={handleDeleteComment}
-          onUploadPhotos={handleUploadPhotos}
-          onDeletePhoto={handleDeletePhoto}
-          onDeleteTicket={handleDeleteTicket}
         />
       )}
 
@@ -732,7 +737,7 @@ function TicketDetail({
   }
 
   return (
-    <Modal onClose={onClose} maxW="max-w-2xl">
+    <div className="p-4 sm:p-5">
       <div className="flex items-start justify-between mb-3 gap-3">
         <div className="min-w-0">
           <h2 className="font-bold text-lg leading-tight">{ticket.title}</h2>
@@ -744,7 +749,7 @@ function TicketDetail({
           {canManage && (
             <button onClick={() => onDeleteTicket(ticket)} title="Meldung löschen"><Trash2 size={16} style={{ color: "#B8B4A2" }} /></button>
           )}
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} title="Einklappen"><ChevronUp size={20} style={{ color: INK_SOFT }} /></button>
         </div>
       </div>
 
@@ -964,7 +969,7 @@ function TicketDetail({
           </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }
 

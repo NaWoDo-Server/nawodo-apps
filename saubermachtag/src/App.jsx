@@ -971,7 +971,7 @@ function EventCard({
   }
 
   return (
-    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: `${accent}0D`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}33` : `1px solid ${accent}1A`, borderLeft: `4px solid ${accent}` }}>
+    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: expanded ? "#fff" : `${accent}0D`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}33` : `1px solid ${accent}1A`, borderLeft: `4px solid ${accent}` }}>
       <div className="flex items-start justify-between mb-1">
         <div>
           <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(ev.event_date)}</div>

@@ -1206,23 +1206,8 @@
         var gBtn = document.getElementById("setGlobalDefaultBtn");
         if (isSuperAdmin && gBtn) {
           gBtn.classList.remove("hidden");
-          var gArmed = false, gTimer = null;
           gBtn.addEventListener("click", function () {
-            // 1. Klick: scharfstellen (5 Sek.), 2. Klick: Sicherheitsabfrage.
-            if (!gArmed) {
-              gArmed = true;
-              gBtn.textContent = "Wirklich für alle? Nochmal tippen";
-              gBtn.classList.add("active");
-              gTimer = setTimeout(function () {
-                gArmed = false; gBtn.textContent = "Als Standard für alle"; gBtn.classList.remove("active");
-              }, 5000);
-              return;
-            }
-            clearTimeout(gTimer);
-            gArmed = false;
-            gBtn.classList.remove("active");
-            gBtn.textContent = "Als Standard für alle";
-            if (!window.confirm("Diese Reihenfolge wird für ALLE Mitglieder als Standard gesetzt (nur für die, die noch keine eigene Reihenfolge eingestellt haben). Fortfahren?")) return;
+            if (!window.confirm("Diese Reihenfolge als Standard für alle setzen? Gilt nur für Mitglieder, die noch keine eigene Reihenfolge eingestellt haben.")) return;
             saveGlobalAppOrder();
             gBtn.textContent = "Als Standard gespeichert ✓";
             setTimeout(function () { gBtn.textContent = "Als Standard für alle"; }, 2000);

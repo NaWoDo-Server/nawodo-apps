@@ -131,13 +131,31 @@ Deno.serve(async (req) => {
 
       const titles = (w.themen || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
       const infos = (w.themen_info || "").split("\n").map((s: string) => s.trim());
-      const themenLines = titles.length
-        ? titles.map((t: string, i: number) => `  - ${t}${infos[i] ? ` (${infos[i]})` : ""}`).join("\n")
+      const themenTitles = titles.length
+        ? titles.map((t: string) => `  - ${t}`).join("\n")
+        : "  (keine)";
+      const themenDetail = titles.length
+        ? titles.map((t: string, i: number) => infos[i] ? `  - ${t}\n    Notiz: ${infos[i]}` : `  - ${t}`).join("\n")
         : "  (keine)";
       const onlineLines = isZoom
         ? [`ACHTUNG: Dieser Steuerungskreis findet ONLINE per Zoom statt.`,
            `Zoom-Link: ${w.zoom_link || "(wird noch bekannt gegeben)"}`, ``]
         : [];
+
+      // Link zum Protokoll des letzten Treffens gleicher Art (falls vorhanden).
+      let lastProtokoll: string | null = null;
+      try {
+        const pResp = await fetch(
+          `${SUPABASE_URL}/rest/v1/workshops?meeting_type=eq.${w.meeting_type}&protokoll_url=not.is.null&date=lt.${tomorrowStr}&select=protokoll_url&order=date.desc&limit=1`,
+          { headers: restHeaders },
+        );
+        const pRows = (await pResp.json().catch(() => [])) as any[];
+        lastProtokoll = Array.isArray(pRows) && pRows[0] ? pRows[0].protokoll_url : null;
+      } catch (_e) { /* ignore */ }
+      const protokollLines = lastProtokoll
+        ? [`Protokoll vom letzten Treffen: ${lastProtokoll}`, ``]
+        : [];
+
       const text = [
         `Hallo,`, ``,
         `morgen findet ein ${typeName} statt, fuer den du eine Erinnerung aktiviert hast.`, ``,
@@ -145,8 +163,10 @@ Deno.serve(async (req) => {
         `Datum:        ${fmtDateLong(w.date)}`,
         `Uhrzeit:      ${zeit}`,
         `Moderator/in: ${w.moderator_name || "-"}`, ``,
-        `Themen:`, themenLines, ``,
         `Agenda:`, `${w.agenda || "(keine)"}`, ``,
+        `Themen:`, themenTitles, ``,
+        `Themen mit Notizen:`, themenDetail, ``,
+        ...protokollLines,
         `Zur Großgruppe: ${appBase}/grossgruppe/`,
       ].join("\n");
 

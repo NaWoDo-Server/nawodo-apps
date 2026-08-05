@@ -12,7 +12,7 @@ const PAPER = "#F1F0EA";
 const INK = "#2B2B26";
 const INK_SOFT = "#6B6A61";
 const BORDER_SOFT = "#D8D5C7";
-const ACCENT = "#C2410C";
+const ACCENT = "#00BF00";
 
 // --- Status ---------------------------------------------------------------
 // Fuenf Hauptstufen im Ablauf + Nebenstatus "abgelehnt".

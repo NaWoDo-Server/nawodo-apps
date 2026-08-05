@@ -14,6 +14,7 @@ const BORDER_SOFT = "#D8D5C7";
 const BLUE = "#2E86AB";
 const PURPLE = "#6C63A6";
 const GREEN = "#2E7D4F";
+const PINK = "#F356AF"; // App-/Icon-Farbe des Saubermachtags
 
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -664,7 +665,7 @@ function SaubermachtagApp({ session }) {
             <img src="/saubermachtag/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Saubermachtag</h1>
           </a>
-          <div className="mt-3 flex items-center gap-1.5 overflow-x-auto">
+          <div className="mt-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap" style={{ backgroundColor: "#E4E1D3" }}>
             {[
               { key: "tage", label: "Saubermachtage" },
               { key: "uebersicht", label: "Übersicht" },
@@ -676,7 +677,7 @@ function SaubermachtagApp({ session }) {
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   className="px-3.5 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap"
-                  style={{ backgroundColor: active ? BLUE : "#fff", color: active ? "#fff" : INK_SOFT, border: `1.5px solid ${active ? BLUE : BORDER_SOFT}` }}
+                  style={{ backgroundColor: active ? "#fff" : "transparent", color: active ? INK : INK_SOFT }}
                 >
                   {t.label}
                 </button>
@@ -691,7 +692,7 @@ function SaubermachtagApp({ session }) {
               <button
                 onClick={openNewForm}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white"
-                style={{ backgroundColor: PURPLE }}
+                style={{ backgroundColor: PINK }}
               >
                 <Plus size={14} /> Neuer Saubermachtag
               </button>
@@ -944,7 +945,7 @@ function EventCard({
   const [newBereichSel, setNewBereichSel] = useState("");
   const [newBereichCustom, setNewBereichCustom] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const accent = BLUE;
+  const accent = PINK;
 
   const groupedTasks = useMemo(() => {
     const sorted = tasks.slice().sort((a, b) => (a.sort_order - b.sort_order) || a.title.localeCompare(b.title));

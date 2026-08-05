@@ -68,6 +68,9 @@ Deno.serve(async (req) => {
   if (!cfg || !cfg.enabled || !cfg.smtp_host || !cfg.smtp_user || !cfg.smtp_pass || !cfg.smtp_from) {
     return jsonResponse({ ok: false, skipped: true, reason: "Mailversand nicht aktiviert/konfiguriert" }, 200);
   }
+  if (!cfg.notify_schaden_enabled) {
+    return jsonResponse({ ok: false, skipped: true, reason: "Schadenmelder-Benachrichtigung nicht aktiviert" }, 200);
+  }
   const port = parseInt(String(cfg.smtp_port || "465"), 10);
   const to = cfg.schaden_notify_to || "schadensmeldung@nawodo.de";
 

@@ -290,7 +290,7 @@ function SettingsApp({ session }) {
   const [savingFaqTabToggle, setSavingFaqTabToggle] = useState(null);
 
   // E-Mail-Tab: zentrale SMTP-Absender-Konfiguration (mail_settings, id=1)
-  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false, schaden_notify_to: "" });
+  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false, schaden_notify_to: "", notify_schaden_enabled: false, notify_vorsorge_enabled: false, notify_grossgruppe_enabled: false });
   const [mailPass, setMailPass] = useState("");   // write-only; leer = unveraendert
   const [savingMail, setSavingMail] = useState(false);
   const [mailSaved, setMailSaved] = useState(false);
@@ -325,7 +325,7 @@ function SettingsApp({ session }) {
   useEffect(() => {
     supabase
       .from("mail_settings")
-      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled,schaden_notify_to")
+      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled,schaden_notify_to,notify_schaden_enabled,notify_vorsorge_enabled,notify_grossgruppe_enabled")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {
@@ -337,6 +337,9 @@ function SettingsApp({ session }) {
             smtp_from: data.smtp_from || "",
             enabled: !!data.enabled,
             schaden_notify_to: data.schaden_notify_to || "",
+            notify_schaden_enabled: !!data.notify_schaden_enabled,
+            notify_vorsorge_enabled: !!data.notify_vorsorge_enabled,
+            notify_grossgruppe_enabled: !!data.notify_grossgruppe_enabled,
           });
         }
       });
@@ -352,6 +355,9 @@ function SettingsApp({ session }) {
         smtp_from: mailCfg.smtp_from.trim() || null,
         enabled: mailCfg.enabled,
         schaden_notify_to: mailCfg.schaden_notify_to.trim() || null,
+        notify_schaden_enabled: mailCfg.notify_schaden_enabled,
+        notify_vorsorge_enabled: mailCfg.notify_vorsorge_enabled,
+        notify_grossgruppe_enabled: mailCfg.notify_grossgruppe_enabled,
         updated_at: new Date().toISOString(),
       };
       if (mailPass) patch.smtp_pass = mailPass;
@@ -1206,17 +1212,68 @@ function SettingsApp({ session }) {
           </div>
 
           <div className="pt-3 mt-1 border-t" style={{ borderColor: BORDER_SOFT }}>
-            <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Ziel-Postfächer der Apps</div>
-            <label className="text-xs font-medium block mb-1">Schadenmelder – neue Meldungen an</label>
-            <input
-              type="email"
-              value={mailCfg.schaden_notify_to}
-              onChange={(e) => setMailCfg((p) => ({ ...p, schaden_notify_to: e.target.value }))}
-              placeholder="z. B. schaden@nawodo.de"
-              className="w-full rounded-lg px-3 py-2.5 text-sm border"
-              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
-            />
-            <p className="text-[11px] mt-1" style={{ color: INK_SOFT }}>Hierhin geht bei einer neuen Schadensmeldung eine Info-Mail. Weitere Apps können hier später ergänzt werden.</p>
+            <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Automatische E-Mails</div>
+            <p className="text-[11px] mb-3" style={{ color: INK_SOFT }}>
+              Jede Automatik lässt sich hier einzeln freigeben. Alles, was hier auf „Aus" steht, wird nicht versendet – auch wenn der E-Mail-Versand oben aktiv ist.
+            </p>
+
+            {/* Schadenmelder */}
+            <div className="p-3.5 rounded-xl mb-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">Schadenmelder</div>
+                  <div className="text-[11px]" style={{ color: INK_SOFT }}>Info-Mail bei jeder neuen Schadensmeldung</div>
+                </div>
+                <button
+                  onClick={() => setMailCfg((p) => ({ ...p, notify_schaden_enabled: !p.notify_schaden_enabled }))}
+                  className="w-12 h-7 rounded-full relative flex-shrink-0"
+                  style={{ backgroundColor: mailCfg.notify_schaden_enabled ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}
+                >
+                  <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: mailCfg.notify_schaden_enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+                </button>
+              </div>
+              <div className="mt-3">
+                <label className="text-xs font-medium block mb-1">Neue Meldungen an</label>
+                <input
+                  type="email"
+                  value={mailCfg.schaden_notify_to}
+                  onChange={(e) => setMailCfg((p) => ({ ...p, schaden_notify_to: e.target.value }))}
+                  placeholder="z. B. schaden@nawodo.de"
+                  className="w-full rounded-lg px-3 py-2.5 text-sm border"
+                  style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                />
+              </div>
+            </div>
+
+            {/* Vorsorge */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl mb-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+              <div>
+                <div className="text-sm font-semibold">Vorsorge-Erinnerung</div>
+                <div className="text-[11px]" style={{ color: INK_SOFT }}>Erinnerung an das Mitglied, ein Dokument nach ~6 Monaten zu prüfen</div>
+              </div>
+              <button
+                onClick={() => setMailCfg((p) => ({ ...p, notify_vorsorge_enabled: !p.notify_vorsorge_enabled }))}
+                className="w-12 h-7 rounded-full relative flex-shrink-0"
+                style={{ backgroundColor: mailCfg.notify_vorsorge_enabled ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}
+              >
+                <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: mailCfg.notify_vorsorge_enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+              </button>
+            </div>
+
+            {/* Grossgruppe */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+              <div>
+                <div className="text-sm font-semibold">Großgruppe-Erinnerung</div>
+                <div className="text-[11px]" style={{ color: INK_SOFT }}>Erinnerung 1 Tag vor Workshop / Steuerungskreis (nur an Mitglieder, die sie angekreuzt haben)</div>
+              </div>
+              <button
+                onClick={() => setMailCfg((p) => ({ ...p, notify_grossgruppe_enabled: !p.notify_grossgruppe_enabled }))}
+                className="w-12 h-7 rounded-full relative flex-shrink-0"
+                style={{ backgroundColor: mailCfg.notify_grossgruppe_enabled ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}
+              >
+                <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: mailCfg.notify_grossgruppe_enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+              </button>
+            </div>
           </div>
 
           {actionError && <div className="flex items-start gap-2 text-sm px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {actionError}</div>}
@@ -1234,7 +1291,7 @@ function SettingsApp({ session }) {
           </div>
 
           <p className="text-xs" style={{ color: INK_SOFT }}>
-Absender/SMTP gilt zentral für alle Apps. Schadensmeldungen gehen an das oben eingetragene Ziel-Postfach; Vorsorge- und Workshop-Erinnerungen gehen automatisch an die betroffenen Mitglieder.
+Absender/SMTP gilt zentral für alle Apps. Es geht nur das raus, was oben ausdrücklich auf „aktiv" steht – im Zweifel bleibt jede Automatik aus.
           </p>
         </div>
         )}

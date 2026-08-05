@@ -71,8 +71,8 @@ Deno.serve(async (req) => {
 
   const result = { vorsorge_sent: 0, workshop_sent: 0, errors: [] as string[] };
 
-  // 1) VORSORGE
-  try {
+  // 1) VORSORGE (nur wenn im Settings-Reiter freigegeben)
+  if (cfg.notify_vorsorge_enabled) try {
     const cutoff = new Date();
     cutoff.setMonth(cutoff.getMonth() - 6);
     const cutoffIso = cutoff.toISOString();
@@ -106,8 +106,8 @@ Deno.serve(async (req) => {
     }
   } catch (e) { result.errors.push(`vorsorge: ${String(e)}`); }
 
-  // 2) WORKSHOP (morgen)
-  try {
+  // 2) WORKSHOP / STEUERUNGSKREIS (morgen) -- nur wenn im Settings-Reiter freigegeben
+  if (cfg.notify_grossgruppe_enabled) try {
     const tomorrowStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" })
       .format(new Date(Date.now() + 24 * 60 * 60 * 1000));
 

@@ -491,6 +491,23 @@
       justify-content: center;
     }
     .tile-move-btn:active { transform: scale(0.9); }
+    /* Persoenliche Widget-Anpassung */
+    .widget.user-hidden { display: none; }
+    .widget.editing-show { display: block !important; }
+    .widgets.editing .widget { position: relative; }
+    .widget.editing-show.user-hidden { opacity: 0.4; }
+    .widget-move {
+      position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; z-index: 6;
+    }
+    .widget-move-btn {
+      width: 26px; height: 26px; padding: 0; border-radius: 50%;
+      border: 1px solid #D8D5C7; background: #fff; color: #2B2B26;
+      font-size: 12px; line-height: 1; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .widget-move-btn.on { background: #2B2B26; border-color: #2B2B26; color: #fff; }
+    .widget-move-btn:active { transform: scale(0.9); }
   </style>
     <script>(function(){var h=0;document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"){h=Date.now();}else if(h&&Date.now()-h>900000){location.reload();}});})();</script>
   </head>
@@ -742,6 +759,7 @@
           </div>
           <div class="apps-toolbar hidden" id="appsToolbar">
             <button type="button" id="editAppsBtn" class="apps-edit-btn">Bearbeiten</button>
+            <button type="button" id="setGlobalDefaultBtn" class="apps-edit-btn hidden">Als Standard für alle</button>
           </div>
         </div>
       </div>
@@ -929,9 +947,38 @@
         }).catch(function () {});
       }
 
-      // --- Persistierte App-Reihenfolge + Bearbeiten-Modus (nur Superadmin) ---
+      // --- Persistierte App-Reihenfolge + Bearbeiten-Modus ---
       var appsGrid = null;
       var appOrderEditing = false;
+      // Persoenliche Startseiten-Einstellungen des aktuellen Nutzers.
+      var userPrefs = { app_order: null, widget_order: null, hidden_widgets: [] };
+      // Welche Widgets sind global (vom Superadmin) ueberhaupt aktiv.
+      var globalWidgetEnabled = { wetter: true, tagebuch: true, geburtstage: true, kalenderansicht: true };
+
+      function loadUserPrefs() {
+        if (!currentSession) return Promise.resolve();
+        return client.from("user_hub_prefs").select("app_order,widget_order,hidden_widgets")
+          .eq("user_id", currentSession.user.id).maybeSingle().then(function (res) {
+            if (res && res.data) {
+              userPrefs.app_order = Array.isArray(res.data.app_order) ? res.data.app_order : null;
+              userPrefs.widget_order = Array.isArray(res.data.widget_order) ? res.data.widget_order : null;
+              userPrefs.hidden_widgets = Array.isArray(res.data.hidden_widgets) ? res.data.hidden_widgets : [];
+            }
+          }).catch(function () {});
+      }
+
+      function saveUserPrefs() {
+        if (!currentSession) return;
+        client.from("user_hub_prefs").upsert({
+          user_id: currentSession.user.id,
+          app_order: userPrefs.app_order,
+          widget_order: userPrefs.widget_order,
+          hidden_widgets: userPrefs.hidden_widgets,
+          updated_at: new Date().toISOString()
+        }).then(function (res) {
+          if (res && res.error) console.error("user_hub_prefs konnte nicht gespeichert werden:", res.error);
+        }).catch(function (e) { console.error("user_hub_prefs Speicherfehler:", e); });
+      }
 
       function getMovableTiles() {
         if (!appsGrid) return [];
@@ -967,10 +1014,17 @@
         }).catch(function () {});
       }
 
+      // Speichert die aktuelle Kachel-Reihenfolge PERSOENLICH fuer den Nutzer.
       function saveAppOrder() {
+        userPrefs.app_order = getMovableTiles().map(function (t) { return t.getAttribute("data-app"); });
+        saveUserPrefs();
+      }
+
+      // Nur Superadmin: aktuelle Reihenfolge als globalen Standard fuer alle speichern.
+      function saveGlobalAppOrder() {
         var order = getMovableTiles().map(function (t) { return t.getAttribute("data-app"); });
         client.from("app_settings").upsert({ key: "app_order", value: order, updated_at: new Date().toISOString() }).then(function (res) {
-          if (res && res.error) console.error("app_order konnte nicht gespeichert werden:", res.error);
+          if (res && res.error) console.error("globale app_order konnte nicht gespeichert werden:", res.error);
         }).catch(function (e) { console.error("app_order Speicherfehler:", e); });
       }
 
@@ -1022,12 +1076,93 @@
         });
       }
 
+      // --- Persoenliche Widgets: Reihenfolge + ein-/ausblenden ---
+      function widgetsContainer() { return document.querySelector(".widgets"); }
+
+      function currentWidgetOrder() {
+        var c = widgetsContainer(); var order = [];
+        if (c) Array.prototype.slice.call(c.children).forEach(function (el) {
+          for (var k in WIDGET_EL_IDS) { if (WIDGET_EL_IDS[k] === el.id) order.push(k); }
+        });
+        return order;
+      }
+
+      function applyWidgetPrefs() {
+        var c = widgetsContainer(); if (!c) return;
+        if (userPrefs.widget_order && userPrefs.widget_order.length) {
+          userPrefs.widget_order.forEach(function (k) {
+            var el = document.getElementById(WIDGET_EL_IDS[k]);
+            if (el && globalWidgetEnabled[k] !== false) c.appendChild(el);
+          });
+        }
+        WIDGET_KEYS.forEach(function (k) {
+          var el = document.getElementById(WIDGET_EL_IDS[k]); if (!el) return;
+          if ((userPrefs.hidden_widgets || []).indexOf(k) !== -1) el.classList.add("user-hidden");
+          else el.classList.remove("user-hidden");
+        });
+      }
+
+      function moveWidget(el, dir) {
+        var c = widgetsContainer(); if (!c) return;
+        var list = Array.prototype.slice.call(c.querySelectorAll(".widget.editing-show"));
+        var idx = list.indexOf(el);
+        if (idx === -1) return;
+        if (dir < 0 && idx > 0) c.insertBefore(el, list[idx - 1]);
+        else if (dir > 0 && idx < list.length - 1) c.insertBefore(el, list[idx + 1].nextSibling);
+        else return;
+        userPrefs.widget_order = currentWidgetOrder();
+        saveUserPrefs();
+      }
+
+      function toggleWidgetHidden(k, btn) {
+        var arr = userPrefs.hidden_widgets || (userPrefs.hidden_widgets = []);
+        var el = document.getElementById(WIDGET_EL_IDS[k]);
+        var i = arr.indexOf(k);
+        if (i === -1) { arr.push(k); if (el) el.classList.add("user-hidden"); if (btn) { btn.classList.remove("on"); btn.title = "Einblenden"; } }
+        else { arr.splice(i, 1); if (el) el.classList.remove("user-hidden"); if (btn) { btn.classList.add("on"); btn.title = "Ausblenden"; } }
+        saveUserPrefs();
+      }
+
+      function addWidgetControls() {
+        WIDGET_KEYS.forEach(function (k) {
+          if (globalWidgetEnabled[k] === false) return;
+          var el = document.getElementById(WIDGET_EL_IDS[k]); if (!el) return;
+          el.classList.add("editing-show");
+          if (el.querySelector(".widget-move")) return;
+          var box = document.createElement("div");
+          box.className = "widget-move";
+          var up = document.createElement("button"); up.type = "button"; up.className = "widget-move-btn"; up.innerHTML = "&#8593;"; up.title = "Nach oben";
+          up.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); moveWidget(el, -1); });
+          var down = document.createElement("button"); down.type = "button"; down.className = "widget-move-btn"; down.innerHTML = "&#8595;"; down.title = "Nach unten";
+          down.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); moveWidget(el, 1); });
+          var eye = document.createElement("button"); eye.type = "button"; eye.className = "widget-move-btn"; eye.innerHTML = "&#128065;";
+          var hidden = (userPrefs.hidden_widgets || []).indexOf(k) !== -1;
+          if (!hidden) eye.classList.add("on");
+          eye.title = hidden ? "Einblenden" : "Ausblenden";
+          eye.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); toggleWidgetHidden(k, eye); });
+          box.appendChild(up); box.appendChild(down); box.appendChild(eye);
+          el.appendChild(box);
+        });
+      }
+
+      function removeWidgetControls() {
+        var c = widgetsContainer(); if (!c) return;
+        Array.prototype.slice.call(c.querySelectorAll(".widget-move")).forEach(function (b) { if (b.parentNode) b.parentNode.removeChild(b); });
+        Array.prototype.slice.call(c.querySelectorAll(".widget.editing-show")).forEach(function (el) { el.classList.remove("editing-show"); });
+      }
+
       function setAppOrderEditing(on) {
         appOrderEditing = on;
-        if (!appsGrid) return;
-        appsGrid.classList.toggle("editing", on);
-        if (on) { addTileControls(); }
-        else { removeTileControls(); saveAppOrder(); }
+        if (appsGrid) {
+          appsGrid.classList.toggle("editing", on);
+          if (on) { addTileControls(); } else { removeTileControls(); }
+        }
+        var c = widgetsContainer();
+        if (c) {
+          c.classList.toggle("editing", on);
+          if (on) { addWidgetControls(); } else { removeWidgetControls(); }
+        }
+        if (!on) { saveAppOrder(); }
       }
 
       function setupAppOrdering(session) {
@@ -1041,13 +1176,23 @@
           e.preventDefault();
           e.stopPropagation();
         }, true);
+        // Im Bearbeiten-Modus auch die Widget-Links/Toggles unterbinden.
+        var wc = widgetsContainer();
+        if (wc) wc.addEventListener("click", function (e) {
+          if (!appOrderEditing) return;
+          if (e.target.closest && e.target.closest(".widget-move-btn")) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }, true);
 
-        readAndApplyAppOrder();
+        // App-Reihenfolge anwenden: persoenlich hat Vorrang, sonst globaler Standard.
+        if (userPrefs.app_order && userPrefs.app_order.length) applyAppOrder(userPrefs.app_order);
+        else readAndApplyAppOrder();
 
-        var isSuperAdmin = session.user.user_metadata && session.user.user_metadata.is_superadmin === true;
+        // "Bearbeiten" ist jetzt fuer ALLE Nutzer verfuegbar (persoenliche Anpassung).
         var toolbar = document.getElementById("appsToolbar");
         var editBtn = document.getElementById("editAppsBtn");
-        if (!isSuperAdmin || !toolbar || !editBtn) return;
+        if (!toolbar || !editBtn) return;
         toolbar.classList.remove("hidden");
         editBtn.addEventListener("click", function () {
           var next = !appOrderEditing;
@@ -1055,6 +1200,19 @@
           editBtn.textContent = next ? "Fertig" : "Bearbeiten";
           editBtn.classList.toggle("active", next);
         });
+
+        // Superadmin: aktuelle Reihenfolge zusaetzlich als globalen Standard fuer alle setzen.
+        var isSuperAdmin = session.user.user_metadata && session.user.user_metadata.is_superadmin === true;
+        var gBtn = document.getElementById("setGlobalDefaultBtn");
+        if (isSuperAdmin && gBtn) {
+          gBtn.classList.remove("hidden");
+          gBtn.addEventListener("click", function () {
+            saveGlobalAppOrder();
+            var prev = gBtn.textContent;
+            gBtn.textContent = "Als Standard gespeichert ✓";
+            setTimeout(function () { gBtn.textContent = "Als Standard für alle"; }, 2000);
+          });
+        }
       }
 
       function showApp(session) {
@@ -1075,10 +1233,13 @@
           var isSuperAdmin = user.user_metadata && user.user_metadata.is_superadmin === true;
           settingsTile.classList.toggle("hidden", !isSuperAdmin);
         }
-        initWidgets(client);
-        applyAppPermissions(client, session);
-        applyGlobalAppEnabled(client, session);
-        setupAppOrdering(session);
+        // Erst persoenliche Einstellungen laden, dann Widgets + App-Reihenfolge anwenden.
+        loadUserPrefs().then(function () {
+          initWidgets(client);
+          applyAppPermissions(client, session);
+          applyGlobalAppEnabled(client, session);
+          setupAppOrdering(session);
+        });
       }
 
       var WIDGET_KEYS = ["wetter", "tagebuch", "geburtstage", "kalenderansicht"];
@@ -1096,17 +1257,21 @@
             var k = row.key.replace("widget_enabled_", "");
             if (enabled.hasOwnProperty(k)) enabled[k] = row.value !== false;
           });
+          globalWidgetEnabled = enabled;
           WIDGET_KEYS.forEach(function (k) {
             if (enabled[k]) return;
             var el = document.getElementById(WIDGET_EL_IDS[k]);
-            if (el) el.classList.add("hidden");
+            // "global-off" trennt global-deaktivierte Widgets von persoenlich ausgeblendeten.
+            if (el) { el.classList.add("hidden"); el.classList.add("global-off"); }
           });
           if (enabled.kalenderansicht) loadTodayWidget(client);
           if (enabled.geburtstage) loadBirthdayWidget(client);
+          applyWidgetPrefs();
         }).catch(function () {
           // Bei Fehler (z.B. Tabelle nicht erreichbar) alles wie gewohnt anzeigen.
           loadTodayWidget(client);
           loadBirthdayWidget(client);
+          applyWidgetPrefs();
         });
       }
 

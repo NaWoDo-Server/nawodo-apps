@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, AlertTriangle, Loader2, MapPin, Tag, Camera,
   MessageSquare, Lock, Trash2, Pencil, ChevronRight, Check, Clock, Wrench,
-  CheckCircle2, Ban, User as UserIcon, Calendar,
+  CheckCircle2, Ban, User as UserIcon, Calendar, HelpCircle,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 
@@ -26,7 +26,7 @@ const STATUS_META = {
   abgelehnt:    { label: "Abgelehnt / kein Schaden", short: "Abgelehnt",    color: "#A13D3D" },
 };
 
-const CATEGORIES = ["Sanitär", "Heizung", "Gebäude", "Fenster", "Wohnung", "Lüftungsanlage", "Elektrik", "Schließanlage", "Sonstige"];
+const CATEGORIES = ["Sanitär", "Heizung", "Dach", "Gebäude", "Fenster", "Wohnung", "Lüftungsanlage", "Elektrik", "Schließanlage", "Außenanlage", "Sonstige"];
 
 const PRIORITIES = {
   niedrig: { label: "Niedrig", color: "#6B6A61" },
@@ -175,6 +175,7 @@ function SchadenApp({ session }) {
 
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   // --- Ziel-Postfach für neue Meldungen (nur Superadmin) ---
   const [notifyTo, setNotifyTo] = useState("");
@@ -223,6 +224,7 @@ function SchadenApp({ session }) {
       setShowForm(false);
       setShowAccount(false);
       setShowEditProfile(false);
+      setShowHelp(false);
       setSelectedId(null);
     }
     window.addEventListener("keydown", handleEscape);
@@ -378,9 +380,12 @@ function SchadenApp({ session }) {
         </div>
 
         {/* Aktion + Filter */}
-        <div className="mb-4">
+        <div className="mb-4 flex items-center gap-2">
           <button onClick={() => setShowForm(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: ACCENT }}>
             <Plus size={14} /> Schaden melden
+          </button>
+          <button onClick={() => setShowHelp(true)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
+            <HelpCircle size={14} /> Hilfe
           </button>
         </div>
 
@@ -514,6 +519,30 @@ function SchadenApp({ session }) {
           onDeletePhoto={handleDeletePhoto}
           onDeleteTicket={handleDeleteTicket}
         />
+      )}
+
+      {showHelp && (
+        <Modal onClose={() => setShowHelp(false)} maxW="max-w-lg">
+          <div className="flex items-start justify-between mb-4 gap-3">
+            <h2 className="font-bold text-lg leading-tight" style={{ color: INK }}>So meldest du einen Schaden</h2>
+            <button onClick={() => setShowHelp(false)} className="flex-shrink-0"><X size={20} /></button>
+          </div>
+          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>In wenigen Schritten ist ein Schaden gemeldet:</p>
+          <ol className="list-decimal pl-5 flex flex-col gap-2 text-sm mb-4" style={{ color: INK }}>
+            <li>Tippe oben auf „Schaden melden".</li>
+            <li>Gib einen kurzen, klaren Titel ein (z. B. „Wasserhahn tropft, 2. OG").</li>
+            <li>Beschreibe den Schaden möglichst genau.</li>
+            <li>Wähle den Ort im Gebäude und die passende Kategorie.</li>
+            <li>Füge – wenn möglich – ein oder mehrere Fotos hinzu.</li>
+            <li>Tippe auf „Schaden melden". Fertig!</li>
+          </ol>
+          <div className="rounded-lg p-3 text-sm" style={{ backgroundColor: "#E9E6D9", color: INK }}>
+            Das Schadenmelder-Team erhält deine Meldung (auch per E-Mail) und kümmert sich darum. Du und alle anderen Mitglieder können den Fortschritt jederzeit verfolgen – von „Gemeldet" über „In Begutachtung" bis „Erledigt". Rückfragen stellst du direkt als Kommentar an der Meldung.
+          </div>
+          <button onClick={() => setShowHelp(false)} className="w-full rounded-lg py-3 mt-4 font-semibold text-sm text-white" style={{ backgroundColor: ACCENT }}>
+            Verstanden
+          </button>
+        </Modal>
       )}
 
       {showAccount && (

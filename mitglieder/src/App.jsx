@@ -295,8 +295,9 @@ function MitgliederApp({ session }) {
   const [newGroupLabel, setNewGroupLabel] = useState("");
   const [newGroupEmail, setNewGroupEmail] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
-  const [groupRenameKey, setGroupRenameKey] = useState(null);
-  const [groupRenameLabel, setGroupRenameLabel] = useState("");
+  const [groupEditKey, setGroupEditKey] = useState(null);
+  const [groupEditLabel, setGroupEditLabel] = useState("");
+  const [groupEditEmail, setGroupEditEmail] = useState("");
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -428,15 +429,15 @@ function MitgliederApp({ session }) {
     }
   }
 
-  async function handleRenameGroup(key) {
-    if (!groupRenameLabel.trim()) return;
+  async function handleSaveGroup(key) {
+    if (!groupEditLabel.trim()) return;
     try {
-      const { error } = await supabase.from("bereiche").update({ label: groupRenameLabel.trim() }).eq("key", key);
+      const { error } = await supabase.from("bereiche").update({ label: groupEditLabel.trim(), email: groupEditEmail.trim() || null }).eq("key", key);
       if (error) throw error;
-      setGroupRenameKey(null);
+      setGroupEditKey(null);
       await loadAll();
     } catch (e) {
-      alert(e.message || "Konnte nicht umbenannt werden.");
+      alert(e.message || "Konnte nicht gespeichert werden.");
     }
   }
 
@@ -976,23 +977,50 @@ function MitgliederApp({ session }) {
             {sortedBereiche.length > 0 && (
               <div className="mb-4 flex flex-col gap-1.5">
                 {sortedBereiche.map((b) => (
-                  <div key={b.key} className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
-                    {groupRenameKey === b.key ? (
-                      <input
-                        autoFocus
-                        value={groupRenameLabel}
-                        onChange={(e) => setGroupRenameLabel(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleRenameGroup(b.key)}
-                        onBlur={() => handleRenameGroup(b.key)}
-                        className="flex-1 rounded-lg px-2 py-1 text-xs border"
-                        style={{ borderColor: BORDER_SOFT }}
-                      />
-                    ) : (
-                      <button type="button" onClick={() => { setGroupRenameKey(b.key); setGroupRenameLabel(b.label); }} className="flex-1 text-left text-xs font-medium">{b.label}</button>
-                    )}
-                    <button type="button" onClick={() => handleDeleteGroup(b.key, b.label)}><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
-                  </div>
+                  groupEditKey === b.key ? (
+                    <div key={b.key} className="rounded-lg p-3 border flex flex-col gap-2" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
+                        <span className="text-xs font-medium" style={{ color: INK_SOFT }}>Gruppe bearbeiten</span>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium block mb-1">Name</label>
+                        <input
+                          autoFocus
+                          value={groupEditLabel}
+                          onChange={(e) => setGroupEditLabel(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSaveGroup(b.key)}
+                          className="w-full rounded-lg px-2 py-1.5 text-sm border"
+                          style={{ borderColor: BORDER_SOFT }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium block mb-1">Kontakt-Email (optional)</label>
+                        <input
+                          value={groupEditEmail}
+                          onChange={(e) => setGroupEditEmail(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSaveGroup(b.key)}
+                          placeholder="gruppe@nawodo.de"
+                          className="w-full rounded-lg px-2 py-1.5 text-sm border"
+                          style={{ borderColor: BORDER_SOFT }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button type="button" onClick={() => handleSaveGroup(b.key)} disabled={!groupEditLabel.trim()} className="flex-1 rounded-lg py-2 font-semibold text-xs text-white" style={{ backgroundColor: BLUE, opacity: !groupEditLabel.trim() ? 0.6 : 1 }}>Speichern</button>
+                        <button type="button" onClick={() => setGroupEditKey(null)} className="flex-1 rounded-lg py-2 font-semibold text-xs border" style={{ borderColor: BORDER_SOFT, color: INK }}>Abbrechen</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={b.key} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate" style={{ color: INK }}>{b.label}</div>
+                        {b.email && <div className="text-xs truncate" style={{ color: INK_SOFT }}>{b.email}</div>}
+                      </div>
+                      <button type="button" onClick={() => { setGroupEditKey(b.key); setGroupEditLabel(b.label); setGroupEditEmail(b.email || ""); }}><Pencil size={13} style={{ color: "#B8B4A2" }} /></button>
+                      <button type="button" onClick={() => handleDeleteGroup(b.key, b.label)}><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
+                    </div>
+                  )
                 ))}
               </div>
             )}

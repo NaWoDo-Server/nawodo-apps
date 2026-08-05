@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Calendar, User, Users, FileText, Paperclip,
-  Trash2, Pencil, ChevronDown, ChevronRight, Check, Download, Archive,
+  Trash2, Pencil, ChevronDown, ChevronRight, Check, Archive, Video,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
 
@@ -10,6 +10,12 @@ const INK = "#2B2B26";
 const INK_SOFT = "#6B6A61";
 const BORDER_SOFT = "#D8D5C7";
 const BLUE = "#2E86AB";
+const PURPLE = "#6C63A6";
+
+// Farbe/Beschriftung je Meeting-Typ: Workshop (blau) vs. Steuerungskreis (lila).
+function typeColor(mt) { return mt === "steuerungskreis" ? PURPLE : BLUE; }
+function typeLabel(mt) { return mt === "steuerungskreis" ? "Steuerungskreis" : "Workshop"; }
+function typeTime(mt) { return mt === "steuerungskreis" ? "20:00–22:00 Uhr" : "10:00–16:00 Uhr"; }
 
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -71,7 +77,7 @@ function AuthGate() {
       .from("member_permissions")
       .select("allowed")
       .eq("user_id", session.user.id)
-      .eq("app_key", "workshop")
+      .eq("app_key", "grossgruppe")
       .maybeSingle()
       .then(({ data }) => setAccess(!data || data.allowed !== false))
       .catch(() => setAccess(true));
@@ -82,7 +88,7 @@ function AuthGate() {
     supabase
       .from("app_settings")
       .select("value")
-      .eq("key", "app_enabled_workshop")
+      .eq("key", "app_enabled_grossgruppe")
       .maybeSingle()
       .then(({ data }) => setAppEnabled(!data || data.value !== false))
       .catch(() => setAppEnabled(true));
@@ -242,7 +248,7 @@ function WorkshopApp({ session }) {
   const isSuperAdmin = user.user_metadata?.is_superadmin === true;
 
   const [myModApps, setMyModApps] = useState([]);
-  const isElevated = isAdmin || isSuperAdmin || myModApps.includes("workshop");
+  const isElevated = isAdmin || isSuperAdmin || myModApps.includes("grossgruppe");
 
   const [workshops, setWorkshops] = useState([]);
   const [termineEventResourceId, setTermineEventResourceId] = useState(null);
@@ -262,7 +268,11 @@ function WorkshopApp({ session }) {
   const [formDate, setFormDate] = useState(todayStr());
   const [formModeratorUserId, setFormModeratorUserId] = useState("");
   const [formThemenList, setFormThemenList] = useState([{ title: "", info: "" }]);
-  const [formAgenda, setFormAgenda] = useState("");
+  const [formAgendaList, setFormAgendaList] = useState([{ time: "", text: "" }]);
+  const [formMeetingType, setFormMeetingType] = useState("workshop");
+  const [formMode, setFormMode] = useState("praesenz");
+  const [formZoomLink, setFormZoomLink] = useState("");
+  const [formProtokollUrl, setFormProtokollUrl] = useState("");
   const [formFiles, setFormFiles] = useState([]);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -308,33 +318,29 @@ function WorkshopApp({ session }) {
     setLoading(false);
   }
 
-  // "Aktueller" Workshop: der naechste bevorstehende (Datum >= heute); gibt es keinen, der
-  // zuletzt vergangene. Alle anderen wandern automatisch ins Archiv - wie bei der Pinnwand.
-  const { currentWorkshop, archivedWorkshops } = useMemo(() => {
+  // Hauptansicht: ALLE bevorstehenden Meetings (Datum >= heute), das naechste zuerst.
+  // Archiv: nur vergangene Meetings (Datum < heute), das juengste zuerst.
+  const { upcomingWorkshops, archivedWorkshops } = useMemo(() => {
     const today = todayStr();
     const upcoming = workshops.filter((w) => w.date >= today).sort((a, b) => a.date.localeCompare(b.date));
     const past = workshops.filter((w) => w.date < today).sort((a, b) => b.date.localeCompare(a.date));
-    const current = upcoming[0] || past[0] || null;
-    const archived = workshops.filter((w) => w.id !== current?.id).sort((a, b) => b.date.localeCompare(a.date));
-    return { currentWorkshop: current, archivedWorkshops: archived };
+    return { upcomingWorkshops: upcoming, archivedWorkshops: past };
   }, [workshops]);
 
-  // Deep-Link von der Termine-App aus (/workshop/?open=<id>): passenden Workshop
-  // automatisch im Archiv aufklappen, falls er nicht sowieso schon oben steht.
+  // Deep-Link von der Termine-App aus (/grossgruppe/?open=<id>): passendes vergangenes
+  // Meeting automatisch im Archiv aufklappen (bevorstehende stehen ohnehin oben).
   useEffect(() => {
     if (loading) return;
     const openId = new URLSearchParams(window.location.search).get("open");
-    if (!openId || openId === currentWorkshop?.id) return;
+    if (!openId) return;
     if (archivedWorkshops.some((w) => w.id === openId)) {
       setShowArchive(true);
       setExpandedArchiveId(openId);
     }
-  }, [loading, currentWorkshop, archivedWorkshops]);
+  }, [loading, archivedWorkshops]);
 
-  // Generische Anhaenge (ohne das als kind='protokoll' markierte "Alte Protokoll").
-  function attachmentsFor(workshopId) { return attachments.filter((a) => a.workshop_id === workshopId && a.kind !== "protokoll"); }
-  // "Altes Protokoll": genau ein Anhang pro Workshop, markiert mit kind='protokoll'.
-  function protokollFor(workshopId) { return attachments.find((a) => a.workshop_id === workshopId && a.kind === "protokoll") || null; }
+  // Generische Anhaenge (Protokoll ist jetzt ein pCloud-Link, kein Anhang mehr).
+  function attachmentsFor(workshopId) { return attachments.filter((a) => a.workshop_id === workshopId); }
   function foodItemsFor(workshopId) { return foodItems.filter((f) => f.workshop_id === workshopId); }
   function attendanceFor(workshopId) { return attendance.filter((a) => a.workshop_id === workshopId); }
   function myAttendance(workshopId) { return attendance.find((a) => a.workshop_id === workshopId && a.user_id === user.id); }
@@ -348,7 +354,11 @@ function WorkshopApp({ session }) {
     setFormDate(todayStr());
     setFormModeratorUserId("");
     setFormThemenList([{ title: "", info: "" }]);
-    setFormAgenda("");
+    setFormAgendaList([{ time: "", text: "" }]);
+    setFormMeetingType("workshop");
+    setFormMode("praesenz");
+    setFormZoomLink("");
+    setFormProtokollUrl("");
     setFormFiles([]);
     setFormError("");
   }
@@ -376,6 +386,29 @@ function WorkshopApp({ session }) {
     setFormThemenList((list) => (list.length > 1 ? list.filter((_, i) => i !== index) : list));
   }
 
+  function parseAgendaPairs(agendaStr, timesStr) {
+    const texts = (agendaStr || "").split("\n").map((s) => s.trim());
+    const times = (timesStr || "").split("\n").map((s) => s.trim());
+    const len = Math.max(texts.length, times.length, 1);
+    const pairs = [];
+    for (let i = 0; i < len; i++) {
+      if (texts[i] || times[i]) pairs.push({ time: times[i] || "", text: texts[i] || "" });
+    }
+    return pairs.length ? pairs : [{ time: "", text: "" }];
+  }
+
+  function updateAgendaField(index, field, value) {
+    setFormAgendaList((list) => list.map((a, i) => (i === index ? { ...a, [field]: value } : a)));
+  }
+
+  function addAgendaField() {
+    setFormAgendaList((list) => [...list, { time: "", text: "" }]);
+  }
+
+  function removeAgendaField(index) {
+    setFormAgendaList((list) => (list.length > 1 ? list.filter((_, i) => i !== index) : list));
+  }
+
   function openNewForm() {
     resetForm();
     setEditingWorkshop(null);
@@ -387,27 +420,44 @@ function WorkshopApp({ session }) {
     setFormDate(w.date);
     setFormModeratorUserId(w.moderator_user_id || "");
     setFormThemenList(parseThemenPairs(w.themen, w.themen_info));
-    setFormAgenda(w.agenda || "");
+    setFormAgendaList(parseAgendaPairs(w.agenda, w.agenda_times));
+    setFormMeetingType(w.meeting_type || "workshop");
+    setFormMode(w.mode || "praesenz");
+    setFormZoomLink(w.zoom_link || "");
+    setFormProtokollUrl(w.protokoll_url || "");
     setFormFiles([]);
     setFormError("");
     setShowForm(true);
   }
 
-  // Legt fuer den Workshop automatisch einen Termin im Termine-Kalender an (10-16 Uhr)
-  // bzw. aktualisiert ihn, und bucht den GMR-Raum fuer denselben Zeitraum gleich mit.
-  // Ein Fehler hier lässt das Speichern des Workshops selbst nicht scheitern, wird aber
+  // Legt fuer das Meeting automatisch einen Termin im Termine-Kalender an bzw.
+  // aktualisiert ihn. Zeiten haengen vom Typ ab (Workshop 10-16 Uhr, Steuerungskreis
+  // 20-22 Uhr). Der GMR-Raum wird mitgebucht - AUSSER bei einem Zoom-Steuerungskreis,
+  // dann entfaellt die Raumbuchung (nur der sichtbare Termin wird angelegt).
+  // Ein Fehler hier lässt das Speichern selbst nicht scheitern, wird aber
   // sichtbar gemacht (termineSyncWarning), statt still zu verschwinden.
-  async function syncTermineBooking(workshopId, { date, moderatorName, themenTitle, agenda }) {
-    const title = themenTitle ? `Workshop: ${themenTitle}` : "Workshop";
+  async function syncTermineBooking(workshopId, { date, moderatorName, themenTitle, agenda, meetingType, mode }) {
+    const isSK = meetingType === "steuerungskreis";
+    const typeName = isSK ? "Steuerungskreis" : "Workshop";
+    const startTime = isSK ? "20:00" : "10:00";
+    const endTime = isSK ? "22:00" : "16:00";
+    const title = themenTitle ? `${typeName}: ${themenTitle}` : typeName;
+    const skipGmr = isSK && mode === "zoom";
     const targets = [
       { resourceId: termineEventResourceId, label: "Termin" },
-      { resourceId: gmrResourceId, label: "GMR" },
+      ...(skipGmr ? [] : [{ resourceId: gmrResourceId, label: "GMR" }]),
     ].filter((t) => t.resourceId);
 
     if (targets.length === 0) {
       const warning = "Konnte nicht im Termine-Kalender eingetragen werden: Termin- oder GMR-Ressource nicht gefunden.";
       setTermineSyncWarning(warning);
       return warning;
+    }
+
+    // Falls zuvor (z.B. als Praesenz) der GMR-Raum gebucht war, dieser aber jetzt
+    // wegfaellt (Zoom), die alte GMR-Buchung entfernen.
+    if (skipGmr && gmrResourceId) {
+      try { await supabase.from("bookings").delete().eq("workshop_id", workshopId).eq("resource_id", gmrResourceId); } catch (e) { /* egal */ }
     }
 
     const problems = [];
@@ -417,9 +467,9 @@ function WorkshopApp({ session }) {
         date,
         end_date: date,
         all_day: false,
-        start_time: "10:00",
-        end_time: "16:00",
-        name: moderatorName || "Workshop",
+        start_time: startTime,
+        end_time: endTime,
+        name: moderatorName || typeName,
         title: t.label === "GMR" ? `${title} (GMR)` : title,
         note: agenda || null,
         user_id: user.id,
@@ -453,13 +503,22 @@ function WorkshopApp({ session }) {
       const cleanedThemen = formThemenList
         .map((t) => ({ title: t.title.trim(), info: t.info.trim() }))
         .filter((t) => t.title || t.info);
+      const cleanedAgenda = formAgendaList
+        .map((a) => ({ time: a.time.trim(), text: a.text.trim() }))
+        .filter((a) => a.time || a.text);
+      const isSK = formMeetingType === "steuerungskreis";
       const payload = {
         date: formDate,
         moderator_user_id: formModeratorUserId || null,
         moderator_name: moderator?.name || null,
         themen: cleanedThemen.length ? cleanedThemen.map((t) => t.title).join("\n") : null,
         themen_info: cleanedThemen.length ? cleanedThemen.map((t) => t.info).join("\n") : null,
-        agenda: formAgenda.trim() || null,
+        agenda: cleanedAgenda.length ? cleanedAgenda.map((a) => a.text).join("\n") : null,
+        agenda_times: cleanedAgenda.length ? cleanedAgenda.map((a) => a.time).join("\n") : null,
+        meeting_type: formMeetingType,
+        mode: isSK ? formMode : null,
+        zoom_link: isSK && formMode === "zoom" ? (formZoomLink.trim() || null) : null,
+        protokoll_url: formProtokollUrl.trim() || null,
       };
 
       let workshopId = editingWorkshop?.id;
@@ -479,7 +538,7 @@ function WorkshopApp({ session }) {
         await supabase.from("workshop_attachments").insert({ workshop_id: workshopId, url, filename, created_by: user.id });
       }
 
-      const syncWarning = await syncTermineBooking(workshopId, { date: formDate, moderatorName: moderator?.name || null, themenTitle: cleanedThemen[0]?.title || "", agenda: payload.agenda });
+      const syncWarning = await syncTermineBooking(workshopId, { date: formDate, moderatorName: moderator?.name || null, themenTitle: cleanedThemen[0]?.title || "", agenda: payload.agenda, meetingType: formMeetingType, mode: payload.mode });
 
       setShowForm(false);
       setEditingWorkshop(null);
@@ -544,34 +603,6 @@ function WorkshopApp({ session }) {
       await loadAll();
     } catch (e) {
       alert(e.message || "Konnte nicht gespeichert werden.");
-    }
-  }
-
-  // "Altes Protokoll" hochladen: gleicher Storage-/Upload-Weg wie normale Anhaenge,
-  // aber mit kind='protokoll' markiert. Es gibt genau ein Protokoll pro Workshop - ein
-  // eventuell vorhandenes wird beim Hochladen ersetzt.
-  async function handleUploadProtokoll(workshopId, file) {
-    if (!file) return;
-    try {
-      const existing = protokollFor(workshopId);
-      const { url, filename } = await uploadAttachment(file);
-      await supabase.from("workshop_attachments").insert({ workshop_id: workshopId, url, filename, created_by: user.id, kind: "protokoll" });
-      if (existing) {
-        await supabase.from("workshop_attachments").delete().eq("id", existing.id);
-      }
-      await loadAll();
-    } catch (e) {
-      alert(e.message || "Protokoll konnte nicht hochgeladen werden.");
-    }
-  }
-
-  async function handleDeleteProtokoll(a) {
-    if (!window.confirm("Altes Protokoll wirklich entfernen?")) return;
-    try {
-      await supabase.from("workshop_attachments").delete().eq("id", a.id);
-      await loadAll();
-    } catch (e) {
-      alert(e.message || "Konnte nicht entfernt werden.");
     }
   }
 
@@ -659,8 +690,8 @@ function WorkshopApp({ session }) {
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
         <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
           <a href="/" className="flex items-center gap-2.5">
-            <img src="/workshop/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
-            <h1 className="font-bold text-lg lg:text-2xl">Workshop</h1>
+            <img src="/grossgruppe/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
+            <h1 className="font-bold text-lg lg:text-2xl">GroßGruppe</h1>
           </a>
           <div className="flex items-center gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
@@ -675,40 +706,42 @@ function WorkshopApp({ session }) {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white"
             style={{ backgroundColor: "#6C63A6" }}
           >
-            <Plus size={14} /> Neuer Workshop
+            <Plus size={14} /> Neues Meeting
           </button>
         </div>
 
-        {!currentWorkshop && (
+        {upcomingWorkshops.length === 0 && (
           <div className="text-center py-10 rounded-xl mb-4" style={{ backgroundColor: "#E9E6D9" }}>
-            <p className="text-sm" style={{ color: INK_SOFT }}>Noch kein Workshop angelegt.</p>
+            <p className="text-sm" style={{ color: INK_SOFT }}>Kein bevorstehendes Meeting angelegt.</p>
           </div>
         )}
 
-        {currentWorkshop && (
+        {upcomingWorkshops.length > 0 && (
           <div className="mb-6">
-            <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Aktueller Workshop</div>
-            <WorkshopCard
-              w={currentWorkshop}
-              highlighted
-              attachmentsList={attachmentsFor(currentWorkshop.id)}
-              protokoll={protokollFor(currentWorkshop.id)}
-              foodList={foodItemsFor(currentWorkshop.id)}
-              attendanceList={attendanceFor(currentWorkshop.id)}
-              myAttendanceRow={myAttendance(currentWorkshop.id)}
-              reminderOn={myReminderOn(currentWorkshop.id)}
-              canManage={canManageWorkshop(currentWorkshop)}
-              userId={user.id}
-              onEdit={() => openEditForm(currentWorkshop)}
-              onDelete={() => handleDeleteWorkshop(currentWorkshop)}
-              onDeleteAttachment={handleDeleteAttachment}
-              onUploadProtokoll={(file) => handleUploadProtokoll(currentWorkshop.id, file)}
-              onDeleteProtokoll={handleDeleteProtokoll}
-              onAddFood={(text) => handleAddFoodItem(currentWorkshop.id, text)}
-              onDeleteFood={handleDeleteFoodItem}
-              onSetAttendance={(v) => handleSetAttendance(currentWorkshop.id, v)}
-              onToggleReminder={(on) => handleToggleReminder(currentWorkshop.id, on)}
-            />
+            <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Bevorstehende Meetings</div>
+            <div className="flex flex-col gap-4">
+              {upcomingWorkshops.map((w, idx) => (
+                <WorkshopCard
+                  key={w.id}
+                  w={w}
+                  highlighted={idx === 0}
+                  attachmentsList={attachmentsFor(w.id)}
+                  foodList={foodItemsFor(w.id)}
+                  attendanceList={attendanceFor(w.id)}
+                  myAttendanceRow={myAttendance(w.id)}
+                  reminderOn={myReminderOn(w.id)}
+                  canManage={canManageWorkshop(w)}
+                  userId={user.id}
+                  onEdit={() => openEditForm(w)}
+                  onDelete={() => handleDeleteWorkshop(w)}
+                  onDeleteAttachment={handleDeleteAttachment}
+                  onAddFood={(text) => handleAddFoodItem(w.id, text)}
+                  onDeleteFood={handleDeleteFoodItem}
+                  onSetAttendance={(v) => handleSetAttendance(w.id, v)}
+                  onToggleReminder={(on) => handleToggleReminder(w.id, on)}
+                />
+              ))}
+            </div>
           </div>
         )}
 
@@ -731,7 +764,6 @@ function WorkshopApp({ session }) {
                         <WorkshopCard
                           w={w}
                           attachmentsList={attachmentsFor(w.id)}
-                          protokoll={protokollFor(w.id)}
                           foodList={foodItemsFor(w.id)}
                           attendanceList={attendanceFor(w.id)}
                           myAttendanceRow={myAttendance(w.id)}
@@ -742,8 +774,6 @@ function WorkshopApp({ session }) {
                           onEdit={() => openEditForm(w)}
                           onDelete={() => handleDeleteWorkshop(w)}
                           onDeleteAttachment={handleDeleteAttachment}
-                          onUploadProtokoll={(file) => handleUploadProtokoll(w.id, file)}
-                          onDeleteProtokoll={handleDeleteProtokoll}
                           onAddFood={(text) => handleAddFoodItem(w.id, text)}
                           onDeleteFood={handleDeleteFoodItem}
                           onSetAttendance={(v) => handleSetAttendance(w.id, v)}
@@ -753,11 +783,14 @@ function WorkshopApp({ session }) {
                         <button
                           onClick={() => setExpandedArchiveId(w.id)}
                           className="w-full text-left rounded-xl p-3.5 flex items-center justify-between"
-                          style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
+                          style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `3px solid ${typeColor(w.meeting_type)}` }}
                         >
                           <div className="min-w-0">
-                            <div className="font-semibold text-sm">{fmtDateLong(w.date)}</div>
-                            {w.themen && <div className="text-xs truncate" style={{ color: INK_SOFT }}>{w.themen}</div>}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: typeColor(w.meeting_type) }}>{typeLabel(w.meeting_type)}</span>
+                              <span className="font-semibold text-sm">{fmtDateLong(w.date)}</span>
+                            </div>
+                            {w.themen && <div className="text-xs truncate mt-0.5" style={{ color: INK_SOFT }}>{w.themen}</div>}
                           </div>
                           <ChevronRight size={16} style={{ color: INK_SOFT }} className="flex-shrink-0" />
                         </button>
@@ -775,9 +808,63 @@ function WorkshopApp({ session }) {
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") { setShowForm(false); } }}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">{editingWorkshop ? "Workshop bearbeiten" : "Neuer Workshop"}</h2>
+              <h2 className="font-bold text-lg">{editingWorkshop ? "Meeting bearbeiten" : "Neues Meeting"}</h2>
               <button onClick={() => setShowForm(false)}><X size={20} /></button>
             </div>
+
+            <label className="text-xs font-medium block mb-1">Art</label>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {[
+                { key: "workshop", label: "Workshop", time: "10:00–16:00 Uhr" },
+                { key: "steuerungskreis", label: "Steuerungskreis", time: "20:00–22:00 Uhr" },
+              ].map((opt) => {
+                const active = formMeetingType === opt.key;
+                const c = typeColor(opt.key);
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setFormMeetingType(opt.key)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-semibold text-left border"
+                    style={{ borderColor: active ? c : BORDER_SOFT, backgroundColor: active ? `${c}1A` : "#fff", color: active ? c : INK }}
+                  >
+                    <div>{opt.label}</div>
+                    <div className="text-xs font-normal" style={{ color: INK_SOFT }}>{opt.time}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {formMeetingType === "steuerungskreis" && (
+              <>
+                <label className="text-xs font-medium block mb-1">Format</label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {[
+                    { key: "praesenz", label: "Präsenz" },
+                    { key: "zoom", label: "Zoom" },
+                  ].map((opt) => {
+                    const active = formMode === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setFormMode(opt.key)}
+                        className="rounded-lg px-3 py-2.5 text-sm font-semibold border"
+                        style={{ borderColor: active ? PURPLE : BORDER_SOFT, backgroundColor: active ? `${PURPLE}1A` : "#fff", color: active ? PURPLE : INK }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {formMode === "zoom" && (
+                  <>
+                    <label className="text-xs font-medium block mb-1">Zoom-Link / Einladung</label>
+                    <input value={formZoomLink} onChange={(e) => setFormZoomLink(e.target.value)} placeholder="https://zoom.us/j/…" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                  </>
+                )}
+              </>
+            )}
 
             <label className="text-xs font-medium block mb-1">Datum</label>
             <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
@@ -827,12 +914,45 @@ function WorkshopApp({ session }) {
             </div>
 
             <label className="text-xs font-medium block mb-1">Agenda</label>
-            <textarea value={formAgenda} onChange={(e) => setFormAgenda(e.target.value)} rows={3} placeholder="z.B. 18:00 Begrüßung, 18:15 Thema 1, ..." className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <div className="flex flex-col gap-2 mb-3">
+              {formAgendaList.map((a, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={a.time}
+                    onChange={(e) => updateAgendaField(i, "time", e.target.value)}
+                    className="rounded-lg px-2.5 py-2 text-sm border flex-shrink-0"
+                    style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                  />
+                  <input
+                    value={a.text}
+                    onChange={(e) => updateAgendaField(i, "text", e.target.value)}
+                    placeholder={`Punkt ${i + 1}`}
+                    className="flex-1 rounded-lg px-3 py-2 text-sm border"
+                    style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+                  />
+                  {formAgendaList.length > 1 && (
+                    <button type="button" onClick={() => removeAgendaField(i)}><X size={16} style={{ color: INK_SOFT }} /></button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addAgendaField}
+                className="flex items-center gap-1.5 self-start px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+              >
+                <Plus size={13} /> Punkt hinzufügen
+              </button>
+            </div>
+
+            <label className="text-xs font-medium block mb-1">Protokoll-Link (pCloud)</label>
+            <input value={formProtokollUrl} onChange={(e) => setFormProtokollUrl(e.target.value)} placeholder="https://…" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
             <label className="text-xs font-medium block mb-1">Anhänge (optional)</label>
             <input type="file" multiple onChange={(e) => setFormFiles(Array.from(e.target.files || []))} className="w-full text-sm mb-3" />
 
-            {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
+            {formError &&<div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
 
             <button
               onClick={handleSaveWorkshop}
@@ -984,27 +1104,62 @@ function ThemenList({ themen, themenInfo }) {
   );
 }
 
+function AgendaList({ agenda, agendaTimes }) {
+  const items = useMemo(() => {
+    const texts = (agenda || "").split("\n").map((s) => s.trim());
+    const times = (agendaTimes || "").split("\n").map((s) => s.trim());
+    const len = Math.max(texts.length, times.length);
+    const out = [];
+    for (let i = 0; i < len; i++) {
+      if (texts[i] || times[i]) out.push({ time: times[i] || "", text: texts[i] || "" });
+    }
+    return out;
+  }, [agenda, agendaTimes]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mb-3">
+      <div className="text-sm font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Agenda</div>
+      <div className="flex flex-col gap-1">
+        {items.map((item, i) => (
+          <div key={i} className="flex items-baseline gap-2 text-base">
+            {item.time && <span className="font-semibold flex-shrink-0" style={{ color: INK_SOFT }}>{item.time}</span>}
+            {item.time && item.text && <span className="flex-shrink-0" style={{ color: INK_SOFT }}>—</span>}
+            {item.text && <span>{item.text}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WorkshopCard({
-  w, highlighted, attachmentsList, protokoll, foodList, attendanceList, myAttendanceRow, reminderOn, canManage, userId,
-  onCollapse, onEdit, onDelete, onDeleteAttachment, onUploadProtokoll, onDeleteProtokoll, onAddFood, onDeleteFood, onSetAttendance, onToggleReminder,
+  w, highlighted, attachmentsList, foodList, attendanceList, myAttendanceRow, reminderOn, canManage, userId,
+  onCollapse, onEdit, onDelete, onDeleteAttachment, onAddFood, onDeleteFood, onSetAttendance, onToggleReminder,
 }) {
   const [newFoodText, setNewFoodText] = useState("");
-  const [uploadingProtokoll, setUploadingProtokoll] = useState(false);
-  async function handleProtokollFile(file) {
-    if (!file) return;
-    setUploadingProtokoll(true);
-    try { await onUploadProtokoll(file); } finally { setUploadingProtokoll(false); }
-  }
+  const isSK = w.meeting_type === "steuerungskreis";
+  const accent = typeColor(w.meeting_type);
   const yesCount = attendanceList.filter((a) => a.attending).length;
   const noCount = attendanceList.filter((a) => a.attending === false).length;
   const yesNames = attendanceList.filter((a) => a.attending).map((a) => a.user_name);
 
   return (
-    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: "#fff", boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${BLUE}33` : "none" }}>
+    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: "#fff", boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}55` : `1px solid ${accent}22`, borderLeft: `4px solid ${accent}` }}>
       <div className="flex items-start justify-between mb-2">
         <div>
-          <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: BLUE }} /> {fmtDateLong(w.date)}</div>
+          <div className="mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: accent }}>{typeLabel(w.meeting_type)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(w.date)}</div>
+          <div className="text-sm mt-0.5" style={{ color: INK_SOFT }}>{typeTime(w.meeting_type)}</div>
           {w.moderator_name && <div className="text-base mt-0.5" style={{ color: INK_SOFT }}>Moderator/in: {w.moderator_name}</div>}
+          {isSK && w.mode === "zoom" && w.zoom_link && (
+            <a href={w.zoom_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-semibold underline" style={{ color: accent }}>
+              <Video size={14} /> Zoom-Meeting beitreten
+            </a>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {canManage && (
@@ -1020,12 +1175,7 @@ function WorkshopCard({
       </div>
 
       <ThemenList themen={w.themen} themenInfo={w.themen_info} />
-      {w.agenda && (
-        <div className="mb-3">
-          <div className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Agenda</div>
-          <p className="text-base whitespace-pre-wrap">{w.agenda}</p>
-        </div>
-      )}
+      <AgendaList agenda={w.agenda} agendaTimes={w.agenda_times} />
 
       {attachmentsList.length > 0 && (
         <div className="mb-3">
@@ -1044,64 +1194,49 @@ function WorkshopCard({
         </div>
       )}
 
-      {(protokoll || canManage) && (
+      {w.protokoll_url && (
         <div className="mb-3">
-          <div className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Altes Protokoll</div>
-          {protokoll ? (
-            <div className="flex items-center gap-2 text-sm">
-              <FileText size={14} style={{ color: INK_SOFT }} />
-              <a href={protokoll.url} target="_blank" rel="noreferrer" className="underline flex-1 truncate flex items-center gap-1" style={{ color: BLUE }}>
-                <Download size={12} /> {protokoll.filename}
-              </a>
-              {canManage && (
-                <button onClick={() => onDeleteProtokoll(protokoll)}><Trash2 size={12} style={{ color: "#B8B4A2" }} /></button>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs" style={{ color: INK_SOFT }}>Noch kein Protokoll hinterlegt.</p>
-          )}
-          {canManage && (
-            <label className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
-              {uploadingProtokoll ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
-              {uploadingProtokoll ? "Wird hochgeladen…" : protokoll ? "Protokoll ersetzen" : "Protokoll hochladen"}
-              <input type="file" className="hidden" disabled={uploadingProtokoll} onChange={(e) => { if (e.target.files[0]) handleProtokollFile(e.target.files[0]); e.target.value = ""; }} />
-            </label>
-          )}
+          <div className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Protokoll</div>
+          <a href={w.protokoll_url} target="_blank" rel="noreferrer" title="Protokoll" aria-label="Protokoll" className="inline-flex items-center gap-1.5 text-sm font-semibold underline" style={{ color: accent }}>
+            <FileText size={16} /> Protokoll
+          </a>
         </div>
       )}
 
-      <div className="mb-3 pt-3" style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
-        <div className="text-sm font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Wer bringt was mit?</div>
-        <div className="flex flex-col gap-1 mb-2">
-          {foodList.length === 0 && <p className="text-xs" style={{ color: INK_SOFT }}>Noch nichts eingetragen.</p>}
-          {foodList.map((f) => (
-            <div key={f.id} className="flex items-center gap-2 text-sm">
-              <span className="flex-1">{f.item}</span>
-              <span className="text-xs" style={{ color: INK_SOFT }}>{f.created_by_name}</span>
-              {(canManage || f.created_by === userId) && (
-                <button onClick={() => onDeleteFood(f.id)}><Trash2 size={12} style={{ color: "#B8B4A2" }} /></button>
-              )}
-            </div>
-          ))}
+      {!isSK && (
+        <div className="mb-3 pt-3" style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
+          <div className="text-sm font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Wer bringt was mit?</div>
+          <div className="flex flex-col gap-1 mb-2">
+            {foodList.length === 0 && <p className="text-xs" style={{ color: INK_SOFT }}>Noch nichts eingetragen.</p>}
+            {foodList.map((f) => (
+              <div key={f.id} className="flex items-center gap-2 text-sm">
+                <span className="flex-1">{f.item}</span>
+                <span className="text-xs" style={{ color: INK_SOFT }}>{f.created_by_name}</span>
+                {(canManage || f.created_by === userId) && (
+                  <button onClick={() => onDeleteFood(f.id)}><Trash2 size={12} style={{ color: "#B8B4A2" }} /></button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={newFoodText}
+              onChange={(e) => setNewFoodText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && newFoodText.trim()) { onAddFood(newFoodText); setNewFoodText(""); } }}
+              placeholder="z.B. Kartoffelsalat"
+              className="flex-1 rounded-lg px-3 py-2 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+            <button
+              onClick={() => { if (newFoodText.trim()) { onAddFood(newFoodText); setNewFoodText(""); } }}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ backgroundColor: INK }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <input
-            value={newFoodText}
-            onChange={(e) => setNewFoodText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && newFoodText.trim()) { onAddFood(newFoodText); setNewFoodText(""); } }}
-            placeholder="z.B. Kartoffelsalat"
-            className="flex-1 rounded-lg px-3 py-2 text-sm border"
-            style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
-          />
-          <button
-            onClick={() => { if (newFoodText.trim()) { onAddFood(newFoodText); setNewFoodText(""); } }}
-            className="px-3 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ backgroundColor: INK }}
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="pt-3" style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
         <div className="flex items-center justify-between mb-1.5">

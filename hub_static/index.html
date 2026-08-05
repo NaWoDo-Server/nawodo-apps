@@ -449,6 +449,48 @@
       .icon svg { width: 40px; height: 40px; }
       .label { font-size: 14px; }
     }
+
+    /* --- App-Reihenfolge bearbeiten (nur Superadmin) --- */
+    .apps-toolbar { display: flex; justify-content: center; margin-bottom: 16px; }
+    .apps-edit-btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1.5px solid #D8D5C7;
+      background: transparent;
+      color: #6B6A61;
+      cursor: pointer;
+    }
+    .apps-edit-btn.active { background: #2B2B26; border-color: #2B2B26; color: #fff; }
+    .grid.editing a.app[data-app] { position: relative; }
+    .grid.editing a.app[data-app]:not(#settingsTile) { cursor: default; }
+    .tile-move {
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      z-index: 5;
+    }
+    .tile-move-btn {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid #D8D5C7;
+      background: #fff;
+      color: #2B2B26;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tile-move-btn:active { transform: scale(0.9); }
   </style>
 </head>
 <body>
@@ -597,6 +639,9 @@
         </div>
 
         <div class="main">
+          <div class="apps-toolbar hidden" id="appsToolbar">
+            <button type="button" id="editAppsBtn" class="apps-edit-btn">Bearbeiten</button>
+          </div>
           <div class="grid">
             <a class="app" href="/termine/" data-app="termine">
               <div class="icon" style="background:#DF3626;">
@@ -633,11 +678,11 @@
               <span class="label">Mitglieder</span>
             </a>
 
-            <a class="app" href="/workshop/" data-app="workshop">
+            <a class="app" href="/grossgruppe/" data-app="grossgruppe">
               <div class="icon" style="background:#7063AA;">
                 <img src="/icon-workshop.png" alt="" />
               </div>
-              <span class="label">Workshop</span>
+              <span class="label">GroßGruppe</span>
             </a>
 
             <a class="app" href="/bulldozer/" data-app="bulldozer">
@@ -850,7 +895,7 @@
         }).catch(function () {});
       }
 
-      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer", "vorsorge", "schadenmelder"];
+      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "grossgruppe", "bulldozer", "vorsorge", "schadenmelder"];
 
       function applyGlobalAppEnabled(client, session) {
         // Suite-weiter Ein/Aus-Schalter aus der Settings-App (app_settings.app_enabled_<key>).
@@ -876,6 +921,134 @@
         }).catch(function () {});
       }
 
+      // --- Persistierte App-Reihenfolge + Bearbeiten-Modus (nur Superadmin) ---
+      var appsGrid = null;
+      var appOrderEditing = false;
+
+      function getMovableTiles() {
+        if (!appsGrid) return [];
+        return Array.prototype.slice.call(appsGrid.querySelectorAll('.app[data-app]')).filter(function (t) {
+          return t.getAttribute("data-app") !== "settings";
+        });
+      }
+
+      function applyAppOrder(order) {
+        // Ordnet die Kacheln gemaess gespeicherter Reihenfolge. Kacheln, die nicht in der
+        // Liste stehen (z.B. Homepage), landen dahinter; die Settings-Kachel bleibt zuletzt.
+        if (!appsGrid || !order || !order.length) return;
+        var settingsTile = appsGrid.querySelector("#settingsTile");
+        var appTiles = Array.prototype.slice.call(appsGrid.querySelectorAll("a.app"));
+        var ordered = [];
+        order.forEach(function (key) {
+          var t = appsGrid.querySelector('.app[data-app="' + key + '"]');
+          if (t && t !== settingsTile && ordered.indexOf(t) === -1) ordered.push(t);
+        });
+        var remaining = appTiles.filter(function (t) {
+          return t !== settingsTile && ordered.indexOf(t) === -1;
+        });
+        ordered.concat(remaining).forEach(function (t) { appsGrid.appendChild(t); });
+        if (settingsTile) appsGrid.appendChild(settingsTile);
+      }
+
+      function readAndApplyAppOrder() {
+        return client.from("app_settings").select("key,value").eq("key", "app_order").maybeSingle().then(function (res) {
+          if (res.error || !res.data) return;
+          var v = res.data.value;
+          if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { return; } }
+          if (Array.isArray(v)) applyAppOrder(v);
+        }).catch(function () {});
+      }
+
+      function saveAppOrder() {
+        var order = getMovableTiles().map(function (t) { return t.getAttribute("data-app"); });
+        client.from("app_settings").upsert({ key: "app_order", value: order, updated_at: new Date().toISOString() }).then(function (res) {
+          if (res && res.error) console.error("app_order konnte nicht gespeichert werden:", res.error);
+        }).catch(function (e) { console.error("app_order Speicherfehler:", e); });
+      }
+
+      function moveTile(tile, dir) {
+        var list = getMovableTiles();
+        var idx = list.indexOf(tile);
+        if (idx === -1) return;
+        if (dir < 0 && idx > 0) {
+          appsGrid.insertBefore(tile, list[idx - 1]);
+        } else if (dir > 0 && idx < list.length - 1) {
+          appsGrid.insertBefore(tile, list[idx + 1].nextSibling);
+        } else {
+          return;
+        }
+        saveAppOrder();
+      }
+
+      function addTileControls() {
+        getMovableTiles().forEach(function (tile) {
+          if (tile.querySelector(".tile-move")) return;
+          var box = document.createElement("div");
+          box.className = "tile-move";
+          var up = document.createElement("button");
+          up.type = "button";
+          up.className = "tile-move-btn";
+          up.innerHTML = "&#8593;";
+          up.title = "Nach vorne";
+          up.addEventListener("click", function (e) {
+            e.preventDefault(); e.stopPropagation(); moveTile(tile, -1);
+          });
+          var down = document.createElement("button");
+          down.type = "button";
+          down.className = "tile-move-btn";
+          down.innerHTML = "&#8595;";
+          down.title = "Nach hinten";
+          down.addEventListener("click", function (e) {
+            e.preventDefault(); e.stopPropagation(); moveTile(tile, 1);
+          });
+          box.appendChild(up);
+          box.appendChild(down);
+          tile.appendChild(box);
+        });
+      }
+
+      function removeTileControls() {
+        if (!appsGrid) return;
+        Array.prototype.slice.call(appsGrid.querySelectorAll(".tile-move")).forEach(function (b) {
+          if (b.parentNode) b.parentNode.removeChild(b);
+        });
+      }
+
+      function setAppOrderEditing(on) {
+        appOrderEditing = on;
+        if (!appsGrid) return;
+        appsGrid.classList.toggle("editing", on);
+        if (on) { addTileControls(); }
+        else { removeTileControls(); saveAppOrder(); }
+      }
+
+      function setupAppOrdering(session) {
+        appsGrid = document.querySelector(".grid");
+        if (!appsGrid) return;
+        // Verhindert im Bearbeiten-Modus die normale Navigation der Kacheln (Capture-Phase),
+        // laesst aber die Pfeil-Buttons zu.
+        appsGrid.addEventListener("click", function (e) {
+          if (!appOrderEditing) return;
+          if (e.target.closest && e.target.closest(".tile-move-btn")) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }, true);
+
+        readAndApplyAppOrder();
+
+        var isSuperAdmin = session.user.user_metadata && session.user.user_metadata.is_superadmin === true;
+        var toolbar = document.getElementById("appsToolbar");
+        var editBtn = document.getElementById("editAppsBtn");
+        if (!isSuperAdmin || !toolbar || !editBtn) return;
+        toolbar.classList.remove("hidden");
+        editBtn.addEventListener("click", function () {
+          var next = !appOrderEditing;
+          setAppOrderEditing(next);
+          editBtn.textContent = next ? "Fertig" : "Bearbeiten";
+          editBtn.classList.toggle("active", next);
+        });
+      }
+
       function showApp(session) {
         loadingBox.classList.add("hidden");
         loginBox.classList.add("hidden");
@@ -897,6 +1070,7 @@
         initWidgets(client);
         applyAppPermissions(client, session);
         applyGlobalAppEnabled(client, session);
+        setupAppOrdering(session);
       }
 
       var WIDGET_KEYS = ["wetter", "tagebuch", "geburtstage", "kalenderansicht"];

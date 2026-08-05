@@ -18,7 +18,7 @@ const APP_LIST = [
   { key: "faq", label: "FAQ" },
   { key: "pinnwand", label: "Pinnwand" },
   { key: "mitglieder", label: "Mitglieder" },
-  { key: "workshop", label: "Workshop" },
+  { key: "grossgruppe", label: "GroßGruppe" },
   { key: "bulldozer", label: "Bulldozer" },
   { key: "vorsorge", label: "Vorsorge" },
   { key: "schadenmelder", label: "Schadenmelder" },

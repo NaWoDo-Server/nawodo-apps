@@ -14,7 +14,7 @@
 // DELETE { user_id } -> Account (+ Profil) löschen
 // Alle Aufrufe erwarten den Access-Token des aufrufenden Nutzers im Authorization-Header.
 
-const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "workshop", "bulldozer", "vorsorge", "schadenmelder"];
+const APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "grossgruppe", "bulldozer", "vorsorge", "schadenmelder"];
 // Feingranulare Unter-Rechte (kein eigener App-Zugriff, sondern ein Bereich innerhalb
 // einer App). Anders als bei APP_KEYS gilt hier: fehlende Zeile = NICHT erlaubt (Opt-in).
 const OPT_IN_PERMISSION_KEYS = ["faq_projekt", "mitglieder_genossenschaft", "mitglieder_gaeste", "mitglieder_bewohner", "mitglieder_kinder"];

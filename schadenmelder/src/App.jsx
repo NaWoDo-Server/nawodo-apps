@@ -26,7 +26,7 @@ const STATUS_META = {
   abgelehnt:    { label: "Abgelehnt / kein Schaden", short: "Abgelehnt",    color: "#A13D3D" },
 };
 
-const CATEGORIES = ["Sanitär", "Elektro", "Heizung", "Dach", "Außenanlage", "Sonstiges"];
+const CATEGORIES = ["Sanitär", "Heizung", "Gebäude", "Fenster", "Wohnung", "Lüftungsanlage", "Elektrik", "Schließanlage", "Sonstige"];
 
 const PRIORITIES = {
   niedrig: { label: "Niedrig", color: "#6B6A61" },
@@ -644,6 +644,7 @@ function TicketDetail({
   const [uploading, setUploading] = useState(false);
   const [rejectReason, setRejectReason] = useState(ticket.reject_reason || "");
   const [handwerkerInfo, setHandwerkerInfo] = useState(ticket.handwerker_info || "");
+  const [selbstPerson, setSelbstPerson] = useState(ticket.selbstreparatur_person || "");
   const [showTeam, setShowTeam] = useState(true);
 
   // Aktivitäts-Feed: öffentliche/interne Kommentare + Events, chronologisch.
@@ -667,6 +668,19 @@ function TicketDetail({
 
   async function changeStatus(newStatus) {
     if (newStatus === ticket.status) return;
+    // Einen Schritt zurück (oder eine erledigte/abgelehnte Meldung wieder aktivieren)
+    // nur nach ausdrücklicher Bestätigung.
+    const curIdx = STATUS_FLOW.indexOf(ticket.status);
+    const newIdx = STATUS_FLOW.indexOf(newStatus);
+    const goingBack =
+      (curIdx !== -1 && newIdx !== -1 && newIdx < curIdx) ||
+      (ticket.status === "abgelehnt" && newStatus !== "abgelehnt");
+    if (goingBack) {
+      const ok = window.confirm(
+        `Meldung von „${STATUS_META[ticket.status].label}" auf „${STATUS_META[newStatus].label}" zurücksetzen?`
+      );
+      if (!ok) return;
+    }
     if (newStatus === "abgelehnt") {
       const reason = (rejectReason || "").trim();
       await onUpdate(ticket, { status: "abgelehnt", reject_reason: reason || null }, "status",
@@ -713,6 +727,7 @@ function TicketDetail({
         {ticket.category && <span className="inline-flex items-center gap-1 text-xs" style={{ color: INK_SOFT }}><Tag size={12} /> {ticket.category}</span>}
         {ticket.location && <span className="inline-flex items-center gap-1 text-xs" style={{ color: INK_SOFT }}><MapPin size={12} /> {ticket.location}</span>}
         {ticket.inspection_date && <span className="inline-flex items-center gap-1 text-xs" style={{ color: INK_SOFT }}><Calendar size={12} /> Begutachtung: {fmtDateLong(ticket.inspection_date)}</span>}
+        {ticket.umsetzung_termin && <span className="inline-flex items-center gap-1 text-xs" style={{ color: INK_SOFT }}><Calendar size={12} /> Termin: {fmtDateLong(ticket.umsetzung_termin)}</span>}
       </div>
 
       {ticket.description && (
@@ -726,6 +741,7 @@ function TicketDetail({
             <div className="flex items-center gap-1.5"><Wrench size={13} /> Behebung in Eigenleistung
               {ticket.resources_available === true && " · Material/Ressourcen vorhanden"}
               {ticket.resources_available === false && " · Material/Ressourcen fehlen noch"}
+              {ticket.selbstreparatur_person && ` · repariert von: ${ticket.selbstreparatur_person}`}
             </div>
           )}
           {ticket.repair_mode === "handwerker" && (
@@ -822,6 +838,12 @@ function TicketDetail({
                 <input type="date" value={ticket.inspection_date || ""} onChange={(e) => onUpdate(ticket, { inspection_date: e.target.value || null }, "field", e.target.value ? `Begutachtungstermin: ${fmtDateLong(e.target.value)}` : "Begutachtungstermin entfernt")} className="rounded-lg px-3 py-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
               </div>
 
+              {/* Termin für Umsetzung / Handwerker / Bestellung (Schritt Freigabe/Behebung) */}
+              <div>
+                <div className="text-[11px] font-semibold mb-1" style={{ color: INK_SOFT }}>Termin (Umsetzung / Handwerker)</div>
+                <input type="date" value={ticket.umsetzung_termin || ""} onChange={(e) => onUpdate(ticket, { umsetzung_termin: e.target.value || null }, "field", e.target.value ? `Umsetzungstermin: ${fmtDateLong(e.target.value)}` : "Umsetzungstermin entfernt")} className="rounded-lg px-3 py-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </div>
+
               {/* Behebungsweg */}
               <div>
                 <div className="text-[11px] font-semibold mb-1" style={{ color: INK_SOFT }}>Behebungsweg</div>
@@ -830,11 +852,20 @@ function TicketDetail({
                   <button onClick={() => setRepairMode("handwerker")} className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={ticket.repair_mode === "handwerker" ? { backgroundColor: INK, color: "#fff" } : { border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>Handwerker</button>
                 </div>
                 {ticket.repair_mode === "eigenleistung" && (
-                  <div className="flex items-center gap-2 text-[11px]" style={{ color: INK_SOFT }}>
-                    <span>Ressourcen NaWoDo vorhanden?</span>
-                    <button onClick={() => onUpdate(ticket, { resources_available: true }, "field", "Ressourcen vorhanden: Ja")} className="px-2 py-0.5 rounded-full font-semibold" style={ticket.resources_available === true ? { backgroundColor: "#2E7D4F", color: "#fff" } : { border: `1px solid ${BORDER_SOFT}` }}>Ja</button>
-                    <button onClick={() => onUpdate(ticket, { resources_available: false }, "field", "Ressourcen vorhanden: Nein")} className="px-2 py-0.5 rounded-full font-semibold" style={ticket.resources_available === false ? { backgroundColor: "#A13D3D", color: "#fff" } : { border: `1px solid ${BORDER_SOFT}` }}>Nein</button>
-                  </div>
+                  <>
+                    <div className="flex items-center gap-2 text-[11px] mb-2" style={{ color: INK_SOFT }}>
+                      <span>Ressourcen NaWoDo vorhanden?</span>
+                      <button onClick={() => onUpdate(ticket, { resources_available: true }, "field", "Ressourcen vorhanden: Ja")} className="px-2 py-0.5 rounded-full font-semibold" style={ticket.resources_available === true ? { backgroundColor: "#2E7D4F", color: "#fff" } : { border: `1px solid ${BORDER_SOFT}` }}>Ja</button>
+                      <button onClick={() => onUpdate(ticket, { resources_available: false }, "field", "Ressourcen vorhanden: Nein")} className="px-2 py-0.5 rounded-full font-semibold" style={ticket.resources_available === false ? { backgroundColor: "#A13D3D", color: "#fff" } : { border: `1px solid ${BORDER_SOFT}` }}>Nein</button>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold mb-1" style={{ color: INK_SOFT }}>Selbstreparatur: wer repariert?</div>
+                      <div className="flex gap-2">
+                        <input value={selbstPerson} onChange={(e) => setSelbstPerson(e.target.value)} placeholder="Name des Bewohners / der Bewohnerin" className="flex-1 rounded-lg px-3 py-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                        <button onClick={() => onUpdate(ticket, { selbstreparatur_person: selbstPerson.trim() || null }, "field", selbstPerson.trim() ? `Selbstreparatur durch: ${selbstPerson.trim()}` : "Selbstreparatur-Person entfernt")} className="px-3 py-2 rounded-lg text-xs font-semibold text-white" style={{ backgroundColor: INK }}>Speichern</button>
+                      </div>
+                    </div>
+                  </>
                 )}
                 {ticket.repair_mode === "handwerker" && (
                   <div className="flex gap-2">

@@ -251,6 +251,7 @@ function WorkshopApp({ session }) {
   const [attachments, setAttachments] = useState([]);
   const [foodItems, setFoodItems] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchive, setShowArchive] = useState(false);
@@ -278,11 +279,12 @@ function WorkshopApp({ session }) {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const [ws, att, food, at, mods, us, cats, res] = await Promise.all([
+    const [ws, att, food, at, rem, mods, us, cats, res] = await Promise.all([
       supabase.from("workshops").select("*").order("date", { ascending: false }),
       supabase.from("workshop_attachments").select("*"),
       supabase.from("workshop_food_items").select("*").order("created_at"),
       supabase.from("workshop_attendance").select("*"),
+      supabase.from("workshop_reminders").select("*").eq("user_id", user.id),
       supabase.from("app_moderators").select("app_key").eq("user_id", user.id),
       supabase.rpc("list_all_users"),
       supabase.from("categories").select("*"),
@@ -292,6 +294,7 @@ function WorkshopApp({ session }) {
     setAttachments(att.data || []);
     setFoodItems(food.data || []);
     setAttendance(at.data || []);
+    setReminders(rem.data || []);
     setMyModApps((mods.data || []).map((r) => r.app_key));
     setAllUsers(us.data || []);
     // Fuer die Termine-Verknuepfung: die Buchungs-"Resource" der Termine-App finden
@@ -328,10 +331,14 @@ function WorkshopApp({ session }) {
     }
   }, [loading, currentWorkshop, archivedWorkshops]);
 
-  function attachmentsFor(workshopId) { return attachments.filter((a) => a.workshop_id === workshopId); }
+  // Generische Anhaenge (ohne das als kind='protokoll' markierte "Alte Protokoll").
+  function attachmentsFor(workshopId) { return attachments.filter((a) => a.workshop_id === workshopId && a.kind !== "protokoll"); }
+  // "Altes Protokoll": genau ein Anhang pro Workshop, markiert mit kind='protokoll'.
+  function protokollFor(workshopId) { return attachments.find((a) => a.workshop_id === workshopId && a.kind === "protokoll") || null; }
   function foodItemsFor(workshopId) { return foodItems.filter((f) => f.workshop_id === workshopId); }
   function attendanceFor(workshopId) { return attendance.filter((a) => a.workshop_id === workshopId); }
   function myAttendance(workshopId) { return attendance.find((a) => a.workshop_id === workshopId && a.user_id === user.id); }
+  function myReminderOn(workshopId) { return reminders.some((r) => r.workshop_id === workshopId && r.user_id === user.id); }
 
   function canManageWorkshop(w) {
     return !!w && (isElevated || w.created_by === user.id);
@@ -540,6 +547,52 @@ function WorkshopApp({ session }) {
     }
   }
 
+  // "Altes Protokoll" hochladen: gleicher Storage-/Upload-Weg wie normale Anhaenge,
+  // aber mit kind='protokoll' markiert. Es gibt genau ein Protokoll pro Workshop - ein
+  // eventuell vorhandenes wird beim Hochladen ersetzt.
+  async function handleUploadProtokoll(workshopId, file) {
+    if (!file) return;
+    try {
+      const existing = protokollFor(workshopId);
+      const { url, filename } = await uploadAttachment(file);
+      await supabase.from("workshop_attachments").insert({ workshop_id: workshopId, url, filename, created_by: user.id, kind: "protokoll" });
+      if (existing) {
+        await supabase.from("workshop_attachments").delete().eq("id", existing.id);
+      }
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Protokoll konnte nicht hochgeladen werden.");
+    }
+  }
+
+  async function handleDeleteProtokoll(a) {
+    if (!window.confirm("Altes Protokoll wirklich entfernen?")) return;
+    try {
+      await supabase.from("workshop_attachments").delete().eq("id", a.id);
+      await loadAll();
+    } catch (e) {
+      alert(e.message || "Konnte nicht entfernt werden.");
+    }
+  }
+
+  // E-Mail-Erinnerung 1 Tag vorher: pro Nutzer nur ein Opt-in-Flag. Optimistisch wie
+  // die Teilnahme - der tatsaechliche Versand ist ein separater, geplanter Job.
+  async function handleToggleReminder(workshopId, on) {
+    setReminders((prev) => on
+      ? (prev.some((r) => r.workshop_id === workshopId && r.user_id === user.id) ? prev : [...prev, { workshop_id: workshopId, user_id: user.id }])
+      : prev.filter((r) => !(r.workshop_id === workshopId && r.user_id === user.id)));
+    try {
+      if (on) {
+        await supabase.from("workshop_reminders").insert({ workshop_id: workshopId, user_id: user.id });
+      } else {
+        await supabase.from("workshop_reminders").delete().eq("workshop_id", workshopId).eq("user_id", user.id);
+      }
+    } catch (e) {
+      alert(e.message || "Konnte nicht gespeichert werden.");
+      await loadAll();
+    }
+  }
+
   async function handleChangePassword() {
     setPasswordError("");
     setPasswordSuccess(false);
@@ -639,17 +692,22 @@ function WorkshopApp({ session }) {
               w={currentWorkshop}
               highlighted
               attachmentsList={attachmentsFor(currentWorkshop.id)}
+              protokoll={protokollFor(currentWorkshop.id)}
               foodList={foodItemsFor(currentWorkshop.id)}
               attendanceList={attendanceFor(currentWorkshop.id)}
               myAttendanceRow={myAttendance(currentWorkshop.id)}
+              reminderOn={myReminderOn(currentWorkshop.id)}
               canManage={canManageWorkshop(currentWorkshop)}
               userId={user.id}
               onEdit={() => openEditForm(currentWorkshop)}
               onDelete={() => handleDeleteWorkshop(currentWorkshop)}
               onDeleteAttachment={handleDeleteAttachment}
+              onUploadProtokoll={(file) => handleUploadProtokoll(currentWorkshop.id, file)}
+              onDeleteProtokoll={handleDeleteProtokoll}
               onAddFood={(text) => handleAddFoodItem(currentWorkshop.id, text)}
               onDeleteFood={handleDeleteFoodItem}
               onSetAttendance={(v) => handleSetAttendance(currentWorkshop.id, v)}
+              onToggleReminder={(on) => handleToggleReminder(currentWorkshop.id, on)}
             />
           </div>
         )}
@@ -673,18 +731,23 @@ function WorkshopApp({ session }) {
                         <WorkshopCard
                           w={w}
                           attachmentsList={attachmentsFor(w.id)}
+                          protokoll={protokollFor(w.id)}
                           foodList={foodItemsFor(w.id)}
                           attendanceList={attendanceFor(w.id)}
                           myAttendanceRow={myAttendance(w.id)}
+                          reminderOn={myReminderOn(w.id)}
                           canManage={canManageWorkshop(w)}
                           userId={user.id}
                           onCollapse={() => setExpandedArchiveId(null)}
                           onEdit={() => openEditForm(w)}
                           onDelete={() => handleDeleteWorkshop(w)}
                           onDeleteAttachment={handleDeleteAttachment}
+                          onUploadProtokoll={(file) => handleUploadProtokoll(w.id, file)}
+                          onDeleteProtokoll={handleDeleteProtokoll}
                           onAddFood={(text) => handleAddFoodItem(w.id, text)}
                           onDeleteFood={handleDeleteFoodItem}
                           onSetAttendance={(v) => handleSetAttendance(w.id, v)}
+                          onToggleReminder={(on) => handleToggleReminder(w.id, on)}
                         />
                       ) : (
                         <button
@@ -892,7 +955,7 @@ function ThemenList({ themen, themenInfo }) {
 
   return (
     <div className="mb-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Themen</div>
+      <div className="text-sm font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Themen</div>
       <div className="flex flex-col gap-1.5">
         {items.map((item, i) => {
           const isOpen = openIndex === i;
@@ -903,7 +966,7 @@ function ThemenList({ themen, themenInfo }) {
                 className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
                 style={{ cursor: item.info ? "pointer" : "default" }}
               >
-                <span className="text-sm font-medium">{item.title}</span>
+                <span className="text-base font-medium">{item.title}</span>
                 {item.info && (
                   isOpen
                     ? <ChevronDown size={14} className="flex-shrink-0" style={{ color: INK_SOFT }} />
@@ -911,7 +974,7 @@ function ThemenList({ themen, themenInfo }) {
                 )}
               </button>
               {isOpen && item.info && (
-                <p className="text-sm whitespace-pre-wrap px-3 pb-2.5" style={{ color: INK_SOFT }}>{item.info}</p>
+                <p className="text-base whitespace-pre-wrap px-3 pb-2.5" style={{ color: INK_SOFT }}>{item.info}</p>
               )}
             </div>
           );
@@ -922,10 +985,16 @@ function ThemenList({ themen, themenInfo }) {
 }
 
 function WorkshopCard({
-  w, highlighted, attachmentsList, foodList, attendanceList, myAttendanceRow, canManage, userId,
-  onCollapse, onEdit, onDelete, onDeleteAttachment, onAddFood, onDeleteFood, onSetAttendance,
+  w, highlighted, attachmentsList, protokoll, foodList, attendanceList, myAttendanceRow, reminderOn, canManage, userId,
+  onCollapse, onEdit, onDelete, onDeleteAttachment, onUploadProtokoll, onDeleteProtokoll, onAddFood, onDeleteFood, onSetAttendance, onToggleReminder,
 }) {
   const [newFoodText, setNewFoodText] = useState("");
+  const [uploadingProtokoll, setUploadingProtokoll] = useState(false);
+  async function handleProtokollFile(file) {
+    if (!file) return;
+    setUploadingProtokoll(true);
+    try { await onUploadProtokoll(file); } finally { setUploadingProtokoll(false); }
+  }
   const yesCount = attendanceList.filter((a) => a.attending).length;
   const noCount = attendanceList.filter((a) => a.attending === false).length;
   const yesNames = attendanceList.filter((a) => a.attending).map((a) => a.user_name);
@@ -935,7 +1004,7 @@ function WorkshopCard({
       <div className="flex items-start justify-between mb-2">
         <div>
           <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: BLUE }} /> {fmtDateLong(w.date)}</div>
-          {w.moderator_name && <div className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Moderator/in: {w.moderator_name}</div>}
+          {w.moderator_name && <div className="text-base mt-0.5" style={{ color: INK_SOFT }}>Moderator/in: {w.moderator_name}</div>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {canManage && (
@@ -953,14 +1022,14 @@ function WorkshopCard({
       <ThemenList themen={w.themen} themenInfo={w.themen_info} />
       {w.agenda && (
         <div className="mb-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Agenda</div>
-          <p className="text-sm whitespace-pre-wrap">{w.agenda}</p>
+          <div className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Agenda</div>
+          <p className="text-base whitespace-pre-wrap">{w.agenda}</p>
         </div>
       )}
 
       {attachmentsList.length > 0 && (
         <div className="mb-3">
-          <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Anhänge</div>
+          <div className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Anhänge</div>
           <div className="flex flex-col gap-1">
             {attachmentsList.map((a) => (
               <div key={a.id} className="flex items-center gap-2 text-sm">
@@ -975,8 +1044,34 @@ function WorkshopCard({
         </div>
       )}
 
+      {(protokoll || canManage) && (
+        <div className="mb-3">
+          <div className="text-sm font-bold uppercase tracking-wide mb-1" style={{ color: INK_SOFT }}>Altes Protokoll</div>
+          {protokoll ? (
+            <div className="flex items-center gap-2 text-sm">
+              <FileText size={14} style={{ color: INK_SOFT }} />
+              <a href={protokoll.url} target="_blank" rel="noreferrer" className="underline flex-1 truncate flex items-center gap-1" style={{ color: BLUE }}>
+                <Download size={12} /> {protokoll.filename}
+              </a>
+              {canManage && (
+                <button onClick={() => onDeleteProtokoll(protokoll)}><Trash2 size={12} style={{ color: "#B8B4A2" }} /></button>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs" style={{ color: INK_SOFT }}>Noch kein Protokoll hinterlegt.</p>
+          )}
+          {canManage && (
+            <label className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>
+              {uploadingProtokoll ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
+              {uploadingProtokoll ? "Wird hochgeladen…" : protokoll ? "Protokoll ersetzen" : "Protokoll hochladen"}
+              <input type="file" className="hidden" disabled={uploadingProtokoll} onChange={(e) => { if (e.target.files[0]) handleProtokollFile(e.target.files[0]); e.target.value = ""; }} />
+            </label>
+          )}
+        </div>
+      )}
+
       <div className="mb-3 pt-3" style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
-        <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Wer bringt was mit?</div>
+        <div className="text-sm font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Wer bringt was mit?</div>
         <div className="flex flex-col gap-1 mb-2">
           {foodList.length === 0 && <p className="text-xs" style={{ color: INK_SOFT }}>Noch nichts eingetragen.</p>}
           {foodList.map((f) => (
@@ -1010,7 +1105,7 @@ function WorkshopCard({
 
       <div className="pt-3" style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
         <div className="flex items-center justify-between mb-1.5">
-          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Teilnahme</div>
+          <div className="text-sm font-bold uppercase tracking-wide" style={{ color: INK_SOFT }}>Teilnahme</div>
           <div className="text-xs" style={{ color: INK_SOFT }}>{yesCount} {yesCount === 1 ? "Zusage" : "Zusagen"}</div>
         </div>
         <div className="flex gap-2 mb-2">
@@ -1032,6 +1127,16 @@ function WorkshopCard({
         {yesNames.length > 0 && (
           <p className="text-xs" style={{ color: INK_SOFT }}>{yesNames.join(", ")}</p>
         )}
+        <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!!reminderOn}
+            onChange={(e) => onToggleReminder(e.target.checked)}
+            className="w-4 h-4 flex-shrink-0"
+            style={{ accentColor: BLUE }}
+          />
+          <span style={{ color: INK_SOFT }}>E-Mail-Erinnerung 1 Tag vorher</span>
+        </label>
       </div>
     </div>
   );

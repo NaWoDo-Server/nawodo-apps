@@ -12,7 +12,6 @@ const PAPER = "#F1F0EA";
 const INK = "#2B2B26";
 const INK_SOFT = "#6B6A61";
 const BORDER_SOFT = "#D8D5C7";
-const BLUE = "#2E86AB";
 const PURPLE = "#6C63A6";
 const GREEN = "#2E7D4F";
 const PINK = "#F356AF"; // App-/Icon-Farbe des Saubermachtags
@@ -808,7 +807,7 @@ function SaubermachtagApp({ session }) {
                             <button
                               onClick={() => setExpandedArchiveId(ev.id)}
                               className="w-full text-left rounded-xl p-3.5 flex items-center justify-between"
-                              style={{ backgroundColor: `${BLUE}14`, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `3px solid ${BLUE}` }}
+                              style={{ backgroundColor: `${PINK}14`, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `3px solid ${PINK}` }}
                             >
                               <div className="min-w-0">
                                 <div className="font-semibold text-sm">{fmtDateLong(ev.event_date)}</div>
@@ -891,7 +890,7 @@ function SaubermachtagApp({ session }) {
 
             {formError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {formError}</div>}
 
-            <button onClick={handleSaveEvent} disabled={saving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: BLUE, opacity: saving ? 0.7 : 1 }}>
+            <button onClick={handleSaveEvent} disabled={saving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: PINK, opacity: saving ? 0.7 : 1 }}>
               {saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Speichern…" : "Speichern"}
             </button>
           </div>
@@ -945,7 +944,7 @@ function SaubermachtagApp({ session }) {
             {inspError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {inspError}</div>}
             {inspMode === "new" && <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Fotos kannst du nach dem Speichern am Eintrag hinzufügen.</p>}
 
-            <button onClick={handleSaveInsp} disabled={inspSaving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: BLUE, opacity: inspSaving ? 0.7 : 1 }}>
+            <button onClick={handleSaveInsp} disabled={inspSaving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: PINK, opacity: inspSaving ? 0.7 : 1 }}>
               {inspSaving && <Loader2 size={15} className="animate-spin" />} {inspSaving ? "Speichern…" : "Speichern"}
             </button>
           </div>
@@ -1178,7 +1177,7 @@ function EventCard({
                     <input value={newBereichCustom} onChange={(e) => setNewBereichCustom(e.target.value)} placeholder="oder neuer Bereich" className="w-full rounded-lg px-3 py-2 mb-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
                     <input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Aufgabe" className="w-full rounded-lg px-3 py-2 mb-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
                     <div className="flex gap-2">
-                      <button onClick={submitAddTask} className="flex-1 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}>Hinzufügen</button>
+                      <button onClick={submitAddTask} className="flex-1 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: PINK }}>Hinzufügen</button>
                       <button onClick={() => { setShowAddTask(false); setNewTaskTitle(""); setNewBereichCustom(""); setNewBereichSel(""); }} className="px-3 py-2 rounded-lg text-sm" style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}>Abbrechen</button>
                     </div>
                   </div>
@@ -1246,7 +1245,7 @@ function OverviewTab({ templates, tasks, events, year }) {
       )}
       {rows.map((group) => (
         <div key={group.bereich} className="mb-4">
-          <div className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: BLUE }}>{group.bereich}</div>
+          <div className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: PINK }}>{group.bereich}</div>
           <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${BORDER_SOFT}` }}>
             <table className="w-full text-sm">
               <thead>
@@ -1277,8 +1276,8 @@ function OverviewTab({ templates, tasks, events, year }) {
 function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, onEdit, onAddNote, onDelete, onUploadPhotos, onDeletePhoto, onOpenPhoto }) {
   return (
     <div>
-      <div className="rounded-xl p-3 mb-3 flex items-start gap-2" style={{ backgroundColor: `${BLUE}14`, border: `1px solid ${BLUE}22` }}>
-        <ClipboardList size={16} style={{ color: BLUE }} className="mt-0.5 flex-shrink-0" />
+      <div className="rounded-xl p-3 mb-3 flex items-start gap-2" style={{ backgroundColor: `${PINK}14`, border: `1px solid ${PINK}22` }}>
+        <ClipboardList size={16} style={{ color: PINK }} className="mt-0.5 flex-shrink-0" />
         <p className="text-xs" style={{ color: INK_SOFT }}>Wird beim Saubermachtag vom Inspektions-Team gepflegt. Erscheint bei jedem Termin als Aufgabe „Inspektionsgang".</p>
       </div>
 
@@ -1289,7 +1288,7 @@ function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, on
             <input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Suchen…" className="flex-1 text-sm outline-none" style={{ backgroundColor: "transparent" }} />
           </div>
           {canManage && (
-            <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white flex-shrink-0" style={{ backgroundColor: BLUE }}>
+            <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white flex-shrink-0" style={{ backgroundColor: PINK }}>
               <Plus size={14} /> Eintrag
             </button>
           )}
@@ -1306,10 +1305,10 @@ function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, on
         {rows.map((row) => {
           const photos = photosFor(row.id);
           return (
-            <div key={row.id} className="rounded-xl p-4" style={{ backgroundColor: "#fff", border: `1px solid ${BORDER_SOFT}`, borderLeft: `4px solid ${BLUE}` }}>
+            <div key={row.id} className="rounded-xl p-4" style={{ backgroundColor: "#fff", border: `1px solid ${BORDER_SOFT}`, borderLeft: `4px solid ${PINK}` }}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  {row.bereich && <span className="inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white mb-1" style={{ backgroundColor: BLUE }}>{row.bereich}</span>}
+                  {row.bereich && <span className="inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white mb-1" style={{ backgroundColor: PINK }}>{row.bereich}</span>}
                   {row.beschreibung && <p className="text-sm whitespace-pre-line">{row.beschreibung}</p>}
                   {row.stand && (
                     <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${BORDER_SOFT}` }}>
@@ -1327,7 +1326,7 @@ function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, on
               </div>
 
               {canManage && (
-                <button onClick={() => onAddNote(row)} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${BLUE}`, color: BLUE }}>
+                <button onClick={() => onAddNote(row)} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${PINK}`, color: PINK }}>
                   <Plus size={13} /> Beschreibung hinzufügen
                 </button>
               )}

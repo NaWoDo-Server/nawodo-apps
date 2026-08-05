@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Search, Trash2, UserX, KeyRound,
-  Check, Users, Pencil, Mail,
+  Check, Users, Pencil, Mail, User as UserIcon,
 } from "lucide-react";
 import { supabase, configMissing } from "./supabaseClient";
 
@@ -132,20 +132,7 @@ function AuthGate() {
   }
   if (!session) return null;
 
-  const isSuperAdmin = session.user.user_metadata?.is_superadmin === true;
-  if (!isSuperAdmin) {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ backgroundColor: PAPER }}>
-        <div className="max-w-sm text-center">
-          <AlertCircle className="mx-auto mb-3" size={28} style={{ color: "#A13D3D" }} />
-          <p className="font-semibold mb-1">Kein Zugriff</p>
-          <p className="text-sm mb-4" style={{ color: INK_SOFT }}>Diese App ist nur für den Superadmin.</p>
-          <a href="/" className="text-sm font-semibold" style={{ color: INK }}>Zurück zur Startseite</a>
-        </div>
-      </div>
-    );
-  }
-
+  // Settings ist jetzt fuer ALLE sichtbar; die Reiter richten sich nach der Rolle.
   return <SettingsApp session={session} />;
 }
 
@@ -153,6 +140,8 @@ function SettingsApp({ session }) {
   const user = session.user;
   const userName = user.user_metadata?.name || user.email;
   const initial = userName.charAt(0).toUpperCase();
+  const isSuperAdmin = user.user_metadata?.is_superadmin === true;
+  const isAdmin = user.user_metadata?.is_admin === true;
 
   // Popups per ESC-Taste schliessbar machen.
   useEffect(() => {
@@ -188,9 +177,32 @@ function SettingsApp({ session }) {
   const [epPlz, setEpPlz] = useState("");
   const [epWohnort, setEpWohnort] = useState("");
   const [epWohneinheit, setEpWohneinheit] = useState("");
+  const [epTelefon, setEpTelefon] = useState("");
+  const [epHandy, setEpHandy] = useState("");
+  const [epGeburtstag, setEpGeburtstag] = useState("");
+  const [epGeburtstagVersteckt, setEpGeburtstagVersteckt] = useState(false);
   const [epEmail, setEpEmail] = useState("");
   const [epError, setEpError] = useState("");
+  const [epSaved, setEpSaved] = useState(false);
   const [epSaving, setEpSaving] = useState(false);
+
+  // Profilfelder aus dem eigenen Mitglieds-Datensatz vorbelegen (fuer den "Mein Bereich"-Reiter).
+  useEffect(() => {
+    if (!ownMember) return;
+    setEpVorname(ownMember.vorname || "");
+    setEpNachname(ownMember.nachname || "");
+    setEpSpitzname(ownMember.spitzname || "");
+    setEpStrasse(ownMember.strasse || "");
+    setEpHausnummer(ownMember.hausnummer || "");
+    setEpPlz(ownMember.plz || "");
+    setEpWohnort(ownMember.wohnort || "");
+    setEpWohneinheit(ownMember.wohneinheit || "");
+    setEpTelefon(ownMember.telefon || "");
+    setEpHandy(ownMember.handy || "");
+    setEpGeburtstag(ownMember.geburtstag || "");
+    setEpGeburtstagVersteckt(ownMember.geburtstag_versteckt === true);
+    setEpEmail(ownMember.email || user.email || "");
+  }, [ownMember, user.email]);
 
   function openEditProfile() {
     setEpVorname(ownMember?.vorname || "");
@@ -237,6 +249,10 @@ function SettingsApp({ session }) {
         plz: epPlz.trim() || null,
         wohnort: epWohnort.trim() || null,
         wohneinheit: epWohneinheit.trim() || null,
+        telefon: epTelefon.trim() || null,
+        handy: epHandy.trim() || null,
+        geburtstag: epGeburtstag || null,
+        geburtstag_versteckt: epGeburtstagVersteckt,
         email: newEmail,
       };
       if (ownMemberId) {
@@ -257,6 +273,8 @@ function SettingsApp({ session }) {
       }
       setOwnMember((prev) => ({ ...(prev || {}), ...payload }));
       setShowEditProfile(false);
+      setEpSaved(true);
+      setTimeout(() => setEpSaved(false), 2500);
     } catch (e) {
       setEpError(e.message || "Konnte nicht gespeichert werden.");
     } finally {
@@ -279,7 +297,7 @@ function SettingsApp({ session }) {
   const [selectedRowKey, setSelectedRowKey] = useState(null);
   const [newPassword, setNewPassword] = useState("");
 
-  const [activeTab, setActiveTab] = useState("benutzer"); // "benutzer" | "apps"
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? "benutzer" : "mein"); // "mein" | "benutzer" | "apps" | "email"
   const [rightsView, setRightsView] = useState("typ"); // "typ" | "rollen" | "gruppen" | "apps" | "nutzung"
 
   // Apps-Tab: globale Ein/Aus-Schalter pro App (app_settings.app_enabled_<key>)
@@ -860,7 +878,16 @@ function SettingsApp({ session }) {
           </a>
         </div>
 
-        <div className="flex items-center gap-1.5 mb-5 p-1 rounded-full w-fit" style={{ backgroundColor: "#E4E1D3" }}>
+        <div className="flex items-center gap-1.5 mb-5 p-1 rounded-full w-fit flex-wrap" style={{ backgroundColor: "#E4E1D3" }}>
+          <button
+            onClick={() => setActiveTab("mein")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+            style={activeTab === "mein" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            <UserIcon size={14} /> Mein Bereich
+          </button>
+          {isSuperAdmin && (
+          <>
           <button
             onClick={() => setActiveTab("benutzer")}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
@@ -882,7 +909,88 @@ function SettingsApp({ session }) {
           >
             <Mail size={14} /> E-Mail
           </button>
+          </>
+          )}
         </div>
+
+        {activeTab === "mein" && (
+          <div className="max-w-lg flex flex-col gap-5">
+            {/* Profil */}
+            <div>
+              <div className="text-sm font-bold mb-2" style={{ color: INK }}>Mein Profil</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1">Vorname</label>
+                  <input value={epVorname} onChange={(e) => setEpVorname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1">Nachname</label>
+                  <input value={epNachname} onChange={(e) => setEpNachname(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+              </div>
+              <label className="text-xs font-medium block mb-1 mt-3">Spitzname</label>
+              <input value={epSpitzname} onChange={(e) => setEpSpitzname(e.target.value)} placeholder="optional" className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="col-span-2">
+                  <label className="text-xs font-medium block mb-1">Straße</label>
+                  <input value={epStrasse} onChange={(e) => setEpStrasse(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1">Hausnr.</label>
+                  <input value={epHausnummer} onChange={(e) => setEpHausnummer(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1">PLZ</label>
+                  <input value={epPlz} onChange={(e) => setEpPlz(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium block mb-1">Wohnort</label>
+                  <input value={epWohnort} onChange={(e) => setEpWohnort(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+              </div>
+              <label className="text-xs font-medium block mb-1 mt-3">Wohneinheit</label>
+              <input value={epWohneinheit} onChange={(e) => setEpWohneinheit(e.target.value)} placeholder="z.B. WE 12" className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1">Telefon</label>
+                  <input value={epTelefon} onChange={(e) => setEpTelefon(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1">Handy</label>
+                  <input value={epHandy} onChange={(e) => setEpHandy(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                </div>
+              </div>
+              <label className="text-xs font-medium block mb-1 mt-3">Geburtstag</label>
+              <input type="date" value={epGeburtstag} onChange={(e) => setEpGeburtstag(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer">
+                <input type="checkbox" checked={epGeburtstagVersteckt} onChange={(e) => setEpGeburtstagVersteckt(e.target.checked)} />
+                Geburtstag nicht im Geburtstage-Widget der Startseite anzeigen
+              </label>
+              <div className="mt-2 text-xs" style={{ color: INK_SOFT }}>E-Mail-Adresse: {ownMember?.email || user.email} <span style={{ color: "#B8B4A2" }}>(ändert der Admin)</span></div>
+              {epError && <div className="flex items-start gap-2 text-sm mt-2" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {epError}</div>}
+              <div className="flex items-center gap-3 mt-3">
+                <button onClick={handleSaveEditProfile} disabled={epSaving} className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2" style={{ backgroundColor: BLUE, opacity: epSaving ? 0.7 : 1 }}>
+                  {epSaving && <Loader2 size={15} className="animate-spin" />} {epSaving ? "Speichern…" : "Profil speichern"}
+                </button>
+                {epSaved && <span className="text-xs font-semibold" style={{ color: "#2E7D4F" }}>Gespeichert.</span>}
+              </div>
+            </div>
+
+            {/* Passwort */}
+            <div className="pt-4 border-t" style={{ borderColor: BORDER_SOFT }}>
+              <div className="text-sm font-bold mb-2" style={{ color: INK }}>Passwort ändern</div>
+              <input type="password" value={selfNewPassword} onChange={(e) => setSelfNewPassword(e.target.value)} placeholder="Neues Passwort" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              <input type="password" value={selfNewPasswordConfirm} onChange={(e) => setSelfNewPasswordConfirm(e.target.value)} placeholder="Neues Passwort wiederholen" className="w-full rounded-lg px-3 py-2.5 mb-2 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              {selfPasswordError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{selfPasswordError}</p>}
+              {selfPasswordSuccess && <p className="text-xs mb-2" style={{ color: "#2E7D4F" }}>Passwort geändert!</p>}
+              <button onClick={handleSelfChangePassword} disabled={savingSelfPassword} className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2" style={{ backgroundColor: INK, opacity: savingSelfPassword ? 0.7 : 1 }}>
+                {savingSelfPassword && <Loader2 size={15} className="animate-spin" />} Passwort speichern
+              </button>
+            </div>
+          </div>
+        )}
 
         {activeTab === "benutzer" && (
         <>

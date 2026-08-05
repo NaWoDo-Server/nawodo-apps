@@ -750,9 +750,9 @@
               <span class="label">Saubermachtag</span>
             </a>
 
-            <a class="app hidden" href="/settings/" data-app="settings" id="settingsTile">
-              <div class="icon" style="background:#000000;">
-                <img src="/icon-settings.png" alt="" />
+            <a class="app" href="/settings/" data-app="settings" id="settingsTile">
+              <div class="icon" style="background:#D9D9DE;">
+                <img src="/icon-settings2.png" alt="" />
               </div>
               <span class="label">Settings</span>
             </a>
@@ -1228,11 +1228,9 @@
         accountNameHeader.textContent = "Hallo " + name;
         setAvatarDisplay(null, initial);
         loadOwnAvatar(user.id, initial, name);
+        // Settings ist jetzt fuer alle sichtbar (Inhalt richtet sich nach der Rolle).
         var settingsTile = document.getElementById("settingsTile");
-        if (settingsTile) {
-          var isSuperAdmin = user.user_metadata && user.user_metadata.is_superadmin === true;
-          settingsTile.classList.toggle("hidden", !isSuperAdmin);
-        }
+        if (settingsTile) settingsTile.classList.remove("hidden");
         // Erst persoenliche Einstellungen laden, dann Widgets + App-Reihenfolge anwenden.
         loadUserPrefs().then(function () {
           initWidgets(client);

@@ -290,7 +290,7 @@ function SettingsApp({ session }) {
   const [savingFaqTabToggle, setSavingFaqTabToggle] = useState(null);
 
   // E-Mail-Tab: zentrale SMTP-Absender-Konfiguration (mail_settings, id=1)
-  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false });
+  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false, schaden_notify_to: "" });
   const [mailPass, setMailPass] = useState("");   // write-only; leer = unveraendert
   const [savingMail, setSavingMail] = useState(false);
   const [mailSaved, setMailSaved] = useState(false);
@@ -325,7 +325,7 @@ function SettingsApp({ session }) {
   useEffect(() => {
     supabase
       .from("mail_settings")
-      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled")
+      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled,schaden_notify_to")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {
@@ -336,6 +336,7 @@ function SettingsApp({ session }) {
             smtp_user: data.smtp_user || "",
             smtp_from: data.smtp_from || "",
             enabled: !!data.enabled,
+            schaden_notify_to: data.schaden_notify_to || "",
           });
         }
       });
@@ -350,6 +351,7 @@ function SettingsApp({ session }) {
         smtp_user: mailCfg.smtp_user.trim() || null,
         smtp_from: mailCfg.smtp_from.trim() || null,
         enabled: mailCfg.enabled,
+        schaden_notify_to: mailCfg.schaden_notify_to.trim() || null,
         updated_at: new Date().toISOString(),
       };
       if (mailPass) patch.smtp_pass = mailPass;
@@ -1203,6 +1205,20 @@ function SettingsApp({ session }) {
             />
           </div>
 
+          <div className="pt-3 mt-1 border-t" style={{ borderColor: BORDER_SOFT }}>
+            <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Ziel-Postfächer der Apps</div>
+            <label className="text-xs font-medium block mb-1">Schadenmelder – neue Meldungen an</label>
+            <input
+              type="email"
+              value={mailCfg.schaden_notify_to}
+              onChange={(e) => setMailCfg((p) => ({ ...p, schaden_notify_to: e.target.value }))}
+              placeholder="z. B. schaden@nawodo.de"
+              className="w-full rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+            <p className="text-[11px] mt-1" style={{ color: INK_SOFT }}>Hierhin geht bei einer neuen Schadensmeldung eine Info-Mail. Weitere Apps können hier später ergänzt werden.</p>
+          </div>
+
           {actionError && <div className="flex items-start gap-2 text-sm px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {actionError}</div>}
 
           <div className="flex items-center gap-3">
@@ -1218,7 +1234,7 @@ function SettingsApp({ session }) {
           </div>
 
           <p className="text-xs" style={{ color: INK_SOFT }}>
-            Wohin Schadensmeldungen gehen, stellst du im Schadenmelder ein. Vorsorge- und Workshop-Erinnerungen gehen automatisch an die betroffenen Mitglieder.
+Absender/SMTP gilt zentral für alle Apps. Schadensmeldungen gehen an das oben eingetragene Ziel-Postfach; Vorsorge- und Workshop-Erinnerungen gehen automatisch an die betroffenen Mitglieder.
           </p>
         </div>
         )}

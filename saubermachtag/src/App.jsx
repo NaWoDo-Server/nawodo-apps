@@ -970,7 +970,7 @@ function EventCard({
   }
 
   return (
-    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: `${accent}14`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}55` : `1px solid ${accent}22`, borderLeft: `4px solid ${accent}` }}>
+    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: `${accent}0D`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}33` : `1px solid ${accent}1A`, borderLeft: `4px solid ${accent}` }}>
       <div className="flex items-start justify-between mb-1">
         <div>
           <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(ev.event_date)}</div>
@@ -1054,45 +1054,50 @@ function EventCard({
                     const isSignedUp = sList.some((s) => s.user_id === userId);
                     const canFinish = canManage || isSignedUp;
                     const doneStyle = task.done
-                      ? { backgroundColor: `${GREEN}14`, borderLeft: `4px solid ${GREEN}` }
-                      : { backgroundColor: "#fff", borderLeft: `4px solid ${BORDER_SOFT}` };
+                      ? { backgroundColor: `${GREEN}0D`, borderColor: `${GREEN}55` }
+                      : { backgroundColor: "#fff", borderColor: BORDER_SOFT };
                     return (
-                      <div key={task.id} className="rounded-lg p-3" style={{ ...doneStyle, border: `1px solid ${BORDER_SOFT}`, borderLeft: doneStyle.borderLeft }}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium">{task.title}</div>
-                            {sList.length > 0 && (
-                              <div className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Helfer: {sList.map((s) => s.user_name).filter(Boolean).join(", ")}</div>
-                            )}
-                            {task.done && task.done_by_name && (
-                              <div className="text-xs mt-0.5 font-semibold" style={{ color: GREEN }}>Erledigt von {task.done_by_name}</div>
+                      <div key={task.id} className="rounded-lg flex items-stretch overflow-hidden" style={{ border: `1px solid ${doneStyle.borderColor}`, borderLeft: `4px solid ${task.done ? GREEN : BORDER_SOFT}`, backgroundColor: doneStyle.backgroundColor }}>
+                        <div className="flex-1 min-w-0 p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold">{task.title}</div>
+                              {sList.length > 0 && (
+                                <div className="text-sm mt-1 font-medium" style={{ color: INK }}>
+                                  <span style={{ color: INK_SOFT }}>Helfer: </span>{sList.map((s) => s.user_name).filter(Boolean).join(", ")}
+                                </div>
+                              )}
+                              {task.done && task.done_by_name && (
+                                <div className="text-xs mt-1 font-semibold" style={{ color: GREEN }}>Erledigt von {task.done_by_name}</div>
+                              )}
+                            </div>
+                            {canManage && (
+                              <button onClick={() => onDeleteTask(task)} className="flex-shrink-0"><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
                             )}
                           </div>
-                          {canManage && (
-                            <button onClick={() => onDeleteTask(task)} className="flex-shrink-0"><Trash2 size={13} style={{ color: "#B8B4A2" }} /></button>
-                          )}
-                        </div>
-                        <div className="flex gap-2 mt-2">
                           <button
                             onClick={() => onToggleSignup(task)}
-                            className="flex-1 py-1.5 rounded-lg text-xs font-semibold"
+                            className="mt-2 inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold"
                             style={isSignedUp
                               ? { backgroundColor: `${PURPLE}1A`, color: PURPLE }
                               : { backgroundColor: PURPLE, color: "#fff" }}
                           >
                             {isSignedUp ? "Nicht mehr mitmachen" : "Ich mache mit"}
                           </button>
-                          <button
-                            onClick={() => canFinish && onToggleDone(task)}
-                            disabled={!canFinish}
-                            className="flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
-                            style={task.done
-                              ? { backgroundColor: GREEN, color: "#fff" }
-                              : { backgroundColor: canFinish ? `${GREEN}1A` : "#EEEDE6", color: canFinish ? GREEN : "#B8B4A2" }}
-                          >
-                            {task.done ? <><Check size={13} /> Erledigt ✓</> : "Fertig"}
-                          </button>
                         </div>
+                        <button
+                          onClick={() => canFinish && onToggleDone(task)}
+                          disabled={!canFinish}
+                          className="w-[76px] flex-shrink-0 flex flex-col items-center justify-center gap-1 text-sm font-bold"
+                          style={{
+                            borderLeft: `1px solid ${task.done ? `${GREEN}55` : BORDER_SOFT}`,
+                            ...(task.done
+                              ? { backgroundColor: GREEN, color: "#fff" }
+                              : { backgroundColor: canFinish ? `${GREEN}1A` : "#EEEDE6", color: canFinish ? GREEN : "#B8B4A2" }),
+                          }}
+                        >
+                          {task.done ? <><Check size={18} /> Erledigt</> : "Fertig"}
+                        </button>
                       </div>
                     );
                   })}

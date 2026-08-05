@@ -1150,7 +1150,7 @@ function WorkshopCard({
   const yesNames = attendanceList.filter((a) => a.attending).map((a) => a.user_name);
 
   return (
-    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: `${accent}14`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}55` : `1px solid ${accent}22`, borderLeft: `4px solid ${accent}` }}>
+    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: `${accent}0D`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}33` : `1px solid ${accent}1A`, borderLeft: `4px solid ${accent}` }}>
       <div className="flex items-start justify-between mb-2">
         <div>
           <div className="mb-1">

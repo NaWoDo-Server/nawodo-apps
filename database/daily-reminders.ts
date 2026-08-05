@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       .format(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
     const wResp = await fetch(
-      `${SUPABASE_URL}/rest/v1/workshops?date=eq.${tomorrowStr}&select=id,date,moderator_name,themen,themen_info,agenda`,
+      `${SUPABASE_URL}/rest/v1/workshops?date=eq.${tomorrowStr}&select=id,date,moderator_name,themen,themen_info,agenda,meeting_type,mode,zoom_link`,
       { headers: restHeaders },
     );
     const workshops = (await wResp.json().catch(() => [])) as any[];
@@ -124,26 +124,37 @@ Deno.serve(async (req) => {
       const rows = (await rResp.json().catch(() => [])) as any[];
       if (!Array.isArray(rows) || rows.length === 0) continue;
 
+      const isSK = w.meeting_type === "steuerungskreis";
+      const typeName = isSK ? "Steuerungskreis" : "Workshop";
+      const zeit = isSK ? "20:00–22:00 Uhr" : "10:00–16:00 Uhr";
+      const isZoom = isSK && w.mode === "zoom";
+
       const titles = (w.themen || "").split("\n").map((s: string) => s.trim()).filter(Boolean);
       const infos = (w.themen_info || "").split("\n").map((s: string) => s.trim());
       const themenLines = titles.length
         ? titles.map((t: string, i: number) => `  - ${t}${infos[i] ? ` (${infos[i]})` : ""}`).join("\n")
         : "  (keine)";
+      const onlineLines = isZoom
+        ? [`ACHTUNG: Dieser Steuerungskreis findet ONLINE per Zoom statt.`,
+           `Zoom-Link: ${w.zoom_link || "(wird noch bekannt gegeben)"}`, ``]
+        : [];
       const text = [
         `Hallo,`, ``,
-        `morgen findet ein Workshop statt, fuer den du eine Erinnerung aktiviert hast.`, ``,
+        `morgen findet ein ${typeName} statt, fuer den du eine Erinnerung aktiviert hast.`, ``,
+        ...onlineLines,
         `Datum:        ${fmtDateLong(w.date)}`,
+        `Uhrzeit:      ${zeit}`,
         `Moderator/in: ${w.moderator_name || "-"}`, ``,
         `Themen:`, themenLines, ``,
         `Agenda:`, `${w.agenda || "(keine)"}`, ``,
-        `Zum Workshop: ${appBase}/workshop/`,
+        `Zur Großgruppe: ${appBase}/grossgruppe/`,
       ].join("\n");
 
       for (const row of rows) {
         const email = await emailFor(row.user_id);
         if (!email) continue;
         try {
-          await sendMail(email, `Erinnerung: Workshop morgen (${fmtDateLong(w.date)})`, text);
+          await sendMail(email, `Erinnerung: ${typeName} morgen (${fmtDateLong(w.date)})`, text);
           await fetch(`${SUPABASE_URL}/rest/v1/workshop_reminders?id=eq.${row.id}`, {
             method: "PATCH", headers: restHeaders,
             body: JSON.stringify({ reminded_at: new Date().toISOString() }),

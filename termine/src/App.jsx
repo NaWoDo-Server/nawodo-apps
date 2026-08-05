@@ -259,15 +259,17 @@ function Hofteiler({ session }) {
   // User die Workshop-App auch wirklich nutzen darf (persoenlich nicht gesperrt und
   // App nicht global deaktiviert).
   const [canAccessWorkshop, setCanAccessWorkshop] = useState(true);
+  const [canAccessSaubermachtag, setCanAccessSaubermachtag] = useState(true);
   useEffect(() => {
     if (isSuperAdmin) return;
     Promise.all([
-      supabase.from("member_permissions").select("allowed").eq("user_id", user.id).eq("app_key", "workshop").maybeSingle(),
-      supabase.from("app_settings").select("value").eq("key", "app_enabled_workshop").maybeSingle(),
-    ]).then(([permRes, settingRes]) => {
-      const deniedPersonally = permRes.data?.allowed === false;
-      const globallyDisabled = settingRes.data?.value === false;
-      setCanAccessWorkshop(!deniedPersonally && !globallyDisabled);
+      supabase.from("member_permissions").select("allowed").eq("user_id", user.id).eq("app_key", "grossgruppe").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key", "app_enabled_grossgruppe").maybeSingle(),
+      supabase.from("member_permissions").select("allowed").eq("user_id", user.id).eq("app_key", "saubermachtag").maybeSingle(),
+      supabase.from("app_settings").select("value").eq("key", "app_enabled_saubermachtag").maybeSingle(),
+    ]).then(([permWs, settingWs, permSmt, settingSmt]) => {
+      setCanAccessWorkshop(!(permWs.data?.allowed === false) && !(settingWs.data?.value === false));
+      setCanAccessSaubermachtag(!(permSmt.data?.allowed === false) && !(settingSmt.data?.value === false));
     }).catch(() => {});
   }, [user.id, isSuperAdmin]);
 
@@ -899,6 +901,7 @@ function Hofteiler({ session }) {
                 colorFor={colorFor}
                 isManageable={isManageable}
                 canAccessWorkshop={canAccessWorkshop}
+                canAccessSaubermachtag={canAccessSaubermachtag}
                 onDelete={handleDelete}
                 onEdit={openEditBookingDialog}
                 onBook={(d) => openBookingDialog(d)}
@@ -1044,6 +1047,7 @@ function Hofteiler({ session }) {
             colorFor={colorFor}
             isManageable={isManageable}
             canAccessWorkshop={canAccessWorkshop}
+                canAccessSaubermachtag={canAccessSaubermachtag}
             onDelete={handleDelete}
             onEdit={openEditBookingDialog}
             onBook={(d) => openBookingDialog(d)}

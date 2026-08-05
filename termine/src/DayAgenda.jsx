@@ -8,7 +8,7 @@ import { weekdayLabel, bookingEndDate, bookingCoversDate, toMinutes, dayIndexInR
 // sich diese Komponente). Wird durch Einzelklick auf einen Tag angezeigt.
 export default function DayAgenda({
   date, bookings, resources, calendarResources, eventCategory, colorFor, onDelete, onEdit,
-  onBook, showBookButton, isManageable, canAccessWorkshop,
+  onBook, showBookButton, isManageable, canAccessWorkshop, canAccessSaubermachtag,
 }) {
   const dayBookings = bookings
     .filter((b) => bookingCoversDate(b, date) && calendarResources.some((r) => r.id === b.resource_id))
@@ -52,15 +52,29 @@ export default function DayAgenda({
                       </span>
                     )}
                     {isMultiDay && <span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: colorFor(res), color: "#fff" }}>{idx}/{totalDays}</span>}
+                    {b.online_note && (
+                      <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "#FBE4E4", color: "#C0271F", border: "1px solid #C0271F" }}>
+                        {b.online_note}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs mt-0.5 truncate" style={{ color: INK_SOFT }}>{b.name}{b.note ? ` · ${b.note}` : ""}</div>
-                  {b.workshop_id && canAccessWorkshop && (
+                  {isEvent && b.workshop_id && canAccessWorkshop && (
                     <a
-                      href={`/workshop/?open=${b.workshop_id}`}
+                      href={`/grossgruppe/?open=${b.workshop_id}`}
                       className="inline-block mt-1.5 text-xs font-semibold px-2 py-1 rounded-full"
                       style={{ border: "1.5px solid #D8D5C7", color: INK }}
                     >
-                      Zum Workshop →
+                      Zur Großgruppe →
+                    </a>
+                  )}
+                  {isEvent && b.saubermachtag_id && canAccessSaubermachtag && (
+                    <a
+                      href={`/saubermachtag/?open=${b.saubermachtag_id}`}
+                      className="inline-block mt-1.5 text-xs font-semibold px-2 py-1 rounded-full"
+                      style={{ border: "1.5px solid #D8D5C7", color: INK }}
+                    >
+                      Zur Saubermachtag-App →
                     </a>
                   )}
                 </div>

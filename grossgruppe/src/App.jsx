@@ -472,6 +472,8 @@ function WorkshopApp({ session }) {
         name: moderatorName || typeName,
         title: t.label === "GMR" ? `${title} (GMR)` : title,
         note: null,
+        // Online-Hinweis nur am sichtbaren Termin eines Zoom-Steuerungskreises (rot im Kalender).
+        online_note: (isSK && mode === "zoom" && t.label === "Termin") ? "Online (Zoom)" : null,
         user_id: user.id,
         workshop_id: workshopId,
       };

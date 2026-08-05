@@ -268,6 +268,19 @@ function SaubermachtagApp({ session }) {
     return { upcomingEvents: upcoming, archivedEvents: past };
   }, [events]);
 
+  // Deep-Link vom Termine-Kalender aus (/saubermachtag/?open=<id>): passenden Termin oeffnen.
+  const [openId, setOpenId] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("open"); } catch (e) { return null; }
+  });
+  useEffect(() => {
+    if (!openId || !events.length) return;
+    setTab("tage");
+    if (archivedEvents.some((e) => e.id === openId)) {
+      setShowArchive(true);
+      setExpandedArchiveId(openId);
+    }
+  }, [openId, events.length]);
+
   const tasksFor = (eventId) => tasks.filter((t) => t.event_id === eventId);
   const signupsFor = (taskId) => signups.filter((s) => s.task_id === taskId);
   const foodFor = (eventId) => food.filter((f) => f.event_id === eventId);
@@ -705,7 +718,7 @@ function SaubermachtagApp({ session }) {
                     <EventCard
                       key={ev.id}
                       ev={ev}
-                      defaultExpanded={idx === 0}
+                      defaultExpanded={idx === 0 || ev.id === openId}
                       highlighted={idx === 0}
                       tasks={tasksFor(ev.id)}
                       signupsFor={signupsFor}

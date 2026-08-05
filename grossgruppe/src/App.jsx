@@ -706,15 +706,13 @@ function WorkshopApp({ session }) {
             >
               <Plus size={14} /> Neues Meeting
             </button>
-            {archivedWorkshops.length > 0 && (
-              <button
-                onClick={() => setShowArchive((v) => !v)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
-                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
-              >
-                <Archive size={12} /> {showArchive ? "Archiv ausblenden" : `Archiv anzeigen (${archivedWorkshops.length})`}
-              </button>
-            )}
+            <button
+              onClick={() => setShowArchive((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+              style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+            >
+              <Archive size={12} /> {showArchive ? "Archiv ausblenden" : `Archiv (${archivedWorkshops.length})`}
+            </button>
           </div>
         </div>
 
@@ -753,9 +751,11 @@ function WorkshopApp({ session }) {
           </div>
         )}
 
-        {archivedWorkshops.length > 0 && (
+        {showArchive && (
           <div>
-            {showArchive && (
+            {archivedWorkshops.length === 0 ? (
+              <p className="text-xs" style={{ color: INK_SOFT }}>Keine vergangenen Meetings.</p>
+            ) : (
               <div className="flex flex-col gap-2">
                 {archivedWorkshops.map((w) => {
                   const isExpanded = expandedArchiveId === w.id;

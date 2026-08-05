@@ -726,6 +726,16 @@
               <span class="label">Schadenmelder</span>
             </a>
 
+            <a class="app" href="/saubermachtag/" data-app="saubermachtag">
+              <div class="icon" style="background:#E4A11B;">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:56%;height:56%;">
+                  <path d="M12 2.5l1.7 4.6 4.6 1.7-4.6 1.7L12 15.1l-1.7-4.6L5.7 8.8l4.6-1.7z" fill="#fff"/>
+                  <path d="M18.5 14l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" fill="#fff"/>
+                </svg>
+              </div>
+              <span class="label">Saubermachtag</span>
+            </a>
+
             <a class="app hidden" href="/settings/" data-app="settings" id="settingsTile">
               <div class="icon" style="background:#000000;">
                 <img src="/icon-settings.png" alt="" />
@@ -896,7 +906,7 @@
         }).catch(function () {});
       }
 
-      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "grossgruppe", "bulldozer", "vorsorge", "schadenmelder"];
+      var STANDARD_APP_KEYS = ["sharing", "termine", "fahrtenbuch", "faq", "pinnwand", "mitglieder", "grossgruppe", "bulldozer", "vorsorge", "schadenmelder", "saubermachtag"];
 
       function applyGlobalAppEnabled(client, session) {
         // Suite-weiter Ein/Aus-Schalter aus der Settings-App (app_settings.app_enabled_<key>).

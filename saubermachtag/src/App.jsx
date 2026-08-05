@@ -205,6 +205,8 @@ function SaubermachtagApp({ session }) {
   // --- Inspektions-Formular ---
   const [showInspForm, setShowInspForm] = useState(false);
   const [editingInsp, setEditingInsp] = useState(null);
+  const [inspMode, setInspMode] = useState("new"); // "new" | "edit" | "note"
+  const [inspDate, setInspDate] = useState("");
   const [inspBereich, setInspBereich] = useState("");
   const [inspBeschreibung, setInspBeschreibung] = useState("");
   const [inspStand, setInspStand] = useState("");
@@ -532,7 +534,9 @@ function SaubermachtagApp({ session }) {
 
   // --- Inspektionsliste ---
   function openNewInsp() {
+    setInspMode("new");
     setEditingInsp(null);
+    setInspDate(todayStr());
     setInspBereich("");
     setInspBeschreibung("");
     setInspStand("");
@@ -540,6 +544,7 @@ function SaubermachtagApp({ session }) {
     setShowInspForm(true);
   }
   function openEditInsp(row) {
+    setInspMode("edit");
     setEditingInsp(row);
     setInspBereich(row.bereich || "");
     setInspBeschreibung(row.beschreibung || "");
@@ -547,22 +552,49 @@ function SaubermachtagApp({ session }) {
     setInspError("");
     setShowInspForm(true);
   }
+  function openAddNote(row) {
+    setInspMode("note");
+    setEditingInsp(row);
+    setInspDate(todayStr());
+    setInspBeschreibung("");
+    setInspError("");
+    setShowInspForm(true);
+  }
+  function fmtInspDate(iso) {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
+  }
   async function handleSaveInsp() {
     setInspError("");
     setInspSaving(true);
     try {
-      const payload = {
-        bereich: inspBereich.trim() || null,
-        beschreibung: inspBeschreibung.trim() || null,
-        stand: inspStand.trim() || null,
-        updated_at: new Date().toISOString(),
-      };
-      if (editingInsp) {
-        const { error } = await supabase.from("smt_inspection").update(payload).eq("id", editingInsp.id);
+      if (inspMode === "note") {
+        const text = inspBeschreibung.trim();
+        if (!text) { setInspError("Bitte eine Beschreibung eingeben."); setInspSaving(false); return; }
+        const line = `${fmtInspDate(inspDate)}: ${text}`;
+        const combined = editingInsp?.beschreibung ? `${editingInsp.beschreibung}\n${line}` : line;
+        const { error } = await supabase.from("smt_inspection").update({ beschreibung: combined, updated_at: new Date().toISOString() }).eq("id", editingInsp.id);
+        if (error) throw error;
+      } else if (inspMode === "edit") {
+        const { error } = await supabase.from("smt_inspection").update({
+          bereich: inspBereich.trim() || null,
+          beschreibung: inspBeschreibung.trim() || null,
+          stand: inspStand.trim() || null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", editingInsp.id);
         if (error) throw error;
       } else {
+        const text = inspBeschreibung.trim();
+        const beschreibung = text ? `${fmtInspDate(inspDate)}: ${text}` : null;
         const maxSort = inspection.reduce((m, r) => Math.max(m, r.sort_order || 0), 0);
-        const { error } = await supabase.from("smt_inspection").insert({ ...payload, sort_order: maxSort + 1 });
+        const { error } = await supabase.from("smt_inspection").insert({
+          bereich: inspBereich.trim() || null,
+          beschreibung,
+          stand: inspStand.trim() || null,
+          sort_order: maxSort + 1,
+          updated_at: new Date().toISOString(),
+        });
         if (error) throw error;
       }
       setShowInspForm(false);
@@ -811,6 +843,7 @@ function SaubermachtagApp({ session }) {
             onSearch={setInspSearch}
             onNew={openNewInsp}
             onEdit={openEditInsp}
+            onAddNote={openAddNote}
             onDelete={handleDeleteInsp}
             onUploadPhotos={handleUploadInspPhotos}
             onDeletePhoto={handleDeleteInspPhoto}
@@ -873,21 +906,47 @@ function SaubermachtagApp({ session }) {
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: "rgba(0,0,0,0.4)", height: "100dvh" }} onMouseDown={(e) => { e.currentTarget.dataset.selfDown = e.target === e.currentTarget ? "1" : ""; }} onClick={(e) => { if (e.target === e.currentTarget && e.currentTarget.dataset.selfDown === "1") setShowInspForm(false); }}>
           <div className="w-full max-w-lg rounded-2xl p-6 max-h-[85dvh] overflow-y-auto" style={{ backgroundColor: PAPER }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">{editingInsp ? "Eintrag bearbeiten" : "Eintrag hinzufügen"}</h2>
+              <h2 className="font-bold text-lg">{inspMode === "note" ? "Beschreibung hinzufügen" : inspMode === "edit" ? "Eintrag bearbeiten" : "Eintrag hinzufügen"}</h2>
               <button onClick={() => setShowInspForm(false)}><X size={20} /></button>
             </div>
 
-            <label className="text-xs font-medium block mb-1">Bereich</label>
-            <input value={inspBereich} onChange={(e) => setInspBereich(e.target.value)} placeholder="z.B. Keller" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            {inspMode === "note" && editingInsp?.beschreibung && (
+              <div className="rounded-lg p-2.5 mb-3 text-xs whitespace-pre-line" style={{ backgroundColor: "#E9E6D9", color: INK_SOFT, maxHeight: "8rem", overflowY: "auto" }}>{editingInsp.beschreibung}</div>
+            )}
+
+            {inspMode === "edit" && (
+              <>
+                <label className="text-xs font-medium block mb-1">Bereich</label>
+                <input value={inspBereich} onChange={(e) => setInspBereich(e.target.value)} placeholder="z.B. Keller" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </>
+            )}
+
+            {inspMode === "new" && (
+              <>
+                <label className="text-xs font-medium block mb-1">Bereich</label>
+                <input value={inspBereich} onChange={(e) => setInspBereich(e.target.value)} placeholder="z.B. Keller" className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </>
+            )}
+
+            {inspMode !== "edit" && (
+              <>
+                <label className="text-xs font-medium block mb-1">Datum</label>
+                <input type="date" value={inspDate} onChange={(e) => setInspDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </>
+            )}
 
             <label className="text-xs font-medium block mb-1">Beschreibung</label>
-            <textarea value={inspBeschreibung} onChange={(e) => setInspBeschreibung(e.target.value)} rows={4} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            <textarea value={inspBeschreibung} onChange={(e) => setInspBeschreibung(e.target.value)} rows={4} placeholder={inspMode === "note" ? "Neue Beobachtung / Stand…" : ""} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
 
-            <label className="text-xs font-medium block mb-1">Stand / Maßnahme</label>
-            <textarea value={inspStand} onChange={(e) => setInspStand(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+            {inspMode !== "note" && (
+              <>
+                <label className="text-xs font-medium block mb-1">Stand / Maßnahme</label>
+                <textarea value={inspStand} onChange={(e) => setInspStand(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2.5 mb-3 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+              </>
+            )}
 
             {inspError && <div className="flex items-start gap-2 text-sm mb-3 px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {inspError}</div>}
-            {!editingInsp && <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Fotos kannst du nach dem Speichern am Eintrag hinzufügen.</p>}
+            {inspMode === "new" && <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Fotos kannst du nach dem Speichern am Eintrag hinzufügen.</p>}
 
             <button onClick={handleSaveInsp} disabled={inspSaving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: BLUE, opacity: inspSaving ? 0.7 : 1 }}>
               {inspSaving && <Loader2 size={15} className="animate-spin" />} {inspSaving ? "Speichern…" : "Speichern"}
@@ -1203,7 +1262,7 @@ function OverviewTab({ templates, tasks, events, year }) {
 }
 
 // =====================================================================
-function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, onEdit, onDelete, onUploadPhotos, onDeletePhoto, onOpenPhoto }) {
+function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, onEdit, onAddNote, onDelete, onUploadPhotos, onDeletePhoto, onOpenPhoto }) {
   return (
     <div>
       <div className="rounded-xl p-3 mb-3 flex items-start gap-2" style={{ backgroundColor: `${BLUE}14`, border: `1px solid ${BLUE}22` }}>
@@ -1249,11 +1308,17 @@ function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, on
                 </div>
                 {canManage && (
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => onEdit(row)}><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
-                    <button onClick={() => onDelete(row)}><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
+                    <button onClick={() => onEdit(row)} title="Ganzen Eintrag bearbeiten"><Pencil size={14} style={{ color: "#B8B4A2" }} /></button>
+                    <button onClick={() => onDelete(row)} title="Eintrag löschen"><Trash2 size={14} style={{ color: "#B8B4A2" }} /></button>
                   </div>
                 )}
               </div>
+
+              {canManage && (
+                <button onClick={() => onAddNote(row)} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style={{ border: `1.5px solid ${BLUE}`, color: BLUE }}>
+                  <Plus size={13} /> Beschreibung hinzufügen
+                </button>
+              )}
 
               {photos.length > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">

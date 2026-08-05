@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronRight, Check, Archive, Download, Search, Camera, ClipboardList,
 } from "lucide-react";
 import { supabase, configMissing, BUCKET } from "./supabaseClient";
+import * as XLSX from "xlsx";
 
 const APP_KEY = "saubermachtag";
 
@@ -506,30 +507,26 @@ function SaubermachtagApp({ session }) {
 
   function downloadExcel(ev) {
     const evTasks = tasksFor(ev.id).slice().sort((a, b) => (a.sort_order - b.sort_order) || a.title.localeCompare(b.title));
-    const rows = evTasks.map((t) => {
-      const helpers = signupsFor(t.id).map((s) => s.user_name).filter(Boolean).join(", ");
-      return `<tr><td>${esc(t.bereich)}</td><td>${esc(t.title)}</td><td>${esc(helpers)}</td><td>${t.done ? "Ja" : "Nein"}</td></tr>`;
-    }).join("");
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>` +
-      `<table border="1">` +
-      `<tr><td><b>Saubermachtag</b></td><td>${esc(fmtDateLong(ev.event_date))}</td></tr>` +
-      `<tr><td>Uhrzeit</td><td>${esc(ev.start_time || "")} - ${esc(ev.end_time || "")} Uhr</td></tr>` +
-      `<tr><td>Hauptverantwortlich</td><td>${esc(ev.creator_name || "")}</td></tr>` +
-      `<tr><td>Es kocht</td><td>${esc(ev.cook_name || "")}</td></tr>` +
-      `<tr><td>Es gibt</td><td>${esc(ev.cook_dish || "")}</td></tr>` +
-      `<tr><td></td><td></td></tr>` +
-      `<tr><th>Bereich</th><th>Aufgabe</th><th>Eingetragene Helfer</th><th>Fertig</th></tr>` +
-      rows +
-      `</table></body></html>`;
-    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Saubermachtag_${ev.event_date}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const aoa = [
+      ["Saubermachtag", fmtDateLong(ev.event_date)],
+      ["Uhrzeit", `${ev.start_time || ""} - ${ev.end_time || ""} Uhr`],
+      ["Hauptverantwortlich", ev.creator_name || ""],
+      ["Es kocht", ev.cook_name || ""],
+      ["Es gibt", ev.cook_dish || ""],
+      [],
+      ["Bereich", "Aufgabe", "Eingetragene Helfer", "Fertig"],
+      ...evTasks.map((t) => [
+        t.bereich || "",
+        t.title || "",
+        signupsFor(t.id).map((s) => s.user_name).filter(Boolean).join(", "),
+        t.done ? "Ja" : "Nein",
+      ]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 20 }, { wch: 48 }, { wch: 30 }, { wch: 8 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Saubermachtag");
+    XLSX.writeFile(wb, `Saubermachtag_${ev.event_date}.xlsx`);
   }
 
   // --- Inspektionsliste ---

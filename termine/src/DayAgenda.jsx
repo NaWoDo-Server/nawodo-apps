@@ -74,7 +74,7 @@ export default function DayAgenda({
                       className="inline-block mt-1.5 text-xs font-semibold px-2 py-1 rounded-full"
                       style={{ border: "1.5px solid #D8D5C7", color: INK }}
                     >
-                      Zur Saubermachtag-App →
+                      Zum Saubermachtag →
                     </a>
                   )}
                 </div>

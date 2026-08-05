@@ -1047,7 +1047,7 @@ function Hofteiler({ session }) {
             onDelete={handleDelete}
             onEdit={openEditBookingDialog}
             onBook={(d) => openBookingDialog(d)}
-            showBookButton={true}
+            showBookButton={false}
           />
         </div>
       </>}

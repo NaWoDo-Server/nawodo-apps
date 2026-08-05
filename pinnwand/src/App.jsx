@@ -660,7 +660,7 @@ function PinnwandApp({ session }) {
 
         <div className="flex items-start gap-3 px-4">
           {/* Icon-Leiste links: fungiert als Filter, oben die Gesamtübersicht */}
-          <div className="flex flex-col items-center gap-2.5 flex-shrink-0 pt-1 sticky overflow-y-auto" style={{ top: "5.75rem", maxHeight: "calc(100vh - 6.25rem)" }}>
+          <div className="flex flex-col items-center gap-2.5 flex-shrink-0 pt-1 sticky overflow-y-auto top-[7rem] lg:top-[9.25rem]" style={{ maxHeight: "calc(100vh - 7.5rem)" }}>
             <button
               onClick={() => setActiveFilter(null)}
               title="Gesamtübersicht"
@@ -684,7 +684,7 @@ function PinnwandApp({ session }) {
 
           {/* Beiträge */}
           <div className="flex-1 min-w-0">
-            <div className="sticky z-20 pb-2" style={{ top: "5.75rem", backgroundColor: PAPER }}>
+            <div className="sticky z-20 pb-2 top-[7rem] lg:top-[9.25rem]" style={{ backgroundColor: PAPER }}>
             <div className="mb-3">
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />

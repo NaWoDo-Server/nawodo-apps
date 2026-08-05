@@ -571,7 +571,7 @@ function TicketCard({ t, photoCount, commentCount, onOpen }) {
     <button
       onClick={onOpen}
       className="w-full text-left rounded-xl p-3.5 sm:p-4 flex items-start gap-3"
-      style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `4px solid ${meta.color}` }}
+      style={{ backgroundColor: `${meta.color}14`, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `4px solid ${meta.color}` }}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -749,7 +749,7 @@ function TicketDetail({
       </div>
 
       {/* Status-Stepper */}
-      <div className="rounded-xl p-3.5 mb-3" style={{ backgroundColor: "#fff", border: `1px solid ${BORDER_SOFT}` }}>
+      <div className="rounded-xl p-3.5 mb-3" style={{ backgroundColor: `${(STATUS_META[ticket.status] || STATUS_META.gemeldet).color}14`, border: `1px solid ${BORDER_SOFT}` }}>
         <StatusStepper status={ticket.status} />
       </div>
 

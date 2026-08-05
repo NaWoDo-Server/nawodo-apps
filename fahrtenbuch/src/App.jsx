@@ -680,8 +680,17 @@ function Fahrtenbuch({ session }) {
                 </div>
               )}
 
+            </div>
+          )}
+        </div>
+
+        {!isDesktop && (
+          cars.length === 0 && !isElevated ? (
+            <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
+          ) : (
+            <>
               {pendingBookings.length > 0 && (
-                <div className="px-5 mb-4">
+                <div className="px-5 mb-4 pt-2">
                   <div className="text-xs font-semibold mb-2" style={{ color: "#C9752F" }}>Ausstehende Buchungen – noch nicht im Fahrtenbuch</div>
                   <div className="space-y-2">
                     {pendingBookings.map((b) => (
@@ -696,16 +705,8 @@ function Fahrtenbuch({ session }) {
                   </div>
                 </div>
               )}
-            </div>
-          )}
-        </div>
 
-        {!isDesktop && (
-          cars.length === 0 && !isElevated ? (
-            <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
-          ) : (
-            <>
-              <div className="px-5 space-y-2 pt-2">
+              <div className="px-5 space-y-2">
                 {carEntries.length === 0 && (
                   <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>
                 )}
@@ -796,6 +797,7 @@ function Fahrtenbuch({ session }) {
                     <button onClick={openForm} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: BLUE }}><Plus size={14} /> Eintrag</button>
                   </div>
                 )}
+                </div>
 
                 {pendingBookings.length > 0 && (
                   <div className="mb-5">
@@ -813,7 +815,6 @@ function Fahrtenbuch({ session }) {
                     </div>
                   </div>
                 )}
-                </div>
 
                 {carEntries.length === 0 ? (
                   <div className="text-center py-14 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>

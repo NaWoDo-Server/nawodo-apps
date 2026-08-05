@@ -471,7 +471,7 @@ function WorkshopApp({ session }) {
         end_time: endTime,
         name: moderatorName || typeName,
         title: t.label === "GMR" ? `${title} (GMR)` : title,
-        note: agenda || null,
+        note: null,
         user_id: user.id,
         workshop_id: workshopId,
       };
@@ -698,7 +698,7 @@ function WorkshopApp({ session }) {
             <img src="/grossgruppe/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Großgruppe</h1>
           </a>
-          <div className="mt-3">
+          <div className="mt-3 flex items-center justify-between gap-2">
             <button
               onClick={openNewForm}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white"
@@ -706,6 +706,15 @@ function WorkshopApp({ session }) {
             >
               <Plus size={14} /> Neues Meeting
             </button>
+            {archivedWorkshops.length > 0 && (
+              <button
+                onClick={() => setShowArchive((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
+              >
+                <Archive size={12} /> {showArchive ? "Archiv ausblenden" : `Archiv anzeigen (${archivedWorkshops.length})`}
+              </button>
+            )}
           </div>
         </div>
 
@@ -746,13 +755,6 @@ function WorkshopApp({ session }) {
 
         {archivedWorkshops.length > 0 && (
           <div>
-            <button
-              onClick={() => setShowArchive((v) => !v)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-3"
-              style={{ border: `1.5px solid ${BORDER_SOFT}`, color: INK_SOFT }}
-            >
-              <Archive size={12} /> {showArchive ? "Archiv ausblenden" : `Archiv anzeigen (${archivedWorkshops.length})`}
-            </button>
             {showArchive && (
               <div className="flex flex-col gap-2">
                 {archivedWorkshops.map((w) => {
@@ -782,7 +784,7 @@ function WorkshopApp({ session }) {
                         <button
                           onClick={() => setExpandedArchiveId(w.id)}
                           className="w-full text-left rounded-xl p-3.5 flex items-center justify-between"
-                          style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `3px solid ${typeColor(w.meeting_type)}` }}
+                          style={{ backgroundColor: `${typeColor(w.meeting_type)}14`, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", borderLeft: `3px solid ${typeColor(w.meeting_type)}` }}
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -1138,6 +1140,7 @@ function WorkshopCard({
   onCollapse, onEdit, onDelete, onDeleteAttachment, onAddFood, onDeleteFood, onSetAttendance, onToggleReminder,
 }) {
   const [newFoodText, setNewFoodText] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const isSK = w.meeting_type === "steuerungskreis";
   const accent = typeColor(w.meeting_type);
   const yesCount = attendanceList.filter((a) => a.attending).length;
@@ -1145,7 +1148,7 @@ function WorkshopCard({
   const yesNames = attendanceList.filter((a) => a.attending).map((a) => a.user_name);
 
   return (
-    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: "#fff", boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}55` : `1px solid ${accent}22`, borderLeft: `4px solid ${accent}` }}>
+    <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: `${accent}14`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}55` : `1px solid ${accent}22`, borderLeft: `4px solid ${accent}` }}>
       <div className="flex items-start justify-between mb-2">
         <div>
           <div className="mb-1">
@@ -1174,6 +1177,17 @@ function WorkshopCard({
       </div>
 
       <ThemenList themen={w.themen} themenInfo={w.themen_info} />
+
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="mt-1 flex items-center gap-1 text-xs font-semibold"
+        style={{ color: accent }}
+      >
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {expanded ? "Weniger anzeigen" : "Mehr anzeigen"}
+      </button>
+
+      {expanded && (
+      <>
       <AgendaList agenda={w.agenda} agendaTimes={w.agenda_times} />
 
       {attachmentsList.length > 0 && (
@@ -1272,6 +1286,8 @@ function WorkshopCard({
           <span style={{ color: INK_SOFT }}>E-Mail-Erinnerung 1 Tag vorher</span>
         </label>
       </div>
+      </>
+      )}
     </div>
   );
 }

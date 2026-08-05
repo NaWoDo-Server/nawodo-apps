@@ -1034,7 +1034,9 @@ function VorsorgeApp({ session }) {
   return (
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
-        <div className="mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
+        {/* Header + Filter-Tabs bleiben zusammen oben fixiert; nur die Dokumente darunter scrollen. */}
+        <div className="sticky top-0 z-30 pb-3" style={{ backgroundColor: PAPER }}>
+          <div className="mb-4 pb-2">
           <div className="flex items-center justify-end gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
@@ -1059,6 +1061,7 @@ function VorsorgeApp({ session }) {
           {isSuperAdmin && (
             <button onClick={() => setActiveTab("alle")} className="px-4 py-2 rounded-full text-sm font-semibold" style={activeTab === "alle" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}>Alle Mitglieder</button>
           )}
+          </div>
         </div>
 
         {activeTab === "meine" && (

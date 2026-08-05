@@ -698,16 +698,15 @@ function WorkshopApp({ session }) {
             <img src="/grossgruppe/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
             <h1 className="font-bold text-lg lg:text-2xl">Großgruppe</h1>
           </a>
-        </div>
-
-        <div className="mb-4">
-          <button
-            onClick={openNewForm}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white"
-            style={{ backgroundColor: "#6C63A6" }}
-          >
-            <Plus size={14} /> Neues Meeting
-          </button>
+          <div className="mt-3">
+            <button
+              onClick={openNewForm}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white"
+              style={{ backgroundColor: "#6C63A6" }}
+            >
+              <Plus size={14} /> Neues Meeting
+            </button>
+          </div>
         </div>
 
         {upcomingWorkshops.length === 0 && (

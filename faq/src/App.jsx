@@ -481,7 +481,9 @@ function FaqApp({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="sm:max-w-2xl mx-auto lg:max-w-none lg:w-2/3">
-        <div className="px-5 pt-6 pb-3 sticky top-0 z-30" style={{ backgroundColor: PAPER }}>
+        {/* Header + Suche bleiben zusammen oben fixiert; nur die Fragen darunter scrollen. */}
+        <div className="sticky top-0 z-30" style={{ backgroundColor: PAPER }}>
+        <div className="px-5 pt-6 pb-3">
           <div className="flex items-center justify-end gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
             <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
@@ -493,7 +495,7 @@ function FaqApp({ session }) {
           </a>
         </div>
 
-        <div className="px-5 mb-4 sticky z-20 pb-1" style={{ top: "5.75rem", backgroundColor: PAPER }}>
+        <div className="px-5 pb-3">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
             <input
@@ -504,6 +506,7 @@ function FaqApp({ session }) {
               style={{ borderColor: "#D8D5C7", backgroundColor: "#fff" }}
             />
           </div>
+        </div>
         </div>
 
         {SECTIONS.filter((sec) => faqTabEnabled[sec.key] !== false && (sec.key !== "projekt" || projektVisible)).map((sec) => {

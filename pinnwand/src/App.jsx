@@ -684,6 +684,7 @@ function PinnwandApp({ session }) {
 
           {/* Beiträge */}
           <div className="flex-1 min-w-0">
+            <div className="sticky z-20 pb-2" style={{ top: "5.75rem", backgroundColor: PAPER }}>
             <div className="mb-3">
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
@@ -712,6 +713,7 @@ function PinnwandApp({ session }) {
               >
                 <Archive size={12} /> Archiv
               </button>
+            </div>
             </div>
 
             <div className="flex flex-col gap-3">

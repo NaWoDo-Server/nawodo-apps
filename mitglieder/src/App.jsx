@@ -775,7 +775,7 @@ function MitgliederApp({ session }) {
           {/* Navigation links: Gruppen als Filter, oben "Alle Mitglieder". Auf Mobil ein
               einschiebbares Seitenmenü, auf Desktop immer sichtbar. */}
           <div
-            className={`flex flex-col gap-1 flex-shrink-0 w-64 sm:w-48 sm:sticky sm:top-[4.5rem] lg:top-[5.75rem] max-h-[calc(100vh-5rem)] lg:max-h-[calc(100vh-6.25rem)] overflow-y-auto pb-4 fixed sm:static inset-y-0 left-0 z-50 sm:z-auto p-4 sm:p-0 transition-transform duration-200 ${showMobileNav ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0`}
+            className={`flex flex-col gap-1 flex-shrink-0 w-64 sm:w-48 sm:sticky sm:top-[7rem] lg:top-[9.25rem] max-h-[calc(100vh-7rem)] lg:max-h-[calc(100vh-9.25rem)] overflow-y-auto pb-4 fixed sm:static inset-y-0 left-0 z-50 sm:z-auto p-4 sm:p-0 transition-transform duration-200 ${showMobileNav ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0`}
             style={{ backgroundColor: PAPER }}
           >
             <button
@@ -815,7 +815,9 @@ function MitgliederApp({ session }) {
 
           {/* Mitgliederliste */}
           <div className="flex-1 min-w-0">
-            <div className="mb-3 sticky z-20 pb-1 top-[4.5rem] lg:top-[5.75rem]" style={{ backgroundColor: PAPER }}>
+            {/* Suche + Typ-Filter bleiben zusammen direkt unter dem (zweizeiligen) Header fixiert; nur die Liste scrollt. */}
+            <div className="sticky z-20 top-[7rem] lg:top-[9.25rem]" style={{ backgroundColor: PAPER }}>
+            <div className="mb-3 pb-1">
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: INK_SOFT }} />
                 <input
@@ -828,7 +830,7 @@ function MitgliederApp({ session }) {
               </div>
             </div>
 
-            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap sticky z-20 top-[7.25rem] lg:top-[8.5rem]" style={{ backgroundColor: "#E4E1D3" }}>
+            <div className="mb-3 flex items-center gap-1 p-1 rounded-full w-fit flex-wrap" style={{ backgroundColor: "#E4E1D3" }}>
               {[
                 ...(isElevatedForMitglieder || canFilterGenossenschaft ? [["mitglieder", "Genossenschaftsmitglieder"]] : []),
                 ...(isElevatedForMitglieder || canFilterGast ? [["gast", "Gäste"]] : []),
@@ -845,6 +847,7 @@ function MitgliederApp({ session }) {
                   {label}
                 </button>
               ))}
+            </div>
             </div>
 
             {activeBereich && (

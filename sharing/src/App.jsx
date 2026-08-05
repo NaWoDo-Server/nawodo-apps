@@ -776,6 +776,11 @@ function Hofteiler({ session }) {
           <img src="/sharing/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
           <h1 className="font-bold text-lg lg:text-2xl">Sharing</h1>
         </a>
+        {!isDesktop && (
+          <div className="mt-3">
+            <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#D6A428" }}><Plus size={14} /> Buchen</button>
+          </div>
+        )}
       </div>
 
       {!isDesktop && (
@@ -812,9 +817,6 @@ function Hofteiler({ session }) {
         />
       </div>
 
-      <div className="px-5 mt-1 mb-3">
-        <button onClick={() => openBookingDialog(selectedDate)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: "#D6A428" }}><Plus size={14} /> Buchen</button>
-      </div>
       </>
       )}
 

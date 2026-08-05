@@ -633,23 +633,21 @@ function Fahrtenbuch({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className={isDesktop ? "lg:w-2/3 mx-auto" : "sm:max-w-2xl mx-auto sm:border-x"} style={{ borderColor: "#E4E1D3" }}>
-        <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6 sticky top-0 z-30" : "px-5 pt-6 pb-3 sticky top-0 z-30"} style={{ backgroundColor: PAPER }}>
-          <div className="flex items-center justify-end gap-2">
-            <span className={isDesktop ? "text-sm font-bold truncate max-w-[180px]" : "text-xs font-bold truncate max-w-[110px]"} style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg text-white flex-shrink-0 overflow-hidden" : "w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden"} style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
-            <a href="/" className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"} style={{ backgroundColor: "#E4E1D3" }}><Home size={isDesktop ? 24 : 16} style={{ color: INK_SOFT }} /></a>
+        <div className="sticky top-0 z-30" style={{ backgroundColor: PAPER }}>
+          <div className={isDesktop ? "max-w-6xl mx-auto px-8 pt-10 pb-6" : "px-5 pt-6 pb-3"}>
+            <div className="flex items-center justify-end gap-2">
+              <span className={isDesktop ? "text-sm font-bold truncate max-w-[180px]" : "text-xs font-bold truncate max-w-[110px]"} style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
+              <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center font-semibold text-lg text-white flex-shrink-0 overflow-hidden" : "w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0 overflow-hidden"} style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
+              <a href="/" className={isDesktop ? "w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" : "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"} style={{ backgroundColor: "#E4E1D3" }}><Home size={isDesktop ? 24 : 16} style={{ color: INK_SOFT }} /></a>
+            </div>
+            <a href="/" className="flex items-center gap-2.5 mt-2">
+              <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-12 object-contain" : "h-8 object-contain"} />
+              <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>
+            </a>
           </div>
-          <a href="/" className="flex items-center gap-2.5 mt-2">
-            <img src="/fahrtenbuch/logo-nawodo.png" alt="NaWoDo" className={isDesktop ? "h-12 object-contain" : "h-8 object-contain"} />
-            <h1 className={isDesktop ? "font-bold text-2xl" : "font-bold text-lg"}>Fahrtenbuch</h1>
-          </a>
-        </div>
 
-        {!isDesktop && (
-          cars.length === 0 && !isElevated ? (
-            <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
-          ) : (
-            <>
+          {!isDesktop && !(cars.length === 0 && !isElevated) && (
+            <div className="pb-2">
               <div className="px-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
                 {cars.map((c) => {
                   const active = c.id === selectedCarId;
@@ -698,8 +696,16 @@ function Fahrtenbuch({ session }) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+        </div>
 
-              <div className="px-5 space-y-2">
+        {!isDesktop && (
+          cars.length === 0 && !isElevated ? (
+            <p className="px-5 text-sm" style={{ color: INK_SOFT }}>Noch keine Autos vorhanden.</p>
+          ) : (
+            <>
+              <div className="px-5 space-y-2 pt-2">
                 {carEntries.length === 0 && (
                   <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>
                 )}
@@ -779,6 +785,7 @@ function Fahrtenbuch({ session }) {
               </div>
 
               <div className="flex-1 min-w-0">
+                <div className="sticky z-20 pb-2" style={{ top: "8rem", backgroundColor: PAPER }}>
                 <div className="mb-3">
                   <button onClick={() => openPicker("view")} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-full" style={{ backgroundColor: isCurrentMonthRange ? "#E4E1D3" : INK, color: isCurrentMonthRange ? INK_SOFT : "#fff" }}>
                     <Calendar size={12} /> {rangeLabel}
@@ -806,6 +813,7 @@ function Fahrtenbuch({ session }) {
                     </div>
                   </div>
                 )}
+                </div>
 
                 {carEntries.length === 0 ? (
                   <div className="text-center py-14 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}><p className="text-sm" style={{ color: INK_SOFT }}>Keine Fahrten in diesem Zeitraum.</p></div>

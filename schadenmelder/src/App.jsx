@@ -176,6 +176,40 @@ function SchadenApp({ session }) {
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
+  // --- Ziel-Postfach für neue Meldungen (nur Superadmin) ---
+  const [notifyTo, setNotifyTo] = useState("");
+  const [savingNotifyTo, setSavingNotifyTo] = useState(false);
+  const [notifyToSaved, setNotifyToSaved] = useState(false);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    supabase
+      .from("mail_settings")
+      .select("schaden_notify_to")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => setNotifyTo(data?.schaden_notify_to || ""))
+      .catch(() => {});
+  }, [isSuperAdmin]);
+
+  async function saveNotifyTo() {
+    setSavingNotifyTo(true);
+    setNotifyToSaved(false);
+    try {
+      const { error } = await supabase
+        .from("mail_settings")
+        .update({ schaden_notify_to: notifyTo.trim() || null, updated_at: new Date().toISOString() })
+        .eq("id", 1);
+      if (error) throw error;
+      setNotifyToSaved(true);
+      setTimeout(() => setNotifyToSaved(false), 3000);
+    } catch (e) {
+      alert(e.message || "Konnte nicht gespeichert werden.");
+    } finally {
+      setSavingNotifyTo(false);
+    }
+  }
+
   // --- Konto / Profil (einheitlich wie in den anderen Apps) ---
   const [ownMemberId, setOwnMemberId] = useState(null);
   const [ownFotoUrl, setOwnFotoUrl] = useState(null);
@@ -349,6 +383,41 @@ function SchadenApp({ session }) {
             <Plus size={14} /> Schaden melden
           </button>
         </div>
+
+        {/* Ziel-Postfach (nur Superadmin) */}
+        {isSuperAdmin && (
+          <div className="rounded-lg p-3 mb-4" style={{ backgroundColor: "#fff", border: `1px solid ${BORDER_SOFT}` }}>
+            <label className="text-xs font-semibold block mb-1.5" style={{ color: INK }}>
+              Ziel-Postfach für neue Meldungen (Superadmin)
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="email"
+                value={notifyTo}
+                onChange={(e) => { setNotifyTo(e.target.value); setNotifyToSaved(false); }}
+                placeholder="z.B. schaden@nawodo.de"
+                className="flex-1 min-w-[180px] rounded-lg px-3 py-2 text-sm border"
+                style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+              />
+              <button
+                onClick={saveNotifyTo}
+                disabled={savingNotifyTo}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: INK, opacity: savingNotifyTo ? 0.6 : 1 }}
+              >
+                {savingNotifyTo && <Loader2 size={14} className="animate-spin" />} Speichern
+              </button>
+              {notifyToSaved && (
+                <span className="text-xs font-semibold inline-flex items-center gap-1" style={{ color: "#2E7D4F" }}>
+                  <Check size={13} /> Gespeichert.
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] mt-1.5" style={{ color: INK_SOFT }}>
+              Hier gehen neue Schadensmeldungen als E-Mail hin. Absender/SMTP wird zentral in Settings → E-Mail gepflegt.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-1.5 mb-4">
           {STATUS_FILTERS.map((f) => (

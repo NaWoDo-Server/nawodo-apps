@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Home, Plus, X, AlertCircle, Loader2, Search, Trash2, UserX, KeyRound,
-  Check, Users, Pencil,
+  Check, Users, Pencil, Mail,
 } from "lucide-react";
 import { supabase, configMissing } from "./supabaseClient";
 
@@ -289,6 +289,12 @@ function SettingsApp({ session }) {
   const [faqTabEnabledMap, setFaqTabEnabledMap] = useState({});
   const [savingFaqTabToggle, setSavingFaqTabToggle] = useState(null);
 
+  // E-Mail-Tab: zentrale SMTP-Absender-Konfiguration (mail_settings, id=1)
+  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false });
+  const [mailPass, setMailPass] = useState("");   // write-only; leer = unveraendert
+  const [savingMail, setSavingMail] = useState(false);
+  const [mailSaved, setMailSaved] = useState(false);
+
   // Benutzer-Tab: Bulk-Rechtevergabe nach Kategorie
 
   const [showCreate, setShowCreate] = useState(false);
@@ -314,6 +320,45 @@ function SettingsApp({ session }) {
   const [savingSelfPassword, setSavingSelfPassword] = useState(false);
 
   useEffect(() => { loadAll(); }, []);
+
+  // Laedt die SMTP-Konfiguration OHNE das Passwort (Sicherheit).
+  useEffect(() => {
+    supabase
+      .from("mail_settings")
+      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setMailCfg({
+            smtp_host: data.smtp_host || "",
+            smtp_port: data.smtp_port || 465,
+            smtp_user: data.smtp_user || "",
+            smtp_from: data.smtp_from || "",
+            enabled: !!data.enabled,
+          });
+        }
+      });
+  }, []);
+
+  async function saveMailSettings() {
+    setSavingMail(true); setMailSaved(false); setActionError("");
+    try {
+      const patch = {
+        smtp_host: mailCfg.smtp_host.trim() || null,
+        smtp_port: parseInt(String(mailCfg.smtp_port), 10) || 465,
+        smtp_user: mailCfg.smtp_user.trim() || null,
+        smtp_from: mailCfg.smtp_from.trim() || null,
+        enabled: mailCfg.enabled,
+        updated_at: new Date().toISOString(),
+      };
+      if (mailPass) patch.smtp_pass = mailPass;
+      const { error } = await supabase.from("mail_settings").update(patch).eq("id", 1);
+      if (error) throw error;
+      setMailPass(""); setMailSaved(true);
+    } catch (e) { setActionError(e.message || "Konnte nicht gespeichert werden."); }
+    finally { setSavingMail(false); }
+  }
 
   async function loadAll() {
     const [u, m, mods, perms, gr, mb, appSet] = await Promise.all([
@@ -821,6 +866,13 @@ function SettingsApp({ session }) {
           >
             Apps
           </button>
+          <button
+            onClick={() => setActiveTab("email")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors"
+            style={activeTab === "email" ? { backgroundColor: "#fff", color: INK, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" } : { color: INK_SOFT }}
+          >
+            <Mail size={14} /> E-Mail
+          </button>
         </div>
 
         {activeTab === "benutzer" && (
@@ -1075,6 +1127,99 @@ function SettingsApp({ session }) {
               </div>
             );
           })}
+        </div>
+        )}
+
+        {activeTab === "email" && (
+        <div className="max-w-lg flex flex-col gap-4">
+          <p className="text-xs" style={{ color: INK_SOFT }}>
+            Zentrale Absender-Konfiguration für alle System-E-Mails der Genossenschaft.
+          </p>
+
+          <div className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+            <div className="text-sm font-semibold">E-Mail-Versand aktiv</div>
+            <button
+              onClick={() => setMailCfg((p) => ({ ...p, enabled: !p.enabled }))}
+              className="w-12 h-7 rounded-full relative flex-shrink-0"
+              style={{ backgroundColor: mailCfg.enabled ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}
+            >
+              <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: mailCfg.enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+            </button>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium block mb-1">SMTP-Server</label>
+            <input
+              value={mailCfg.smtp_host}
+              onChange={(e) => setMailCfg((p) => ({ ...p, smtp_host: e.target.value }))}
+              placeholder="z. B. smtp.example.com"
+              className="w-full rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium block mb-1">Port</label>
+            <input
+              type="number"
+              value={mailCfg.smtp_port}
+              onChange={(e) => setMailCfg((p) => ({ ...p, smtp_port: e.target.value }))}
+              placeholder="465"
+              className="w-full rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium block mb-1">Benutzer</label>
+            <input
+              value={mailCfg.smtp_user}
+              onChange={(e) => setMailCfg((p) => ({ ...p, smtp_user: e.target.value }))}
+              className="w-full rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium block mb-1">Passwort</label>
+            <input
+              type="password"
+              value={mailPass}
+              onChange={(e) => setMailPass(e.target.value)}
+              placeholder="leer lassen = unveraendert"
+              className="w-full rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium block mb-1">Absender-Adresse</label>
+            <input
+              value={mailCfg.smtp_from}
+              onChange={(e) => setMailCfg((p) => ({ ...p, smtp_from: e.target.value }))}
+              placeholder="z. B. noreply@example.com"
+              className="w-full rounded-lg px-3 py-2.5 text-sm border"
+              style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}
+            />
+          </div>
+
+          {actionError && <div className="flex items-start gap-2 text-sm px-1" style={{ color: "#A13D3D" }}><AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {actionError}</div>}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={saveMailSettings}
+              disabled={savingMail}
+              className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+              style={{ backgroundColor: BLUE, opacity: savingMail ? 0.7 : 1 }}
+            >
+              {savingMail && <Loader2 size={15} className="animate-spin" />} {savingMail ? "Speichern…" : "Speichern"}
+            </button>
+            {mailSaved && <span className="text-xs font-semibold" style={{ color: "#2E7D4F" }}>Gespeichert.</span>}
+          </div>
+
+          <p className="text-xs" style={{ color: INK_SOFT }}>
+            Wohin Schadensmeldungen gehen, stellst du im Schadenmelder ein. Vorsorge- und Workshop-Erinnerungen gehen automatisch an die betroffenen Mitglieder.
+          </p>
         </div>
         )}
       </div>

@@ -955,7 +955,7 @@ function SettingsApp({ session }) {
             <thead>
               {(rightsView === "nutzung" || rightsView === "rollen") && (
                 <tr>
-                  <th className="sticky left-0 top-0 z-20" style={{ backgroundColor: "#fff", height: "2rem" }}></th>
+                  <th className="sticky left-0 top-0 z-20" style={{ backgroundColor: "#fff", height: "2rem", borderRight: rightsView === "rollen" ? `3px solid ${BORDER_SOFT}` : undefined }}></th>
                   {groupOptionsByApp(rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((g, i) => (
                     <th
                       key={`${g.app}-${i}`}
@@ -971,7 +971,7 @@ function SettingsApp({ session }) {
               <tr>
                 <th
                   className="text-left px-3 py-2.5 sticky left-0 z-20"
-                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "2rem" : 0 }}
+                  style={{ backgroundColor: "#fff", borderBottom: `1.5px solid ${BORDER_SOFT}`, top: rightsView === "nutzung" || rightsView === "rollen" ? "2rem" : 0, borderRight: rightsView === "rollen" ? `3px solid ${BORDER_SOFT}` : undefined }}
                 >
                   Mitglied
                 </th>
@@ -1004,7 +1004,7 @@ function SettingsApp({ session }) {
                 const mods = u ? modAppsFor(u.id) : [];
                 return (
                   <tr key={rowKey(r)} style={{ borderBottom: `1px solid ${BORDER_SOFT}` }}>
-                    <td className="px-3 py-2 sticky left-0" style={{ backgroundColor: "#fff" }}>
+                    <td className="px-3 py-2 sticky left-0" style={{ backgroundColor: "#fff", borderRight: rightsView === "rollen" ? `3px solid ${BORDER_SOFT}` : undefined }}>
                       <button onClick={() => setSelectedRowKey(rowKey(r))} className="text-left">
                         <div className="font-semibold text-sm truncate flex items-center gap-1.5">
                           {r.displayName}

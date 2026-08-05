@@ -1156,7 +1156,7 @@ function WorkshopCard({
           <div className="mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: accent }}>{typeLabel(w.meeting_type)}</span>
           </div>
-          <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(w.date)}</div>
+          <div onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1.5 font-bold text-base cursor-pointer select-none"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(w.date)}</div>
           <div className="text-sm mt-0.5" style={{ color: INK_SOFT }}>{typeTime(w.meeting_type)}</div>
           {w.moderator_name && <div className="text-base mt-0.5" style={{ color: INK_SOFT }}>Moderator/in: {w.moderator_name}</div>}
           {isSK && w.mode === "zoom" && w.zoom_link && (

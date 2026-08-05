@@ -46,7 +46,7 @@ const USAGE_RIGHT_OPTIONS = BULK_RIGHT_OPTIONS.filter((o) => ["faq_projekt", "mi
 // Fuer den "Rollen"-Reiter: globaler Admin-Status + Moderator-Zuordnung pro App,
 // als Kontrollkaestchen-Matrix statt einzeln ueber das Profil-Popup.
 const ROLE_RIGHT_OPTIONS = [
-  { key: "admin", label: "Admin" },
+  { key: "admin", label: "Admin", app: "Admin" },
   ...APP_LIST.map((a) => ({ key: `mod_${a.key}`, label: a.label, app: "Moderator" })),
 ];
 
@@ -961,7 +961,7 @@ function SettingsApp({ session }) {
                       key={`${g.app}-${i}`}
                       colSpan={g.count}
                       className="px-1.5 text-center text-[10px] font-bold uppercase tracking-wide sticky top-0 z-10"
-                      style={{ color: BLUE, backgroundColor: "#fff", height: "2rem" }}
+                      style={{ color: BLUE, backgroundColor: "#fff", height: "2rem", borderRight: g.app === "Admin" ? `3px solid ${BORDER_SOFT}` : undefined }}
                     >
                       {g.app}
                     </th>
@@ -980,7 +980,7 @@ function SettingsApp({ session }) {
                     key={opt.key}
                     title={opt.label}
                     className="px-1.5 py-2 text-center font-semibold whitespace-nowrap sticky z-10"
-                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "2rem" : 0 }}
+                    style={{ color: INK_SOFT, borderBottom: `1.5px solid ${BORDER_SOFT}`, backgroundColor: "#fff", top: rightsView === "nutzung" || rightsView === "rollen" ? "2rem" : 0, borderRight: (rightsView === "rollen" && opt.key === "admin") ? `3px solid ${BORDER_SOFT}` : undefined }}
                   >
                     {rightsView !== "typ" && (
                       <input
@@ -1053,7 +1053,7 @@ function SettingsApp({ session }) {
                       ))
                     ) : (
                       (rightsView === "apps" ? APP_RIGHT_OPTIONS : rightsView === "nutzung" ? USAGE_RIGHT_OPTIONS : ROLE_RIGHT_OPTIONS).map((opt) => (
-                        <td key={opt.key} className="text-center px-1.5 py-2">
+                        <td key={opt.key} className="text-center px-1.5 py-2" style={{ borderRight: (rightsView === "rollen" && opt.key === "admin") ? `3px solid ${BORDER_SOFT}` : undefined }}>
                           {u ? (
                             <input
                               type="checkbox"

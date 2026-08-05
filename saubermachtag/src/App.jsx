@@ -1030,7 +1030,7 @@ function EventCard({
     <div className="rounded-xl p-4 sm:p-5" style={{ backgroundColor: expanded ? "#fff" : `${accent}0D`, boxShadow: highlighted ? "0 2px 8px rgba(0,0,0,0.10)" : "0 1px 3px rgba(0,0,0,0.08)", border: highlighted ? `1.5px solid ${accent}33` : `1px solid ${accent}1A`, borderLeft: `4px solid ${accent}` }}>
       <div className="flex items-start justify-between mb-1">
         <div>
-          <div className="flex items-center gap-1.5 font-bold text-base"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(ev.event_date)}</div>
+          <div onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1.5 font-bold text-base cursor-pointer select-none"><Calendar size={15} style={{ color: accent }} /> {fmtDateLong(ev.event_date)}</div>
           <div className="text-sm mt-0.5" style={{ color: INK_SOFT }}>{ev.start_time || ""}{ev.end_time ? `–${ev.end_time}` : ""} Uhr</div>
           {ev.creator_name && <div className="text-sm mt-0.5" style={{ color: INK_SOFT }}>Hauptverantwortlich: {ev.creator_name}</div>}
         </div>
@@ -1194,6 +1194,16 @@ function EventCard({
 
 // =====================================================================
 function OverviewTab({ templates, tasks, events, year }) {
+  const [selYear, setSelYear] = useState(year);
+
+  const availableYears = useMemo(() => {
+    const set = new Set([year]);
+    for (const e of events) {
+      if (e.event_date) set.add(Number(e.event_date.slice(0, 4)));
+    }
+    return Array.from(set).sort((a, b) => b - a);
+  }, [events, year]);
+
   const rows = useMemo(() => {
     const eventYear = {};
     for (const e of events) {
@@ -1201,7 +1211,7 @@ function OverviewTab({ templates, tasks, events, year }) {
     }
     const countByTemplate = {};
     for (const t of tasks) {
-      if (t.done && t.template_id && eventYear[t.event_id] === year) {
+      if (t.done && t.template_id && eventYear[t.event_id] === selYear) {
         countByTemplate[t.template_id] = (countByTemplate[t.template_id] || 0) + 1;
       }
     }
@@ -1216,13 +1226,18 @@ function OverviewTab({ templates, tasks, events, year }) {
       groups[idx[key]].items.push({ ...tpl, done: countByTemplate[tpl.id] || 0 });
     }
     return groups;
-  }, [templates, tasks, events, year]);
+  }, [templates, tasks, events, selYear]);
 
   return (
     <div>
-      <div className="mb-3">
-        <div className="text-sm font-bold" style={{ color: INK }}>Übersicht {year}</div>
-        <p className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Wie oft wurde jede Aufgabe in diesem Jahr erledigt.</p>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <div className="text-sm font-bold" style={{ color: INK }}>Übersicht {selYear}</div>
+          <p className="text-xs mt-0.5" style={{ color: INK_SOFT }}>Wie oft wurde jede Aufgabe in diesem Jahr erledigt.</p>
+        </div>
+        <select value={selYear} onChange={(e) => setSelYear(Number(e.target.value))} className="rounded-lg px-3 py-2 text-sm border font-semibold flex-shrink-0" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }}>
+          {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
       {rows.length === 0 && (
         <div className="text-center py-10 rounded-xl" style={{ backgroundColor: "#E9E6D9" }}>
@@ -1238,7 +1253,7 @@ function OverviewTab({ templates, tasks, events, year }) {
                 <tr style={{ backgroundColor: "#E4E1D3" }}>
                   <th className="text-left px-3 py-2 font-semibold">Aufgabe</th>
                   <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">Geplant</th>
-                  <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">Erledigt {year}</th>
+                  <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">Erledigt {selYear}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1274,7 +1289,7 @@ function InspectionTab({ rows, photosFor, canManage, search, onSearch, onNew, on
             <input value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Suchen…" className="flex-1 text-sm outline-none" style={{ backgroundColor: "transparent" }} />
           </div>
           {canManage && (
-            <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white flex-shrink-0" style={{ backgroundColor: PURPLE }}>
+            <button onClick={onNew} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white flex-shrink-0" style={{ backgroundColor: BLUE }}>
               <Plus size={14} /> Eintrag
             </button>
           )}

@@ -740,7 +740,7 @@ function TicketDetail({
     <div className="p-4 sm:p-5">
       <div className="flex items-start justify-between mb-3 gap-3">
         <div className="min-w-0">
-          <h2 className="font-bold text-lg leading-tight">{ticket.title}</h2>
+          <h2 onClick={onClose} className="font-bold text-lg leading-tight cursor-pointer select-none">{ticket.title}</h2>
           <div className="text-[11px] mt-1" style={{ color: INK_SOFT }}>
             {ticket.created_by_name || "Unbekannt"} · {fmtWhen(ticket.created_at)}
           </div>

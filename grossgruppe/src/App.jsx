@@ -1176,8 +1176,6 @@ function WorkshopCard({
         </div>
       </div>
 
-      <ThemenList themen={w.themen} themenInfo={w.themen_info} />
-
       <button
         onClick={() => setExpanded((v) => !v)}
         className="mt-1 flex items-center gap-1 text-xs font-semibold"
@@ -1188,6 +1186,8 @@ function WorkshopCard({
 
       {expanded && (
       <>
+      <ThemenList themen={w.themen} themenInfo={w.themen_info} />
+
       <AgendaList agenda={w.agenda} agendaTimes={w.agenda_times} />
 
       {attachmentsList.length > 0 && (

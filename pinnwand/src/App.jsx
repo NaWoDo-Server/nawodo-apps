@@ -900,6 +900,7 @@ function PostCard({
             <info.Icon size={11} /> {info.label}
           </span>
           <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: INK_SOFT }}>{new Date(post.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
             {archived && <span className="text-xs flex items-center gap-1" style={{ color: INK_SOFT }}><Archive size={11} /> archiviert</span>}
             <button onClick={onTogglePin} title={pinned ? "Nicht mehr anpinnen" : "Anpinnen"}>
               <Pin size={14} style={{ color: pinned ? info.color : "#B8B4A2" }} fill={pinned ? info.color : "none"} />

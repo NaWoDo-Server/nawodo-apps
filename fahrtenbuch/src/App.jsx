@@ -470,10 +470,11 @@ function Fahrtenbuch({ session }) {
 
   const todayStr = fmtDate(new Date());
   const loggedBookingIds = new Set(entries.filter((e) => e.booking_id).map((e) => e.booking_id));
+  // Alle noch nicht eingetragenen Buchungen des Fahrzeugs anzeigen – auch kommende,
+  // damit man sofort sieht, dass zu einer Buchung noch km fehlen.
   const pendingBookings = bookings
     .filter((b) => b.resource_id === selectedCarId)
     .filter((b) => !loggedBookingIds.has(b.id))
-    .filter((b) => (b.end_date || b.date) <= todayStr)
     .filter(canLogBooking)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 

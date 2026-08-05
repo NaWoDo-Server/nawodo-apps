@@ -121,7 +121,7 @@ export default function BookingDialog({
             <div className="flex gap-3 mb-3">
               <div className="flex-1">
                 <label className="text-xs font-medium block mb-1">Start</label>
-                <input type="date" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
+                <input type="date" value={formStartDate} onChange={(e) => { setFormStartDate(e.target.value); setFormEndDate(e.target.value); }} className="w-full rounded-lg px-3 py-2.5 mb-1.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />
                 {!formAllDay && <input type="time" value={formStart} onChange={(e) => setFormStart(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff" }} />}
               </div>
               <div className="flex-1">

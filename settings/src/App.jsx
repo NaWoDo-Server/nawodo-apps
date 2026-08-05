@@ -255,11 +255,27 @@ function SettingsApp({ session }) {
   const [layoutDevice, setLayoutDevice] = useState(viewportIsMobile ? "mobile" : "desktop");
   const [layoutSaved, setLayoutSaved] = useState(false);
   const [layoutSaving, setLayoutSaving] = useState(false);
+  const [notifyPrefs, setNotifyPrefs] = useState({ grossgruppe: false, vorsorge: false, notfallpass: false });
   useEffect(() => {
-    supabase.from("user_hub_prefs").select("layout").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => setHubLayout(normalizeHubLayout(data && data.layout)))
+    supabase.from("user_hub_prefs").select("layout,notify_grossgruppe,notify_vorsorge,notify_notfallpass").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => {
+        setHubLayout(normalizeHubLayout(data && data.layout));
+        setNotifyPrefs({
+          grossgruppe: data && data.notify_grossgruppe === true,
+          vorsorge: data && data.notify_vorsorge === true,
+          notfallpass: data && data.notify_notfallpass === true,
+        });
+      })
       .catch(() => setHubLayout(normalizeHubLayout(null)));
   }, [user.id]);
+  async function toggleNotify(key) {
+    const col = key === "grossgruppe" ? "notify_grossgruppe" : key === "vorsorge" ? "notify_vorsorge" : "notify_notfallpass";
+    const next = !notifyPrefs[key];
+    setNotifyPrefs((p) => ({ ...p, [key]: next }));
+    try {
+      await supabase.from("user_hub_prefs").upsert({ user_id: user.id, [col]: next, updated_at: new Date().toISOString() });
+    } catch (e) { /* ignore */ }
+  }
 
   function updateHubDevice(mut) {
     setHubLayout((prev) => ({ ...prev, [layoutDevice]: mut({ ...prev[layoutDevice] }) }));
@@ -396,7 +412,7 @@ function SettingsApp({ session }) {
   const [savingFaqTabToggle, setSavingFaqTabToggle] = useState(null);
 
   // E-Mail-Tab: zentrale SMTP-Absender-Konfiguration (mail_settings, id=1)
-  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false, schaden_notify_to: "", notify_schaden_enabled: false, notify_vorsorge_enabled: false, notify_grossgruppe_enabled: false });
+  const [mailCfg, setMailCfg] = useState({ smtp_host: "", smtp_port: 465, smtp_user: "", smtp_from: "", enabled: false, schaden_notify_to: "", notify_schaden_enabled: false, notify_vorsorge_enabled: false, notify_grossgruppe_enabled: false, notify_notfallpass_enabled: false });
   const [mailPass, setMailPass] = useState("");   // write-only; leer = unveraendert
   const [savingMail, setSavingMail] = useState(false);
   const [mailSaved, setMailSaved] = useState(false);
@@ -431,7 +447,7 @@ function SettingsApp({ session }) {
   useEffect(() => {
     supabase
       .from("mail_settings")
-      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled,schaden_notify_to,notify_schaden_enabled,notify_vorsorge_enabled,notify_grossgruppe_enabled")
+      .select("smtp_host,smtp_port,smtp_user,smtp_from,enabled,schaden_notify_to,notify_schaden_enabled,notify_vorsorge_enabled,notify_grossgruppe_enabled,notify_notfallpass_enabled")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {
@@ -446,6 +462,7 @@ function SettingsApp({ session }) {
             notify_schaden_enabled: !!data.notify_schaden_enabled,
             notify_vorsorge_enabled: !!data.notify_vorsorge_enabled,
             notify_grossgruppe_enabled: !!data.notify_grossgruppe_enabled,
+            notify_notfallpass_enabled: !!data.notify_notfallpass_enabled,
           });
         }
       });
@@ -464,6 +481,7 @@ function SettingsApp({ session }) {
         notify_schaden_enabled: mailCfg.notify_schaden_enabled,
         notify_vorsorge_enabled: mailCfg.notify_vorsorge_enabled,
         notify_grossgruppe_enabled: mailCfg.notify_grossgruppe_enabled,
+        notify_notfallpass_enabled: mailCfg.notify_notfallpass_enabled,
         updated_at: new Date().toISOString(),
       };
       if (mailPass) patch.smtp_pass = mailPass;
@@ -1142,6 +1160,27 @@ function SettingsApp({ session }) {
                 </div>
               );
             })()}
+
+            {/* Meine Erinnerungen */}
+            <div className="pt-4 border-t" style={{ borderColor: BORDER_SOFT }}>
+              <div className="text-sm font-bold mb-1" style={{ color: INK }}>Meine Erinnerungen</div>
+              <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Per E-Mail erinnern lassen. Greift nur, wenn der E-Mail-Versand insgesamt aktiv ist.</p>
+              {[
+                ["grossgruppe", "Großgruppe", "1 Tag vor jedem Workshop / Steuerungskreis"],
+                ["vorsorge", "Vorsorge", "Halbjährlich (1.1. und 1.7.) meine Vorsorge-Dokumente prüfen"],
+                ["notfallpass", "Notfallpass", "Halbjährlich (1.1. und 1.7.) meinen Notfallpass prüfen"],
+              ].map(([key, label, desc]) => (
+                <div key={key} className="flex items-center justify-between p-3.5 rounded-xl mb-2" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+                  <div className="pr-3">
+                    <div className="text-sm font-semibold">{label}</div>
+                    <div className="text-[11px]" style={{ color: INK_SOFT }}>{desc}</div>
+                  </div>
+                  <button onClick={() => toggleNotify(key)} className="w-12 h-7 rounded-full relative flex-shrink-0" style={{ backgroundColor: notifyPrefs[key] ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}>
+                    <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: notifyPrefs[key] ? "22px" : "2px", transition: "left 0.15s" }} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1511,7 +1550,7 @@ function SettingsApp({ session }) {
             <div className="flex items-center justify-between p-3.5 rounded-xl mb-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
               <div>
                 <div className="text-sm font-semibold">Vorsorge-Erinnerung</div>
-                <div className="text-[11px]" style={{ color: INK_SOFT }}>Erinnerung an das Mitglied, ein Dokument nach ~6 Monaten zu prüfen</div>
+                <div className="text-[11px]" style={{ color: INK_SOFT }}>Halbjährlich (1.1. und 1.7.) – nur an Mitglieder, die es in „Mein Bereich" abonniert haben</div>
               </div>
               <button
                 onClick={() => setMailCfg((p) => ({ ...p, notify_vorsorge_enabled: !p.notify_vorsorge_enabled }))}
@@ -1526,7 +1565,7 @@ function SettingsApp({ session }) {
             <div className="flex items-center justify-between p-3.5 rounded-xl" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
               <div>
                 <div className="text-sm font-semibold">Großgruppe-Erinnerung</div>
-                <div className="text-[11px]" style={{ color: INK_SOFT }}>Erinnerung 1 Tag vor Workshop / Steuerungskreis (nur an Mitglieder, die sie angekreuzt haben)</div>
+                <div className="text-[11px]" style={{ color: INK_SOFT }}>1 Tag vor Workshop / Steuerungskreis – nur an Mitglieder, die es in „Mein Bereich" abonniert haben</div>
               </div>
               <button
                 onClick={() => setMailCfg((p) => ({ ...p, notify_grossgruppe_enabled: !p.notify_grossgruppe_enabled }))}
@@ -1534,6 +1573,21 @@ function SettingsApp({ session }) {
                 style={{ backgroundColor: mailCfg.notify_grossgruppe_enabled ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}
               >
                 <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: mailCfg.notify_grossgruppe_enabled ? "22px" : "2px", transition: "left 0.15s" }} />
+              </button>
+            </div>
+
+            {/* Notfallpass */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl mt-3" style={{ backgroundColor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
+              <div>
+                <div className="text-sm font-semibold">Notfallpass-Erinnerung</div>
+                <div className="text-[11px]" style={{ color: INK_SOFT }}>Halbjährlich (1.1. und 1.7.) – nur an Mitglieder, die es in „Mein Bereich" abonniert haben</div>
+              </div>
+              <button
+                onClick={() => setMailCfg((p) => ({ ...p, notify_notfallpass_enabled: !p.notify_notfallpass_enabled }))}
+                className="w-12 h-7 rounded-full relative flex-shrink-0"
+                style={{ backgroundColor: mailCfg.notify_notfallpass_enabled ? BLUE : "#D8D5C7", transition: "background-color 0.15s" }}
+              >
+                <span className="absolute top-0.5 w-6 h-6 rounded-full bg-white" style={{ left: mailCfg.notify_notfallpass_enabled ? "22px" : "2px", transition: "left 0.15s" }} />
               </button>
             </div>
           </div>

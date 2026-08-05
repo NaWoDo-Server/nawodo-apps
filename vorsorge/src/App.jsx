@@ -423,9 +423,6 @@ function DocumentRow({ doc, onDownload, downloading, onEdit, onDelete, shareCoun
           {canManage && shareCount > 0 && (
             <div className="text-xs mt-1" style={{ color: GREEN }}>Einzeln freigegeben an {shareCount} {shareCount === 1 ? "Person" : "Personen"}</div>
           )}
-          {canManage && doc.reminder_enabled && (
-            <div className="text-xs mt-1 flex items-center gap-1" style={{ color: INK_SOFT }}><Bell size={11} /> Erinnerung alle 6 Monate aktiv</div>
-          )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
           <button onClick={onDownload} disabled={downloading} title="Herunterladen" className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>
@@ -1298,11 +1295,6 @@ function VorsorgeApp({ session }) {
             <label className="text-xs font-medium block mb-1">Datei</label>
             <input type="file" onChange={(e) => setFormFile(e.target.files[0] || null)} className="w-full text-sm mb-3" />
 
-            <label className="flex items-center gap-2 text-xs font-medium mb-3">
-              <input type="checkbox" checked={formReminderEnabled} onChange={(e) => setFormReminderEnabled(e.target.checked)} />
-              Alle 6 Monate per Email an mich erinnern, dieses Dokument zu aktualisieren
-            </label>
-
             {formError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{formError}</p>}
             <button onClick={handleUpload} disabled={saving} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: saving ? 0.7 : 1 }}>
               {saving && <Loader2 size={15} className="animate-spin" />} {saving ? "Wird hochgeladen…" : "Hochladen"}
@@ -1339,11 +1331,6 @@ function VorsorgeApp({ session }) {
             <p className="text-xs mb-1.5" style={{ color: INK_SOFT }}>Aktuell: {editingDoc.file_name}</p>
             <input type="file" onChange={(e) => setEditFile(e.target.files[0] || null)} className="w-full text-sm mb-3" />
             <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Leer lassen, um die aktuelle Datei zu behalten.</p>
-
-            <label className="flex items-center gap-2 text-xs font-medium mb-3">
-              <input type="checkbox" checked={editReminderEnabled} onChange={(e) => setEditReminderEnabled(e.target.checked)} />
-              Alle 6 Monate per Email an mich erinnern, dieses Dokument zu aktualisieren
-            </label>
 
             {editError && <p className="text-xs mb-2" style={{ color: "#A13D3D" }}>{editError}</p>}
             <button onClick={handleSaveEdit} disabled={savingEdit} className="w-full rounded-lg py-3 font-semibold text-sm text-white flex items-center justify-center gap-2" style={{ backgroundColor: GREEN, opacity: savingEdit ? 0.7 : 1 }}>

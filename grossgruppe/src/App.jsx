@@ -1277,16 +1277,6 @@ function WorkshopCard({
         {yesNames.length > 0 && (
           <p className="text-xs" style={{ color: INK_SOFT }}>{yesNames.join(", ")}</p>
         )}
-        <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={!!reminderOn}
-            onChange={(e) => onToggleReminder(e.target.checked)}
-            className="w-4 h-4 flex-shrink-0"
-            style={{ accentColor: BLUE }}
-          />
-          <span style={{ color: INK_SOFT }}>E-Mail-Erinnerung 1 Tag vorher</span>
-        </label>
       </div>
       </>
       )}

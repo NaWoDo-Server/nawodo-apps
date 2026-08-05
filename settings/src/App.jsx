@@ -25,6 +25,51 @@ const APP_LIST = [
   { key: "saubermachtag", label: "Saubermachtag" },
 ];
 
+// Katalog fuer die persoenliche Startseiten-Anordnung (Reihenfolge = Standard),
+// Icons/Farben wie auf der Hauptseite. Reihenfolge entspricht der Hauptseite.
+const APP_CATALOG = [
+  { key: "termine", label: "Termine", icon: "/icon-termine.png", bg: "#DF3626" },
+  { key: "sharing", label: "Sharing", icon: "/icon-sharing.png", bg: "#E7A505" },
+  { key: "fahrtenbuch", label: "Fahrtenbuch", icon: "/icon-fahrtenbuch.png", bg: "#0087AE" },
+  { key: "pinnwand", label: "Pinnwand", icon: "/icon-pinnwand.png", bg: "#E27624" },
+  { key: "mitglieder", label: "Mitglieder", icon: "/icon-mitglieder.png", bg: "#0087AC" },
+  { key: "grossgruppe", label: "Großgruppe", icon: "/icon-workshop.png", bg: "#7063AA" },
+  { key: "bulldozer", label: "Bulldozer", icon: "/icon-bulldozer.png", bg: "#BDBDBD" },
+  { key: "homepage", label: "Homepage", icon: "/icon-homepage.png", bg: "#F5F5F5" },
+  { key: "faq", label: "FAQ", icon: "/icon-faq.png", bg: "#00AAA1" },
+  { key: "vorsorge", label: "Vorsorge", icon: "/icon-vorsorge.png", bg: "#FF9292" },
+  { key: "schadenmelder", label: "Schadenmelder", icon: "/icon-schadenmelder.png", bg: "#00BF00" },
+  { key: "saubermachtag", label: "Saubermachtag", icon: "/icon-saubermachtag.png", bg: "#F356AF" },
+];
+const WIDGET_CATALOG = [
+  { key: "wetter", label: "Wetter", emoji: "☁️" },
+  { key: "tagebuch", label: "Tagebuch", emoji: "📖" },
+  { key: "geburtstage", label: "Geburtstage", emoji: "🎂" },
+  { key: "kalenderansicht", label: "Terminkalender", emoji: "📅" },
+];
+const APP_BY_KEY = Object.fromEntries(APP_CATALOG.map((a) => [a.key, a]));
+const WIDGET_BY_KEY = Object.fromEntries(WIDGET_CATALOG.map((w) => [w.key, w]));
+
+function normalizeHubDevice(dev) {
+  const appKeys = APP_CATALOG.map((a) => a.key);
+  const widgetKeys = WIDGET_CATALOG.map((w) => w.key);
+  const apps = [];
+  (dev && Array.isArray(dev.apps) ? dev.apps : []).forEach((k) => { if (appKeys.includes(k) && !apps.includes(k)) apps.push(k); });
+  appKeys.forEach((k) => { if (!apps.includes(k)) apps.push(k); });
+  const widgets = [];
+  (dev && Array.isArray(dev.widgets) ? dev.widgets : []).forEach((k) => { if (widgetKeys.includes(k) && !widgets.includes(k)) widgets.push(k); });
+  widgetKeys.forEach((k) => { if (!widgets.includes(k)) widgets.push(k); });
+  return {
+    apps,
+    hiddenApps: (dev && Array.isArray(dev.hiddenApps) ? dev.hiddenApps : []).filter((k) => appKeys.includes(k)),
+    widgets,
+    hiddenWidgets: (dev && Array.isArray(dev.hiddenWidgets) ? dev.hiddenWidgets : []).filter((k) => widgetKeys.includes(k)),
+  };
+}
+function normalizeHubLayout(l) {
+  return { desktop: normalizeHubDevice(l && l.desktop), mobile: normalizeHubDevice(l && l.mobile) };
+}
+
 // Fuer die Bulk-Rechtevergabe: alle Rechte, die sich pro Kategorie auf einmal
 // setzen lassen - die 8 Standard-Apps (opt-out) + die 5 Opt-in-Unterfilter.
 const BULK_RIGHT_OPTIONS = [
@@ -203,6 +248,48 @@ function SettingsApp({ session }) {
     setEpGeburtstagVersteckt(ownMember.geburtstag_versteckt === true);
     setEpEmail(ownMember.email || user.email || "");
   }, [ownMember, user.email]);
+
+  // --- Persoenliche Startseiten-Anordnung (Desktop + Handy getrennt) ---
+  const viewportIsMobile = typeof window !== "undefined" && window.innerWidth < 900;
+  const [hubLayout, setHubLayout] = useState(null); // { desktop, mobile }
+  const [layoutDevice, setLayoutDevice] = useState(viewportIsMobile ? "mobile" : "desktop");
+  const [layoutSaved, setLayoutSaved] = useState(false);
+  const [layoutSaving, setLayoutSaving] = useState(false);
+  useEffect(() => {
+    supabase.from("user_hub_prefs").select("layout").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => setHubLayout(normalizeHubLayout(data && data.layout)))
+      .catch(() => setHubLayout(normalizeHubLayout(null)));
+  }, [user.id]);
+
+  function updateHubDevice(mut) {
+    setHubLayout((prev) => ({ ...prev, [layoutDevice]: mut({ ...prev[layoutDevice] }) }));
+  }
+  function moveHubItem(kind, key, dir) { // kind: "apps" | "widgets"
+    updateHubDevice((d) => {
+      const arr = d[kind].slice();
+      const i = arr.indexOf(key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= arr.length) return d;
+      arr.splice(i, 1); arr.splice(j, 0, key);
+      return { ...d, [kind]: arr };
+    });
+  }
+  function toggleHubHidden(kind, key) {
+    const hk = kind === "apps" ? "hiddenApps" : "hiddenWidgets";
+    updateHubDevice((d) => {
+      const set = d[hk].slice();
+      const i = set.indexOf(key);
+      if (i >= 0) set.splice(i, 1); else set.push(key);
+      return { ...d, [hk]: set };
+    });
+  }
+  async function saveHubLayout() {
+    setLayoutSaving(true);
+    try {
+      const { error } = await supabase.from("user_hub_prefs").upsert({ user_id: user.id, layout: hubLayout, updated_at: new Date().toISOString() });
+      if (!error) { setLayoutSaved(true); setTimeout(() => setLayoutSaved(false), 2500); }
+    } catch (e) { /* ignore */ } finally { setLayoutSaving(false); }
+  }
 
   function openEditProfile() {
     setEpVorname(ownMember?.vorname || "");
@@ -989,6 +1076,72 @@ function SettingsApp({ session }) {
                 {savingSelfPassword && <Loader2 size={15} className="animate-spin" />} Passwort speichern
               </button>
             </div>
+
+            {/* Meine Startseite: Anordnung Apps + Widgets (Desktop/Handy getrennt) */}
+            {hubLayout && (() => {
+              const dev = hubLayout[layoutDevice];
+              const visibleApps = dev.apps.filter((k) => !dev.hiddenApps.includes(k));
+              return (
+                <div className="pt-4 border-t" style={{ borderColor: BORDER_SOFT }}>
+                  <div className="text-sm font-bold mb-1" style={{ color: INK }}>Meine Startseite</div>
+                  <p className="text-xs mb-3" style={{ color: INK_SOFT }}>Reihenfolge und sichtbare Apps/Widgets – getrennt für Desktop und Handy. Gilt nur für dich.</p>
+
+                  {!viewportIsMobile && (
+                    <div className="flex items-center gap-1 p-1 rounded-full w-fit mb-3" style={{ backgroundColor: "#E4E1D3" }}>
+                      {[["desktop", "Desktop"], ["mobile", "Handy"]].map(([k, l]) => (
+                        <button key={k} onClick={() => setLayoutDevice(k)} className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ backgroundColor: layoutDevice === k ? "#fff" : "transparent", color: layoutDevice === k ? INK : INK_SOFT }}>{l}</button>
+                      ))}
+                    </div>
+                  )}
+                  {viewportIsMobile && <div className="text-xs mb-3" style={{ color: INK_SOFT }}>Du bist am Handy – hier stellst du die Handy-Ansicht ein. Die Desktop-Ansicht passt du am Computer an.</div>}
+
+                  <div className="rounded-xl p-3 mb-3" style={{ backgroundColor: "#EDEBE0", border: `1px solid ${BORDER_SOFT}` }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: INK_SOFT }}>Vorschau ({layoutDevice === "desktop" ? "Desktop" : "Handy"})</div>
+                    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${layoutDevice === "desktop" ? 6 : 4}, minmax(0,1fr))`, maxWidth: layoutDevice === "desktop" ? "100%" : "240px" }}>
+                      {visibleApps.map((k) => { const a = APP_BY_KEY[k]; return (
+                        <div key={k} className="flex flex-col items-center gap-1">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden" style={{ backgroundColor: a.bg }}><img src={a.icon} alt="" className="w-6 h-6 object-contain" /></div>
+                          <span className="text-[9px] truncate w-full text-center" style={{ color: INK_SOFT }}>{a.label}</span>
+                        </div>
+                      ); })}
+                    </div>
+                  </div>
+
+                  <div className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Apps</div>
+                  <div className="flex flex-col gap-1.5 mb-4">
+                    {dev.apps.map((k, idx) => { const a = APP_BY_KEY[k]; const hidden = dev.hiddenApps.includes(k); return (
+                      <div key={k} className="flex items-center gap-2 rounded-lg px-2 py-1.5 border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff", opacity: hidden ? 0.5 : 1 }}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0" style={{ backgroundColor: a.bg }}><img src={a.icon} alt="" className="w-5 h-5 object-contain" /></div>
+                        <span className="text-sm flex-1 truncate">{a.label}</span>
+                        <button onClick={() => moveHubItem("apps", k, -1)} disabled={idx === 0} className="w-7 h-7 rounded-full border flex items-center justify-center text-xs" style={{ borderColor: BORDER_SOFT, opacity: idx === 0 ? 0.4 : 1 }}>↑</button>
+                        <button onClick={() => moveHubItem("apps", k, 1)} disabled={idx === dev.apps.length - 1} className="w-7 h-7 rounded-full border flex items-center justify-center text-xs" style={{ borderColor: BORDER_SOFT, opacity: idx === dev.apps.length - 1 ? 0.4 : 1 }}>↓</button>
+                        <button onClick={() => toggleHubHidden("apps", k)} className="w-7 h-7 rounded-full border flex items-center justify-center text-xs" style={{ borderColor: hidden ? BORDER_SOFT : BLUE, color: hidden ? INK_SOFT : BLUE }} title={hidden ? "Einblenden" : "Ausblenden"}>{hidden ? "–" : "✓"}</button>
+                      </div>
+                    ); })}
+                  </div>
+
+                  <div className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: INK_SOFT }}>Widgets</div>
+                  <div className="flex flex-col gap-1.5 mb-4">
+                    {dev.widgets.map((k, idx) => { const w = WIDGET_BY_KEY[k]; const hidden = dev.hiddenWidgets.includes(k); return (
+                      <div key={k} className="flex items-center gap-2 rounded-lg px-2 py-1.5 border" style={{ borderColor: BORDER_SOFT, backgroundColor: "#fff", opacity: hidden ? 0.5 : 1 }}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm" style={{ backgroundColor: "#E4E1D3" }}>{w.emoji}</div>
+                        <span className="text-sm flex-1 truncate">{w.label}</span>
+                        <button onClick={() => moveHubItem("widgets", k, -1)} disabled={idx === 0} className="w-7 h-7 rounded-full border flex items-center justify-center text-xs" style={{ borderColor: BORDER_SOFT, opacity: idx === 0 ? 0.4 : 1 }}>↑</button>
+                        <button onClick={() => moveHubItem("widgets", k, 1)} disabled={idx === dev.widgets.length - 1} className="w-7 h-7 rounded-full border flex items-center justify-center text-xs" style={{ borderColor: BORDER_SOFT, opacity: idx === dev.widgets.length - 1 ? 0.4 : 1 }}>↓</button>
+                        <button onClick={() => toggleHubHidden("widgets", k)} className="w-7 h-7 rounded-full border flex items-center justify-center text-xs" style={{ borderColor: hidden ? BORDER_SOFT : BLUE, color: hidden ? INK_SOFT : BLUE }} title={hidden ? "Einblenden" : "Ausblenden"}>{hidden ? "–" : "✓"}</button>
+                      </div>
+                    ); })}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button onClick={saveHubLayout} disabled={layoutSaving} className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2" style={{ backgroundColor: BLUE, opacity: layoutSaving ? 0.7 : 1 }}>
+                      {layoutSaving && <Loader2 size={15} className="animate-spin" />} Anordnung speichern
+                    </button>
+                    {layoutSaved && <span className="text-xs font-semibold" style={{ color: "#2E7D4F" }}>Gespeichert.</span>}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

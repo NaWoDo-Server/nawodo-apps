@@ -491,7 +491,8 @@
       justify-content: center;
     }
     .tile-move-btn:active { transform: scale(0.9); }
-    /* Persoenliche Widget-Anpassung */
+    /* Persoenliche Anpassung: ausgeblendete Apps/Widgets */
+    .app.user-hidden { display: none; }
     .widget.user-hidden { display: none; }
     .widget.editing-show { display: block !important; }
     .widgets.editing .widget { position: relative; }
@@ -951,18 +952,19 @@
       var appsGrid = null;
       var appOrderEditing = false;
       // Persoenliche Startseiten-Einstellungen des aktuellen Nutzers.
-      var userPrefs = { app_order: null, widget_order: null, hidden_widgets: [] };
+      var userPrefs = { app_order: null, widget_order: null, hidden_widgets: [], layout: null };
       // Welche Widgets sind global (vom Superadmin) ueberhaupt aktiv.
       var globalWidgetEnabled = { wetter: true, tagebuch: true, geburtstage: true, kalenderansicht: true };
 
       function loadUserPrefs() {
         if (!currentSession) return Promise.resolve();
-        return client.from("user_hub_prefs").select("app_order,widget_order,hidden_widgets")
+        return client.from("user_hub_prefs").select("app_order,widget_order,hidden_widgets,layout")
           .eq("user_id", currentSession.user.id).maybeSingle().then(function (res) {
             if (res && res.data) {
               userPrefs.app_order = Array.isArray(res.data.app_order) ? res.data.app_order : null;
               userPrefs.widget_order = Array.isArray(res.data.widget_order) ? res.data.widget_order : null;
               userPrefs.hidden_widgets = Array.isArray(res.data.hidden_widgets) ? res.data.hidden_widgets : [];
+              userPrefs.layout = (res.data.layout && typeof res.data.layout === "object") ? res.data.layout : null;
             }
           }).catch(function () {});
       }
@@ -1151,6 +1153,57 @@
         Array.prototype.slice.call(c.querySelectorAll(".widget.editing-show")).forEach(function (el) { el.classList.remove("editing-show"); });
       }
 
+      // --- Geraetegetrenntes Layout (Desktop/Handy) aus den persoenlichen Einstellungen ---
+      function currentDevice() { return (window.innerWidth && window.innerWidth < 900) ? "mobile" : "desktop"; }
+
+      function applyLayoutApps() {
+        if (!appsGrid) appsGrid = document.querySelector(".grid");
+        if (!appsGrid) return;
+        var lay = userPrefs.layout;
+        var dev = lay && lay[currentDevice()];
+        if (dev) {
+          if (Array.isArray(dev.apps)) applyAppOrder(dev.apps);
+          var hide = Array.isArray(dev.hiddenApps) ? dev.hiddenApps : [];
+          getMovableTiles().forEach(function (t) {
+            var k = t.getAttribute("data-app");
+            if (hide.indexOf(k) !== -1) t.classList.add("user-hidden"); else t.classList.remove("user-hidden");
+          });
+        } else if (userPrefs.app_order && userPrefs.app_order.length) {
+          applyAppOrder(userPrefs.app_order);
+        } else {
+          readAndApplyAppOrder();
+        }
+      }
+
+      function applyLayoutWidgets() {
+        var c = widgetsContainer(); if (!c) return;
+        var lay = userPrefs.layout;
+        var dev = lay && lay[currentDevice()];
+        if (dev) {
+          if (Array.isArray(dev.widgets)) dev.widgets.forEach(function (k) {
+            var el = document.getElementById(WIDGET_EL_IDS[k]);
+            if (el && globalWidgetEnabled[k] !== false) c.appendChild(el);
+          });
+          var hide = Array.isArray(dev.hiddenWidgets) ? dev.hiddenWidgets : [];
+          WIDGET_KEYS.forEach(function (k) {
+            var el = document.getElementById(WIDGET_EL_IDS[k]); if (!el) return;
+            if (hide.indexOf(k) !== -1) el.classList.add("user-hidden"); else el.classList.remove("user-hidden");
+          });
+        } else {
+          applyWidgetPrefs();
+        }
+      }
+
+      // Beim Wechsel zwischen Desktop-/Handy-Breite neu anwenden.
+      var lastDeviceApplied = null;
+      window.addEventListener("resize", function () {
+        var d = currentDevice();
+        if (d === lastDeviceApplied) return;
+        lastDeviceApplied = d;
+        applyLayoutApps();
+        applyLayoutWidgets();
+      });
+
       function setAppOrderEditing(on) {
         appOrderEditing = on;
         if (appsGrid) {
@@ -1185,34 +1238,9 @@
           e.stopPropagation();
         }, true);
 
-        // App-Reihenfolge anwenden: persoenlich hat Vorrang, sonst globaler Standard.
-        if (userPrefs.app_order && userPrefs.app_order.length) applyAppOrder(userPrefs.app_order);
-        else readAndApplyAppOrder();
-
-        // "Bearbeiten" ist jetzt fuer ALLE Nutzer verfuegbar (persoenliche Anpassung).
-        var toolbar = document.getElementById("appsToolbar");
-        var editBtn = document.getElementById("editAppsBtn");
-        if (!toolbar || !editBtn) return;
-        toolbar.classList.remove("hidden");
-        editBtn.addEventListener("click", function () {
-          var next = !appOrderEditing;
-          setAppOrderEditing(next);
-          editBtn.textContent = next ? "Fertig" : "Bearbeiten";
-          editBtn.classList.toggle("active", next);
-        });
-
-        // Superadmin: aktuelle Reihenfolge zusaetzlich als globalen Standard fuer alle setzen.
-        var isSuperAdmin = session.user.user_metadata && session.user.user_metadata.is_superadmin === true;
-        var gBtn = document.getElementById("setGlobalDefaultBtn");
-        if (isSuperAdmin && gBtn) {
-          gBtn.classList.remove("hidden");
-          gBtn.addEventListener("click", function () {
-            if (!window.confirm("Diese Reihenfolge als Standard für alle setzen? Gilt nur für Mitglieder, die noch keine eigene Reihenfolge eingestellt haben.")) return;
-            saveGlobalAppOrder();
-            gBtn.textContent = "Als Standard gespeichert ✓";
-            setTimeout(function () { gBtn.textContent = "Als Standard für alle"; }, 2000);
-          });
-        }
+        // Die Anordnung wird jetzt in Settings -> "Mein Bereich" gepflegt; hier nur anwenden.
+        lastDeviceApplied = currentDevice();
+        applyLayoutApps();
       }
 
       function showApp(session) {
@@ -1264,12 +1292,12 @@
           });
           if (enabled.kalenderansicht) loadTodayWidget(client);
           if (enabled.geburtstage) loadBirthdayWidget(client);
-          applyWidgetPrefs();
+          applyLayoutWidgets();
         }).catch(function () {
           // Bei Fehler (z.B. Tabelle nicht erreichbar) alles wie gewohnt anzeigen.
           loadTodayWidget(client);
           loadBirthdayWidget(client);
-          applyWidgetPrefs();
+          applyLayoutWidgets();
         });
       }
 

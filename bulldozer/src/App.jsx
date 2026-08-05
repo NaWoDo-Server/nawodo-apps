@@ -713,8 +713,15 @@ function BulldozerApp({ session }) {
   return (
     <div className="min-h-screen pb-10" style={{ backgroundColor: PAPER, color: INK, fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
-        <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
-          <div className="flex items-center gap-2.5">
+        <div className="mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
+            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
+              {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
+            </button>
+            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
+          </div>
+          <div className="flex items-center gap-2.5 mt-2">
             {screen !== "select" && (
               <button onClick={() => setScreen("select")} className="p-1.5 -ml-1.5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E4E1D3" }}>
                 <ChevronLeft size={16} style={{ color: INK_SOFT }} />
@@ -724,13 +731,6 @@ function BulldozerApp({ session }) {
               <img src="/bulldozer/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
               <h1 className="font-bold text-lg lg:text-2xl">Bulldozer</h1>
             </a>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
-            <button onClick={() => { setShowAccount(true); setPasswordError(""); setPasswordSuccess(false); }} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>
-              {ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}
-            </button>
-            <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
           </div>
         </div>
 

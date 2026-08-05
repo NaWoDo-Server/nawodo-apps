@@ -451,7 +451,7 @@
     }
 
     /* --- App-Reihenfolge bearbeiten (nur Superadmin) --- */
-    .apps-toolbar { display: flex; justify-content: center; margin-bottom: 16px; }
+    .apps-toolbar { display: flex; justify-content: center; margin-top: 14px; margin-bottom: 4px; }
     .apps-edit-btn {
       font-size: 12px;
       font-weight: 600;
@@ -639,9 +639,6 @@
         </div>
 
         <div class="main">
-          <div class="apps-toolbar hidden" id="appsToolbar">
-            <button type="button" id="editAppsBtn" class="apps-edit-btn">Bearbeiten</button>
-          </div>
           <div class="grid">
             <a class="app" href="/termine/" data-app="termine">
               <div class="icon" style="background:#DF3626;">
@@ -692,7 +689,7 @@
               <span class="label">Bulldozer</span>
             </a>
 
-            <a class="app" href="https://www.nawodo.de" target="_blank" rel="noopener">
+            <a class="app" href="https://www.nawodo.de" target="_blank" rel="noopener" data-app="homepage">
               <div class="icon" style="background:#F5F5F5;">
                 <img src="/icon-homepage.png" alt="" />
               </div>
@@ -734,6 +731,9 @@
               </div>
               <span class="label">Settings</span>
             </a>
+          </div>
+          <div class="apps-toolbar hidden" id="appsToolbar">
+            <button type="button" id="editAppsBtn" class="apps-edit-btn">Bearbeiten</button>
           </div>
         </div>
       </div>

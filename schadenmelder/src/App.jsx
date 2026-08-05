@@ -333,16 +333,16 @@ function SchadenApp({ session }) {
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <div className="max-w-3xl mx-auto lg:max-w-none lg:w-2/3 lg:mx-auto px-4 sm:px-6 py-5">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
-          <a href="/" className="flex items-center gap-2.5">
-            <img src="/schadenmelder/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
-            <h1 className="font-bold text-lg lg:text-2xl">Schadenmelder</h1>
-          </a>
-          <div className="flex items-center gap-2">
+        <div className="mb-5 sticky top-0 z-30 pb-2" style={{ backgroundColor: PAPER }}>
+          <div className="flex items-center justify-end gap-2">
             <span className="text-xs lg:text-sm font-bold truncate max-w-[110px] lg:max-w-[180px]" style={{ color: INK_SOFT }}>Hallo {ownMember?.spitzname || ownMember?.vorname || userName}</span>
             <button onClick={() => setShowAccount(true)} className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center font-semibold text-sm lg:text-lg text-white flex-shrink-0 overflow-hidden" style={{ backgroundColor: INK }}>{ownFotoUrl ? <img src={ownFotoUrl} alt="" className="w-full h-full object-cover" /> : initial}</button>
             <a href="/" className="w-9 h-9 lg:w-14 lg:h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#E4E1D3" }}><Home size={16} className="lg:w-6 lg:h-6" style={{ color: INK_SOFT }} /></a>
           </div>
+          <a href="/" className="flex items-center gap-2.5 mt-2">
+            <img src="/schadenmelder/logo-nawodo.png" alt="NaWoDo" className="h-8 lg:h-12 object-contain" />
+            <h1 className="font-bold text-lg lg:text-2xl">Schadenmelder</h1>
+          </a>
         </div>
 
         {/* Aktion + Filter */}
